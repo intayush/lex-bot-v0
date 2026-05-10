@@ -1,0 +1,1907 @@
+{
+  "version": 1,
+  "generated_at": "2026-05-09T12:34:48.038Z",
+  "base_url": "http://localhost:5173/chatbot-context/",
+  "files": [
+    {
+      "path": "pages/index.md",
+      "title": "Pittsburgh, PA Criminal Lawyers | Shrager Defense Attorneys | Call 24/7",
+      "section_type": "attorney-bio",
+      "word_count": 1111,
+      "content_hash": "a3de4b1c8303",
+      "keywords": [
+        "https",
+        "com",
+        "shragerdefense",
+        "www",
+        "pittsburgh",
+        "criminal",
+        "defense",
+        "shrager",
+        "lawyers",
+        "attorneys"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-law-firm.md",
+      "title": "About Shrager Defense Attorneys | Pittsburgh Criminal Law Firm",
+      "section_type": "attorney-bio",
+      "word_count": 727,
+      "content_hash": "f6145c518569",
+      "keywords": [
+        "https",
+        "com",
+        "shragerdefense",
+        "shrager",
+        "defense",
+        "attorneys",
+        "pittsburgh",
+        "criminal",
+        "www",
+        "legal"
+      ]
+    },
+    {
+      "path": "pages/case-results.md",
+      "title": "Case Results - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 235,
+      "content_hash": "efd388224793",
+      "keywords": [
+        "https",
+        "www",
+        "shragerdefense",
+        "com",
+        "case-result",
+        "aggravated",
+        "assault",
+        "results",
+        "2025",
+        "read"
+      ]
+    },
+    {
+      "path": "pages/contact.md",
+      "title": "Contact Us | Shrager Defense Attorneys | Free Consultation",
+      "section_type": "contact",
+      "word_count": 555,
+      "content_hash": "d31816c46104",
+      "keywords": [
+        "shrager",
+        "https",
+        "com",
+        "defense",
+        "pittsburgh",
+        "attorney",
+        "attorneys",
+        "call",
+        "criminal",
+        "free"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-attorneys.md",
+      "title": "About Shrager Defense Attorneys | Pittsburgh Criminal Law Firm",
+      "section_type": "attorney-bio",
+      "word_count": 727,
+      "content_hash": "f6145c518569",
+      "keywords": [
+        "https",
+        "com",
+        "shragerdefense",
+        "shrager",
+        "defense",
+        "attorneys",
+        "pittsburgh",
+        "criminal",
+        "www",
+        "legal"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-attorneys-david-shrager.md",
+      "title": "Pittsburgh Defense Attorney - David Shrager - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 476,
+      "content_hash": "8103d5a86f1f",
+      "keywords": [
+        "shrager",
+        "pittsburgh",
+        "david",
+        "https",
+        "his",
+        "defense",
+        "attorney",
+        "com",
+        "law",
+        "criminal"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-attorneys-shelley-duff.md",
+      "title": "Pittsburgh Criminal Attorney Shelley Duff - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 151,
+      "content_hash": "ae4d2a891da4",
+      "keywords": [
+        "shelley",
+        "pittsburgh",
+        "attorney",
+        "duff",
+        "she",
+        "criminal",
+        "defense",
+        "public",
+        "shrager",
+        "attorneys"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-attorneys-lyle-dresbold.md",
+      "title": "Pittsburgh Attorney Lyle Dresbold - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 238,
+      "content_hash": "d17e25234ef8",
+      "keywords": [
+        "criminal",
+        "attorney",
+        "dresbold",
+        "pennsylvania",
+        "defense",
+        "https",
+        "shragerdefense",
+        "com",
+        "district",
+        "lyle"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-attorneys-frankie-exler.md",
+      "title": "Frankie Exler - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 265,
+      "content_hash": "a2ac8aded77e",
+      "keywords": [
+        "she",
+        "frankie",
+        "her",
+        "exler",
+        "pittsburgh",
+        "firm",
+        "law",
+        "criminal",
+        "time",
+        "defense"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-attorneys-kevin-chernosky.md",
+      "title": "Pittsburgh Attorney Kevin Chernosky - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 173,
+      "content_hash": "c89640139f01",
+      "keywords": [
+        "attorney",
+        "pittsburgh",
+        "kevin",
+        "chernosky",
+        "his",
+        "cases",
+        "defense",
+        "pennsylvania",
+        "homicide",
+        "shrager"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-attorneys-attorney-donald-shrager.md",
+      "title": "Attorney Donald I. Shrager - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 233,
+      "content_hash": "45f9a03afc6c",
+      "keywords": [
+        "shrager",
+        "donald",
+        "pittsburgh",
+        "law",
+        "august",
+        "2019",
+        "attorney",
+        "school",
+        "university",
+        "visitation"
+      ]
+    },
+    {
+      "path": "pages/criminal-lawyers-pittsburgh.md",
+      "title": "Pittsburgh Criminal Attorneys - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1905,
+      "content_hash": "2ace33fff450",
+      "keywords": [
+        "https",
+        "com",
+        "shragerdefense",
+        "pittsburgh",
+        "attorneys",
+        "shrager",
+        "dui",
+        "attorney",
+        "crime",
+        "lawyer"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-dui-attorney.md",
+      "title": "Pittsburgh DUI Lawyer - Get a Free Consultation 24/7",
+      "section_type": "attorney-bio",
+      "word_count": 1202,
+      "content_hash": "dea722391ca2",
+      "keywords": [
+        "dui",
+        "https",
+        "com",
+        "shragerdefense",
+        "shrager",
+        "www",
+        "defense",
+        "pittsburgh",
+        "pittsburgh-dui-attorney",
+        "david"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-drug-lawyer.md",
+      "title": "Pittsburgh Drug Lawyer - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 821,
+      "content_hash": "9a898842d401",
+      "keywords": [
+        "https",
+        "shragerdefense",
+        "com",
+        "drug",
+        "shrager",
+        "charges",
+        "defense",
+        "pittsburgh",
+        "attorneys",
+        "legal"
+      ]
+    },
+    {
+      "path": "pages/sex-crimes-attorney.md",
+      "title": "Pennsylvania Sex Crime Lawyer - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 986,
+      "content_hash": "92849b189087",
+      "keywords": [
+        "sex",
+        "shrager",
+        "https",
+        "shragerdefense",
+        "com",
+        "attorney",
+        "charges",
+        "crime",
+        "pennsylvania",
+        "crimes"
+      ]
+    },
+    {
+      "path": "pages/gun-violations-pennsylvania.md",
+      "title": "Gun Charges and Weapons Violations Lawyer - Pittsburgh, PA - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1384,
+      "content_hash": "d8f0e1542d82",
+      "keywords": [
+        "firearm",
+        "weapon",
+        "https",
+        "shragerdefense",
+        "com",
+        "gun",
+        "criminal",
+        "degree",
+        "shrager",
+        "possession"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-theft-attorneys.md",
+      "title": "Pittsburgh Theft Attorneys - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 815,
+      "content_hash": "7ad289777716",
+      "keywords": [
+        "theft",
+        "https",
+        "shragerdefense",
+        "com",
+        "shrager",
+        "charges",
+        "pittsburgh",
+        "attorneys",
+        "attorney",
+        "prison"
+      ]
+    },
+    {
+      "path": "pages/criminal-lawyers-pittsburgh-fraud-attorneys.md",
+      "title": "Fraud Attorneys - Pennsylvania - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 883,
+      "content_hash": "d69d0a40b190",
+      "keywords": [
+        "fraud",
+        "com",
+        "https",
+        "shragerdefense",
+        "attorneys",
+        "shrager",
+        "pittsburgh",
+        "attorney",
+        "pennsylvania",
+        "fine"
+      ]
+    },
+    {
+      "path": "pages/violent-crimes-attorneys.md",
+      "title": "Pittsburgh Violent Crimes Attorneys - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 612,
+      "content_hash": "23683cd1736b",
+      "keywords": [
+        "https",
+        "shragerdefense",
+        "com",
+        "crimes",
+        "violent",
+        "shrager",
+        "attorney",
+        "pittsburgh",
+        "attorneys",
+        "time"
+      ]
+    },
+    {
+      "path": "pages/criminal-lawyers-pittsburgh-white-collar-crimes-attorney.md",
+      "title": "White Collar Crime Attorney - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 510,
+      "content_hash": "2f22e729d766",
+      "keywords": [
+        "https",
+        "shragerdefense",
+        "com",
+        "fraud",
+        "shrager",
+        "attorney",
+        "attorneys",
+        "legal",
+        "charges",
+        "defense"
+      ]
+    },
+    {
+      "path": "pages/disorderly-conduct-attorney-pennsylvania.md",
+      "title": "Disorderly Conduct Charges in Pennsylvania - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 951,
+      "content_hash": "44ece7d2c528",
+      "keywords": [
+        "conduct",
+        "disorderly",
+        "https",
+        "shragerdefense",
+        "com",
+        "shrager",
+        "charges",
+        "defense",
+        "fight",
+        "public"
+      ]
+    },
+    {
+      "path": "pages/summary-offenses.md",
+      "title": "Summary Offense Lawyers Pittsburgh - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1384,
+      "content_hash": "f0d9348ddc50",
+      "keywords": [
+        "summary",
+        "offense",
+        "criminal",
+        "offenses",
+        "https",
+        "shragerdefense",
+        "com",
+        "charges",
+        "record",
+        "attorney"
+      ]
+    },
+    {
+      "path": "pages/federal-crime-attorneys.md",
+      "title": "Federal Crime Attorneys - Pittsburgh - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 595,
+      "content_hash": "e7dd12e2d342",
+      "keywords": [
+        "federal",
+        "crimes",
+        "https",
+        "shragerdefense",
+        "com",
+        "shrager",
+        "attorney",
+        "charges",
+        "attorneys",
+        "pittsburgh"
+      ]
+    },
+    {
+      "path": "pages/juvenile-criminal-attorney.md",
+      "title": "Pittsburgh Juvenile Defense Lawyer - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1594,
+      "content_hash": "0fa82d2491fb",
+      "keywords": [
+        "child",
+        "juvenile",
+        "com",
+        "https",
+        "shragerdefense",
+        "crime",
+        "shrager",
+        "defense",
+        "attorneys",
+        "criminal"
+      ]
+    },
+    {
+      "path": "pages/homicide-lawyer-pittsburgh.md",
+      "title": "Homicide Lawyer Pittsburgh - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1388,
+      "content_hash": "6c676390f5a5",
+      "keywords": [
+        "murder",
+        "homicide",
+        "shrager",
+        "manslaughter",
+        "attorney",
+        "defense",
+        "rights",
+        "charges",
+        "https",
+        "shragerdefense"
+      ]
+    },
+    {
+      "path": "pages/offense-grading-in-pennsylvania.md",
+      "title": "Criminal Offense Grading in Pennsylvania | Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 712,
+      "content_hash": "735a36fa322e",
+      "keywords": [
+        "offense",
+        "penalties",
+        "degree",
+        "misdemeanor",
+        "maximum",
+        "criminal",
+        "pennsylvania",
+        "grading",
+        "felony",
+        "offenses"
+      ]
+    },
+    {
+      "path": "pages/preliminary-hearing-attorney.md",
+      "title": "Preliminary Hearing Lawyers, Pittsburgh PA | Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 592,
+      "content_hash": "0ad2c032f566",
+      "keywords": [
+        "hearing",
+        "preliminary",
+        "charges",
+        "attorney",
+        "commonwealth",
+        "evidence",
+        "defense",
+        "case",
+        "court",
+        "against"
+      ]
+    },
+    {
+      "path": "pages/pa-criminal-jury-trials.md",
+      "title": "Jury Trial Criminal Defense Attorney - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1014,
+      "content_hash": "bd0cbef3c165",
+      "keywords": [
+        "jury",
+        "trial",
+        "criminal",
+        "defendant",
+        "guilty",
+        "right",
+        "reasonable",
+        "doubt",
+        "charges",
+        "trials"
+      ]
+    },
+    {
+      "path": "pages/reasonable-doubt-pa.md",
+      "title": "Reasonable Doubt - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 475,
+      "content_hash": "4f9c02fd5595",
+      "keywords": [
+        "doubt",
+        "reasonable",
+        "pennsylvania",
+        "proof",
+        "trials",
+        "beyond",
+        "jury",
+        "criminal",
+        "trial",
+        "attorneys"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-dui-attorney-first-time-dui-pennsylvania.md",
+      "title": "First DUI Pittsburgh - What You Need to Know - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1822,
+      "content_hash": "dc314586629a",
+      "keywords": [
+        "dui",
+        "https",
+        "com",
+        "shragerdefense",
+        "bac",
+        "offense",
+        "shrager",
+        "pittsburgh-dui-attorney",
+        "first",
+        "pennsylvania"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-dui-attorney-second-dui.md",
+      "title": "Second DUI in PA - Penalties, Laws - Pittsburgh, Allegheny Co. & Western PA - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1782,
+      "content_hash": "2c7ad4b66ee6",
+      "keywords": [
+        "dui",
+        "https",
+        "com",
+        "shragerdefense",
+        "second",
+        "offense",
+        "bac",
+        "pittsburgh",
+        "shrager",
+        "penalties"
+      ]
+    },
+    {
+      "path": "pages/dui-accidents-lawyer-pennsylvania.md",
+      "title": "Charged with a DUI Accident in Pennsylvania - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1382,
+      "content_hash": "b54a18f89279",
+      "keywords": [
+        "dui",
+        "https",
+        "shragerdefense",
+        "com",
+        "charges",
+        "shrager",
+        "pittsburgh-dui-attorney",
+        "accident",
+        "could",
+        "charged"
+      ]
+    },
+    {
+      "path": "pages/dui-cdl-license-pennsylvania.md",
+      "title": "DUI Charges and a CDL License in Pennsylvania - Pittsburgh DUI Laws - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1454,
+      "content_hash": "ac154689cf38",
+      "keywords": [
+        "dui",
+        "https",
+        "shragerdefense",
+        "com",
+        "cdl",
+        "shrager",
+        "attorney",
+        "charges",
+        "license",
+        "pennsylvania"
+      ]
+    },
+    {
+      "path": "pages/felony-dui-in-pennsylvania.md",
+      "title": "Felony DUI in Pennsylvania - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 515,
+      "content_hash": "fabe007157ee",
+      "keywords": [
+        "dui",
+        "felony",
+        "individual",
+        "prior",
+        "convictions",
+        "charged",
+        "degree",
+        "3803",
+        "https",
+        "www"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-dui-attorney-multiple-duis-in-pennsylvania.md",
+      "title": "Multiple DUI Arrests in PA | Pittsburgh DUI Lawyer - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 431,
+      "content_hash": "8fee3bc49d69",
+      "keywords": [
+        "dui",
+        "com",
+        "https",
+        "shragerdefense",
+        "shrager",
+        "pittsburgh",
+        "pittsburgh-dui-attorney",
+        "david",
+        "multiple",
+        "lawyers"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-dui-attorney-dui-drugs.md",
+      "title": "DUI Drugs / DUI Controlled Substance Lawyers - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1278,
+      "content_hash": "abaf23b6f983",
+      "keywords": [
+        "dui",
+        "https",
+        "shragerdefense",
+        "com",
+        "pittsburgh-dui-attorney",
+        "drugs",
+        "shrager",
+        "pennsylvania",
+        "controlled",
+        "substance"
+      ]
+    },
+    {
+      "path": "pages/dui-prescription-meds-pennsylvania.md",
+      "title": "DUI - Prescription Drugs / Medication - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1328,
+      "content_hash": "b96821f65c2f",
+      "keywords": [
+        "dui",
+        "https",
+        "shragerdefense",
+        "com",
+        "pittsburgh-dui-attorney",
+        "shrager",
+        "drugs",
+        "legal",
+        "attorney",
+        "prescription"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-dui-attorney-underage-dui-pennsylvania.md",
+      "title": "Underage DUI Lawyer - Pittsburgh - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1212,
+      "content_hash": "b8b1b2752128",
+      "keywords": [
+        "dui",
+        "com",
+        "https",
+        "shragerdefense",
+        "shrager",
+        "fines",
+        "pittsburgh-dui-attorney",
+        "pennsylvania",
+        "penalties",
+        "david"
+      ]
+    },
+    {
+      "path": "pages/allegheny-county-ard-program.md",
+      "title": "ARD Program - Pennsylvania - Allegheny County ARD - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 805,
+      "content_hash": "21ea52871645",
+      "keywords": [
+        "dui",
+        "https",
+        "shragerdefense",
+        "com",
+        "program",
+        "ard",
+        "attorney",
+        "shrager",
+        "pittsburgh-dui-attorney",
+        "pittsburgh"
+      ]
+    },
+    {
+      "path": "pages/dui-following-ard-diversion-2026.md",
+      "title": "DUI Following Diversion (ARD) in 2026 - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 729,
+      "content_hash": "8294421fdf19",
+      "keywords": [
+        "dui",
+        "new",
+        "ard",
+        "law",
+        "offense",
+        "2025",
+        "https",
+        "within",
+        "years",
+        "www"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-dui-attorney-pennsylvania-dui-laws.md",
+      "title": "PA DUI Laws - Pittsburgh DUI Lawyer - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1371,
+      "content_hash": "62c783bbf189",
+      "keywords": [
+        "dui",
+        "com",
+        "https",
+        "shragerdefense",
+        "pittsburgh-dui-attorney",
+        "shrager",
+        "pittsburgh",
+        "first",
+        "charges",
+        "penalties"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-dui-attorney-refusing-blood-breath-tests.md",
+      "title": "Legal Consequences of Refusing DUI Breath or Blood Tests in Pennsylvania - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 826,
+      "content_hash": "922d60e9b66b",
+      "keywords": [
+        "dui",
+        "suspension",
+        "testing",
+        "license",
+        "htm",
+        "refuse",
+        "blood",
+        "breath",
+        "civil",
+        "chemical"
+      ]
+    },
+    {
+      "path": "pages/dui-defense-pennsylvania.md",
+      "title": "Beating a DUI in PA - Pittsburgh DUI Lawyer - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1397,
+      "content_hash": "8f9c1fd541b6",
+      "keywords": [
+        "dui",
+        "https",
+        "shragerdefense",
+        "com",
+        "shrager",
+        "pittsburgh-dui-attorney",
+        "defense",
+        "attorney",
+        "charges",
+        "attorneys"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-dui-court-process.md",
+      "title": "Pittsburgh DUI Court Process - DUI in Pennsylvania - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1461,
+      "content_hash": "5ddbeb80cb9a",
+      "keywords": [
+        "dui",
+        "https",
+        "shragerdefense",
+        "com",
+        "court",
+        "shrager",
+        "pittsburgh-dui-attorney",
+        "charges",
+        "process",
+        "case"
+      ]
+    },
+    {
+      "path": "pages/criminal-record-expungement-pennsylvania.md",
+      "title": "Criminal Record Expungement Lawyer Pennsylvania - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1012,
+      "content_hash": "ccf99e0cad1f",
+      "keywords": [
+        "criminal",
+        "record",
+        "expungement",
+        "shrager",
+        "expunged",
+        "https",
+        "shragerdefense",
+        "com",
+        "free",
+        "consultation"
+      ]
+    },
+    {
+      "path": "pages/driving-while-under-dui-license-suspension.md",
+      "title": "Driving on a Suspended License for DUI in PA - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 915,
+      "content_hash": "ec6e36a692f9",
+      "keywords": [
+        "dui",
+        "https",
+        "shragerdefense",
+        "com",
+        "license",
+        "shrager",
+        "pittsburgh-dui-attorney",
+        "driving",
+        "suspended",
+        "penalties"
+      ]
+    },
+    {
+      "path": "pages/criminal-lawyers-pittsburgh-vehicular-homicide.md",
+      "title": "Vehicular Homicide Attorney Pittsburgh - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1211,
+      "content_hash": "82ecb8b81581",
+      "keywords": [
+        "homicide",
+        "dui",
+        "https",
+        "shragerdefense",
+        "com",
+        "vehicular",
+        "vehicle",
+        "death",
+        "shrager",
+        "pittsburgh"
+      ]
+    },
+    {
+      "path": "pages/choosing-a-dui-attorney.md",
+      "title": "Choosing a DUI Attorney - DUI Lawyer in PA - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1367,
+      "content_hash": "58dc4a2ce521",
+      "keywords": [
+        "dui",
+        "attorney",
+        "com",
+        "https",
+        "shragerdefense",
+        "pittsburgh-dui-attorney",
+        "charges",
+        "shrager",
+        "case",
+        "pennsylvania"
+      ]
+    },
+    {
+      "path": "pages/pittsburgh-dui-attorney-birchfield-ruling-dui-penalty-changes.md",
+      "title": "DUI Law Changes and Effects - Birchfield Ruling - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 993,
+      "content_hash": "8e8235ff276a",
+      "keywords": [
+        "dui",
+        "com",
+        "blood",
+        "https",
+        "shrager",
+        "shragerdefense",
+        "birchfield",
+        "law",
+        "ruling",
+        "defense"
+      ]
+    },
+    {
+      "path": "pages/reviews.md",
+      "title": "Client Reviews and Testimonials - Attorney Shrager Reviews - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 28200,
+      "content_hash": "1fd4892c7f10",
+      "keywords": [
+        "com",
+        "google",
+        "https",
+        "png",
+        "ssl",
+        "gstatic",
+        "images",
+        "icons",
+        "gplus-16",
+        "maps"
+      ]
+    },
+    {
+      "path": "pages/legal-news.md",
+      "title": "Legal News - Pittsburgh, PA & Western Pennsylvania - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 831,
+      "content_hash": "8b7169562dfe",
+      "keywords": [
+        "com",
+        "www",
+        "https",
+        "shragerdefense",
+        "legal-news",
+        "div",
+        "class",
+        "entry-meta",
+        "shrager",
+        "attorney"
+      ]
+    },
+    {
+      "path": "pages/legal-news-videos.md",
+      "title": "Videos & News Clips - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 907,
+      "content_hash": "ab3647835972",
+      "keywords": [
+        "https",
+        "www",
+        "com",
+        "youtube",
+        "shrager",
+        "watch",
+        "news",
+        "david",
+        "pittsburgh",
+        "shragerdefense"
+      ]
+    },
+    {
+      "path": "pages/videos.md",
+      "title": "Videos & News Clips - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 907,
+      "content_hash": "ab3647835972",
+      "keywords": [
+        "https",
+        "www",
+        "com",
+        "youtube",
+        "shrager",
+        "watch",
+        "news",
+        "david",
+        "pittsburgh",
+        "shragerdefense"
+      ]
+    },
+    {
+      "path": "pages/videos-news-clips.md",
+      "title": "Videos & News Clips - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 907,
+      "content_hash": "ab3647835972",
+      "keywords": [
+        "https",
+        "www",
+        "com",
+        "youtube",
+        "shrager",
+        "watch",
+        "news",
+        "david",
+        "pittsburgh",
+        "shragerdefense"
+      ]
+    },
+    {
+      "path": "pages/professional-awards.md",
+      "title": "Professional Awards - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 757,
+      "content_hash": "a5e140e6eed8",
+      "keywords": [
+        "defense",
+        "com",
+        "https",
+        "lawyers",
+        "www",
+        "attorneys",
+        "top",
+        "dui",
+        "criminal",
+        "pittsburgh"
+      ]
+    },
+    {
+      "path": "pages/our-trademarks.md",
+      "title": "Our Trademarks - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 12,
+      "content_hash": "8d0f2af0d2ce",
+      "keywords": [
+        "trademarks",
+        "trademark",
+        "shrager",
+        "defense",
+        "attorneys",
+        "pennsyvlania",
+        "website",
+        "https",
+        "file",
+        "dos"
+      ]
+    },
+    {
+      "path": "pages/disclaimer.md",
+      "title": "Website Disclaimer and Terms of Use - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 239,
+      "content_hash": "9ac8be65a046",
+      "keywords": [
+        "website",
+        "information",
+        "use",
+        "shrager",
+        "defense",
+        "com",
+        "attorney",
+        "david",
+        "attorney-client",
+        "relationship"
+      ]
+    },
+    {
+      "path": "pages/case-result-aggravated-assault-of-a-police-officer-charges-withdrawn.md",
+      "title": "Aggravated Assault of a Police Officer Charges Withdrawn - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 84,
+      "content_hash": "29af35fea699",
+      "keywords": [
+        "amp",
+        "div",
+        "class",
+        "officer",
+        "com",
+        "aggravated",
+        "assault",
+        "police",
+        "charges",
+        "withdrawn"
+      ]
+    },
+    {
+      "path": "pages/case-result-dui-not-guilty-allegheny.md",
+      "title": "DUI Trial \u2013 Not Guilty Verdict in Allegheny County - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 156,
+      "content_hash": "a14abd45d40a",
+      "keywords": [
+        "amp",
+        "div",
+        "class",
+        "com",
+        "https",
+        "dui",
+        "trial",
+        "guilty",
+        "www",
+        "script"
+      ]
+    },
+    {
+      "path": "pages/case-result-aggravated-assault-by-vehicle-reduced-to-summary-offense.md",
+      "title": "Aggravated Assault by Vehicle Reduced to Summary Offense - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 103,
+      "content_hash": "22f994b0d0de",
+      "keywords": [
+        "amp",
+        "div",
+        "class",
+        "vehicle",
+        "com",
+        "aggravated",
+        "assault",
+        "summary",
+        "shrager",
+        "https"
+      ]
+    },
+    {
+      "path": "pages/case-result-felony-aggravated-assault-reduced-to-misdemeanor.md",
+      "title": "Felony Aggravated Assault Reduced to Misdemeanor - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 103,
+      "content_hash": "93a09a5d0fe2",
+      "keywords": [
+        "amp",
+        "div",
+        "class",
+        "assault",
+        "com",
+        "felony",
+        "aggravated",
+        "reduced",
+        "misdemeanor",
+        "shrager"
+      ]
+    },
+    {
+      "path": "pages/case-result-dui-dismissed-suppression-motion.md",
+      "title": "DUI Dismissed After Suppression Motion - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 114,
+      "content_hash": "1086a85416ca",
+      "keywords": [
+        "amp",
+        "div",
+        "class",
+        "case",
+        "com",
+        "dui",
+        "dismissed",
+        "suppression",
+        "https",
+        "script"
+      ]
+    },
+    {
+      "path": "pages/case-results-page-2.md",
+      "title": "Case Results - Shrager Defense Attorneys - Page 2",
+      "section_type": "attorney-bio",
+      "word_count": 303,
+      "content_hash": "2b81ac6dd3ce",
+      "keywords": [
+        "https",
+        "www",
+        "shragerdefense",
+        "com",
+        "case-result",
+        "client",
+        "case",
+        "page",
+        "county",
+        "results"
+      ]
+    },
+    {
+      "path": "pages/case-results-page-3.md",
+      "title": "Case Results - Shrager Defense Attorneys - Page 3",
+      "section_type": "attorney-bio",
+      "word_count": 314,
+      "content_hash": "ff62bacad5d4",
+      "keywords": [
+        "https",
+        "www",
+        "shragerdefense",
+        "com",
+        "case-result",
+        "client",
+        "case",
+        "page",
+        "results",
+        "2024"
+      ]
+    },
+    {
+      "path": "pages/case-results-page-4.md",
+      "title": "Case Results - Shrager Defense Attorneys - Page 4",
+      "section_type": "attorney-bio",
+      "word_count": 170,
+      "content_hash": "6d65a90246d8",
+      "keywords": [
+        "https",
+        "www",
+        "shragerdefense",
+        "com",
+        "results",
+        "page",
+        "case",
+        "case-result",
+        "case-results",
+        "shrager"
+      ]
+    },
+    {
+      "path": "pages/cocaine-charges-penalties-pa.md",
+      "title": "Pittsburgh Cocaine Lawyer | Penalties & PA Laws - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1208,
+      "content_hash": "cfaa478f3b1b",
+      "keywords": [
+        "cocaine",
+        "shrager",
+        "pittsburgh",
+        "possession",
+        "prison",
+        "drug",
+        "https",
+        "shragerdefense",
+        "com",
+        "david"
+      ]
+    },
+    {
+      "path": "pages/heroin-attorney-pittsburgh.md",
+      "title": "Pittsburgh Heroin Lawyer - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 664,
+      "content_hash": "ee5288a7d796",
+      "keywords": [
+        "heroin",
+        "shrager",
+        "drug",
+        "pittsburgh",
+        "charges",
+        "attorney",
+        "attorneys",
+        "possession",
+        "https",
+        "shragerdefense"
+      ]
+    },
+    {
+      "path": "pages/illegal-prescription-drugs-attorney.md",
+      "title": "Illegal Prescription Drug Lawyer, Pittsburgh - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1085,
+      "content_hash": "6648a200980b",
+      "keywords": [
+        "prescription",
+        "drug",
+        "https",
+        "shragerdefense",
+        "com",
+        "drugs",
+        "shrager",
+        "illegal",
+        "pittsburgh",
+        "attorneys"
+      ]
+    },
+    {
+      "path": "pages/sexting-attorneys.md",
+      "title": "Sexting Lawyer Pennsylvania - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1434,
+      "content_hash": "2ad8dc2a9a98",
+      "keywords": [
+        "sexting",
+        "child",
+        "https",
+        "shragerdefense",
+        "com",
+        "sex",
+        "charges",
+        "pennsylvania",
+        "pornography",
+        "shrager"
+      ]
+    },
+    {
+      "path": "pages/child-pornography-attorney.md",
+      "title": "Child Pornography Lawyer - Pennsylvania - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1292,
+      "content_hash": "f6a8987a1eac",
+      "keywords": [
+        "child",
+        "pornography",
+        "charges",
+        "https",
+        "shragerdefense",
+        "com",
+        "sex",
+        "attorney",
+        "shrager",
+        "pennsylvania"
+      ]
+    },
+    {
+      "path": "pages/sexual-assault-attorney.md",
+      "title": "Pennsylvania Sexual Assault Charges - Information & Laws - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1649,
+      "content_hash": "147218f367ec",
+      "keywords": [
+        "https",
+        "shragerdefense",
+        "com",
+        "sexual",
+        "assault",
+        "rape",
+        "charges",
+        "years",
+        "sex",
+        "degree"
+      ]
+    },
+    {
+      "path": "pages/mistake-of-age-defense-statutory-sexual-assault.md",
+      "title": "Mistake of Age Defense in PA Statutory Sexual Assault Cases - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 986,
+      "content_hash": "fbd4846ffe88",
+      "keywords": [
+        "age",
+        "defense",
+        "mistake",
+        "sexual",
+        "statutory",
+        "assault",
+        "defendant",
+        "years",
+        "critical",
+        "evidence"
+      ]
+    },
+    {
+      "path": "pages/child-solicitation-molestation.md",
+      "title": "Child Solicitation & Molestation Charges - Pittsburgh - Western PA - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1579,
+      "content_hash": "8eb7020cd485",
+      "keywords": [
+        "child",
+        "sex",
+        "https",
+        "shragerdefense",
+        "com",
+        "sexual",
+        "charges",
+        "molestation",
+        "shrager",
+        "attorney"
+      ]
+    },
+    {
+      "path": "pages/aggravated-assault.md",
+      "title": "Pittsburgh Aggravated Assault Attorney - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1064,
+      "content_hash": "24de7d8e51df",
+      "keywords": [
+        "assault",
+        "aggravated",
+        "attorney",
+        "defense",
+        "shrager",
+        "rights",
+        "free",
+        "help",
+        "pittsburgh",
+        "attorneys"
+      ]
+    },
+    {
+      "path": "pages/fraud-attorneys.md",
+      "title": "Fraud Attorneys - Pennsylvania - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 883,
+      "content_hash": "d69d0a40b190",
+      "keywords": [
+        "fraud",
+        "com",
+        "https",
+        "shragerdefense",
+        "attorneys",
+        "shrager",
+        "pittsburgh",
+        "attorney",
+        "pennsylvania",
+        "fine"
+      ]
+    },
+    {
+      "path": "pages/shoplifting.md",
+      "title": "Shoplifting - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 715,
+      "content_hash": "d3559d0d608a",
+      "keywords": [
+        "shoplifting",
+        "shrager",
+        "pennsylvania",
+        "attorney",
+        "https",
+        "shragerdefense",
+        "com",
+        "defense",
+        "pittsburgh",
+        "criminal"
+      ]
+    },
+    {
+      "path": "pages/ppp-fraud-lawyer.md",
+      "title": "Paycheck Protection Program (PPP) Fraud - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 523,
+      "content_hash": "e76085c88c2e",
+      "keywords": [
+        "ppp",
+        "fraud",
+        "criminal",
+        "loan",
+        "federal",
+        "https",
+        "uscode",
+        "charges",
+        "law",
+        "program"
+      ]
+    },
+    {
+      "path": "pages/simple-assault.md",
+      "title": "Simple Assault - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1096,
+      "content_hash": "37a771dfdb7b",
+      "keywords": [
+        "assault",
+        "simple",
+        "shrager",
+        "attorney",
+        "defense",
+        "aggravated",
+        "https",
+        "shragerdefense",
+        "com",
+        "david"
+      ]
+    },
+    {
+      "path": "pages/domestic-violence.md",
+      "title": "Domestic Violence Attorney Pittsburgh - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 731,
+      "content_hash": "e4e220912aa1",
+      "keywords": [
+        "domestic",
+        "violence",
+        "shrager",
+        "charges",
+        "assault",
+        "pittsburgh",
+        "attorneys",
+        "criminal",
+        "https",
+        "shragerdefense"
+      ]
+    },
+    {
+      "path": "pages/internet-crime-attorneys.md",
+      "title": "Pittsburgh Internet Crime Lawyer, Cyber Crimes - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 808,
+      "content_hash": "6675defe9da5",
+      "keywords": [
+        "internet",
+        "crime",
+        "shrager",
+        "crimes",
+        "https",
+        "shragerdefense",
+        "com",
+        "attorneys",
+        "pittsburgh",
+        "attorney"
+      ]
+    },
+    {
+      "path": "pages/drug-trafficking-attorneys.md",
+      "title": "Drug Trafficking Attorneys Pennsylvania - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1034,
+      "content_hash": "ee178506bc88",
+      "keywords": [
+        "https",
+        "shragerdefense",
+        "com",
+        "drug",
+        "shrager",
+        "charges",
+        "attorneys",
+        "pittsburgh",
+        "trafficking",
+        "attorney"
+      ]
+    },
+    {
+      "path": "pages/legal-news-2022-10-new-pa-dui-laws-2022.md",
+      "title": "New PA DUI Laws 2022 - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 662,
+      "content_hash": "4d76d526fcc1",
+      "keywords": [
+        "law",
+        "dui",
+        "new",
+        "2022",
+        "div",
+        "amp",
+        "https",
+        "felony",
+        "individual",
+        "www"
+      ]
+    },
+    {
+      "path": "pages/marijuana-lawyer-pittsburgh.md",
+      "title": "Penalties for Marijuana Possession in Pennsylvania - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 916,
+      "content_hash": "5bfc564509a7",
+      "keywords": [
+        "https",
+        "marijuana",
+        "com",
+        "possession",
+        "780-113",
+        "penalty",
+        "charge",
+        "govt",
+        "westlaw",
+        "pac"
+      ]
+    },
+    {
+      "path": "pages/underage-dui-pennsylvania.md",
+      "title": "Underage DUI Lawyer - Pittsburgh - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 1212,
+      "content_hash": "b8b1b2752128",
+      "keywords": [
+        "dui",
+        "com",
+        "https",
+        "shragerdefense",
+        "shrager",
+        "fines",
+        "pittsburgh-dui-attorney",
+        "pennsylvania",
+        "penalties",
+        "david"
+      ]
+    },
+    {
+      "path": "pages/legal-news-page-2.md",
+      "title": "Legal News - Pittsburgh, PA & Western Pennsylvania - Shrager Defense Attorneys - Page 2",
+      "section_type": "attorney-bio",
+      "word_count": 904,
+      "content_hash": "56b320c00eb6",
+      "keywords": [
+        "com",
+        "www",
+        "https",
+        "shragerdefense",
+        "legal-news",
+        "div",
+        "class",
+        "entry-meta",
+        "pittsburgh",
+        "article"
+      ]
+    },
+    {
+      "path": "pages/legal-news-2025-11-delayed-license-suspensions-in-allegheny-county.md",
+      "title": "Delayed License Suspensions in Allegheny County - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 345,
+      "content_hash": "23a41bff5e04",
+      "keywords": [
+        "amp",
+        "div",
+        "license",
+        "suspensions",
+        "class",
+        "penndot",
+        "allegheny",
+        "county",
+        "com",
+        "2025"
+      ]
+    },
+    {
+      "path": "pages/legal-news-2025-07-new-decision-on-calculation-of-dui-offenses-has-unexpected-consequences.md",
+      "title": "New decision on calculation of DUI offenses has unexpected consequences - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 237,
+      "content_hash": "1006d5f46cde",
+      "keywords": [
+        "amp",
+        "div",
+        "class",
+        "dui",
+        "com",
+        "prior",
+        "shrager",
+        "attorneys",
+        "https",
+        "script"
+      ]
+    },
+    {
+      "path": "pages/legal-news-2024-02-attorney-shrager-discusses-murder-for-hire-allegations-against-his-client.md",
+      "title": "Attorney Shrager Discusses Murder-for-Hire Allegations Against His Client - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 112,
+      "content_hash": "39524b664acc",
+      "keywords": [
+        "amp",
+        "div",
+        "shrager",
+        "com",
+        "class",
+        "attorney",
+        "his",
+        "client",
+        "https",
+        "murder-for-hire"
+      ]
+    },
+    {
+      "path": "pages/legal-news-2024-01-attorney-shrager-discusses-mans-jumping-out-of-window.md",
+      "title": "Attorney Shrager Discusses Man\u2019s Jumping Out of Window - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 172,
+      "content_hash": "a3b2f70ee065",
+      "keywords": [
+        "amp",
+        "div",
+        "shrager",
+        "class",
+        "com",
+        "attorney",
+        "discusses",
+        "man",
+        "jumping",
+        "window"
+      ]
+    },
+    {
+      "path": "pages/legal-news-2023-07-pittsburgh-attorney-lyle-dresbold-secures-a-not-guilty-verdict-in-a-federal-charges-case.md",
+      "title": "Pittsburgh Attorney Lyle Dresbold Secures a Not-Guilty Verdict in a Federal Charges Case - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 108,
+      "content_hash": "9fe61121731b",
+      "keywords": [
+        "amp",
+        "div",
+        "class",
+        "com",
+        "attorney",
+        "dresbold",
+        "https",
+        "lyle",
+        "not-guilty",
+        "verdict"
+      ]
+    },
+    {
+      "path": "pages/legal-news-2023-05-get-to-know-shrager-defense-attorneys-in-2023.md",
+      "title": "Get to Know Shrager Defense Attorneys in 2023 - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 58,
+      "content_hash": "d977dd7c152c",
+      "keywords": [
+        "amp",
+        "div",
+        "defense",
+        "class",
+        "shrager",
+        "attorneys",
+        "com",
+        "script",
+        "fjs",
+        "get"
+      ]
+    },
+    {
+      "path": "pages/legal-news-2022-01-marijuana-smell-alone-insufficient-for-warrantless-search.md",
+      "title": "Marijuana Smell, Alone, Insufficient for Warrantless Search: Supreme Court of Pennsylvania - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 731,
+      "content_hash": "1d9c6082c68e",
+      "keywords": [
+        "marijuana",
+        "court",
+        "smell",
+        "amp",
+        "search",
+        "supreme",
+        "pennsylvania",
+        "div",
+        "2021",
+        "case"
+      ]
+    },
+    {
+      "path": "pages/legal-news-2021-09-throws-a-strike-at-pnc-park.md",
+      "title": "Attorney David J. Shrager Throws a Strike at PNC Park - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 59,
+      "content_hash": "64e2b59b96c0",
+      "keywords": [
+        "amp",
+        "div",
+        "class",
+        "shrager",
+        "attorney",
+        "david",
+        "strike",
+        "pnc",
+        "park",
+        "com"
+      ]
+    },
+    {
+      "path": "pages/legal-news-2021-07-courts-are-working-through-backlogs-in-criminal-cases-postponed-due-to-the-pandemic.md",
+      "title": "Courts Are Working Through Backlogs In Criminal Cases Postponed Due To The Pandemic - Shrager Defense Attorneys",
+      "section_type": "attorney-bio",
+      "word_count": 146,
+      "content_hash": "5e35b635b983",
+      "keywords": [
+        "amp",
+        "div",
+        "class",
+        "courts",
+        "criminal",
+        "cases",
+        "pandemic",
+        "shrager",
+        "postponed",
+        "defense"
+      ]
+    },
+    {
+      "path": "pages/legal-news-page-3.md",
+      "title": "Legal News - Pittsburgh, PA & Western Pennsylvania - Shrager Defense Attorneys - Page 3",
+      "section_type": "attorney-bio",
+      "word_count": 867,
+      "content_hash": "f55af560af0f",
+      "keywords": [
+        "www",
+        "com",
+        "https",
+        "shragerdefense",
+        "legal-news",
+        "shrager",
+        "div",
+        "class",
+        "entry-meta",
+        "pittsburgh"
+      ]
+    },
+    {
+      "path": "pages/legal-news-page-4.md",
+      "title": "Legal News - Pittsburgh, PA & Western Pennsylvania - Shrager Defense Attorneys - Page 4",
+      "section_type": "attorney-bio",
+      "word_count": 907,
+      "content_hash": "1eddd8f843ad",
+      "keywords": [
+        "com",
+        "www",
+        "https",
+        "shragerdefense",
+        "legal-news",
+        "div",
+        "class",
+        "entry-meta",
+        "2017",
+        "pittsburgh"
+      ]
+    },
+    {
+      "path": "pages/legal-news-page-5.md",
+      "title": "Legal News - Pittsburgh, PA & Western Pennsylvania - Shrager Defense Attorneys - Page 5",
+      "section_type": "attorney-bio",
+      "word_count": 906,
+      "content_hash": "00507e8a4613",
+      "keywords": [
+        "com",
+        "www",
+        "https",
+        "shragerdefense",
+        "legal-news",
+        "2016",
+        "div",
+        "class",
+        "entry-meta",
+        "shrager"
+      ]
+    },
+    {
+      "path": "pages/legal-news-page-6.md",
+      "title": "Legal News - Pittsburgh, PA & Western Pennsylvania - Shrager Defense Attorneys - Page 6",
+      "section_type": "attorney-bio",
+      "word_count": 911,
+      "content_hash": "29d3b97ab97b",
+      "keywords": [
+        "com",
+        "www",
+        "https",
+        "shragerdefense",
+        "legal-news",
+        "2015",
+        "div",
+        "class",
+        "entry-meta",
+        "shrager"
+      ]
+    },
+    {
+      "path": "pages/legal-news-page-7.md",
+      "title": "Legal News - Pittsburgh, PA & Western Pennsylvania - Shrager Defense Attorneys - Page 7",
+      "section_type": "attorney-bio",
+      "word_count": 901,
+      "content_hash": "0a58ed4495ab",
+      "keywords": [
+        "com",
+        "www",
+        "https",
+        "shragerdefense",
+        "legal-news",
+        "2014",
+        "div",
+        "class",
+        "entry-meta",
+        "shrager"
+      ]
+    },
+    {
+      "path": "pages/legal-news-page-8.md",
+      "title": "Legal News - Pittsburgh, PA & Western Pennsylvania - Shrager Defense Attorneys - Page 8",
+      "section_type": "attorney-bio",
+      "word_count": 908,
+      "content_hash": "bd69ba68363a",
+      "keywords": [
+        "com",
+        "www",
+        "news",
+        "http",
+        "pittsburgh",
+        "https",
+        "legal-news",
+        "shragerdefense",
+        "read",
+        "2013"
+      ]
+    }
+  ]
+}

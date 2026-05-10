@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.local
+*.db
+*.db-shm
+*.db-wal
+.turbo/
+.next/
+.idea/
+packages/crawler/test-site/crawl-output/
+packages/api/tsconfig.tsbuildinfo

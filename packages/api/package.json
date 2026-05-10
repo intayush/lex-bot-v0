@@ -1,0 +1,45 @@
+{
+  "name": "@legal-chatbot/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed": "tsx src/db/seed.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^1.2.0",
+    "@ai-sdk/react": "^1.2.0",
+    "@legal-chatbot/shared": "workspace:*",
+    "@neondatabase/serverless": "^1.1.0",
+    "@tailwindcss/postcss": "^4.3.0",
+    "ai": "^4.3.0",
+    "bcryptjs": "^3.0.3",
+    "drizzle-orm": "^0.40.1",
+    "iron-session": "^8.0.4",
+    "nanoid": "^5.1.0",
+    "next": "^15.3.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tailwindcss": "^4.3.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "better-sqlite3": "^12.9.0",
+    "drizzle-kit": "^0.30.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.8.0"
+  }
+}

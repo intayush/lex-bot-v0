@@ -1,0 +1,10 @@
+[build]
+  base = "packages/api"
+  command = "cd ../.. && pnpm install && pnpm --filter @legal-chatbot/shared build && cd packages/api && pnpm build"
+  publish = ".next"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[build.environment]
+  NODE_VERSION = "20"
