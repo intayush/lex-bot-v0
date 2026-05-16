@@ -1,7 +1,7 @@
 # Product Specification: Legal Chatbot for Law Firm Client Intake & Lead Qualification
 
-**Version:** 0.1 (MVP / Rapid Prototype)
-**Date:** 2026-05-09
+**Version:** 0.2 (MVP deployed on Netlify)
+**Date:** 2026-05-16
 
 ---
 
@@ -50,7 +50,7 @@ The chatbot is powered by a pre-integrated Gemini model provided by us. Lawyers 
 Architecture respects attorney-client privilege through the following measures:
 
 - **Context files** (website content, firm information) remain on the lawyer's own infrastructure.
-- **Conversation data** (chat transcripts, extracted lead info) is stored on the SaaS server in the SQLite database. Lawyers explicitly consent to this during onboarding — the SaaS acts as a data processor, not data owner.
+- **Conversation data** (chat transcripts, extracted lead info) is stored in the Neon PostgreSQL database. Lawyers explicitly consent to this during onboarding — the SaaS acts as a data processor, not data owner.
 - **Data ownership:** The lawyer retains ownership of their conversation data and lead records. They can export or delete their visible data at any time via the dashboard.
 - **Data retention:** A copy of all conversation data and lead records is retained on our servers indefinitely, even after the lawyer deletes their copy. This is disclosed in the terms of service and serves purposes including: service improvement, abuse prevention, compliance auditing, and dispute resolution.
 - **Minimization:** Only data necessary for lead qualification is extracted and stored. The lawyer-facing view respects their deletion requests, while the backend retains a separate archived copy.
@@ -66,11 +66,11 @@ The system consists of six primary components:
 | Component | Type | Hosting |
 |-----------|------|---------|
 | Chat Widget | Client-side JS library | Embedded in lawyer's website |
-| API Server | Backend service | SaaS (centrally hosted) |
+| API Server | Backend service | SaaS (centrally hosted on Netlify) |
 | Context Store | Markdown files | Lawyer's own server |
-| SaaS Dashboard | Web application | SaaS (centrally hosted) |
+| SaaS Dashboard | Web application | SaaS (centrally hosted on Netlify) |
 | Crawler CLI | Command-line tool | Runs on lawyer's machine/CI |
-| SQLite Database | Persistence layer | Co-located with API Server |
+| PostgreSQL Database | Persistence layer | Neon (serverless PostgreSQL) |
 
 ### 2.2 Data Flow
 
@@ -105,6 +105,8 @@ The system consists of six primary components:
 └───────────────────────────────────────────────────────────────┘
 ```
 
+> **Note:** The diagram above shows the logical architecture. In the current implementation, the database is Neon PostgreSQL (serverless), not a co-located SQLite file.
+
 ### 2.3 Context Flow
 
 1. **Crawl phase (one-time or scheduled):** Crawler CLI runs against the lawyer's website → outputs structured markdown files → stored on the lawyer's server alongside their website.
@@ -119,7 +121,7 @@ The system consists of six primary components:
 **API Key Authentication Flow:**
 
 1. Lawyer generates an API key in the dashboard (format: `lc_live_` + 32-character random string via `nanoid`)
-2. Key is stored as a bcrypt hash in SQLite (the plaintext is shown once at generation, never again)
+2. Key is stored as a bcrypt hash in the database (the plaintext is shown once at generation, never again)
 3. Widget sends the key in the `x-api-key` header with every request
 4. API server hashes the incoming key and looks it up in the `api_keys` table
 5. If matched, the request is associated with that lawyer's account and configuration is loaded
@@ -134,7 +136,7 @@ This is a static key lookup — no JWT signing or token refresh is involved. The
   - Lead data reads (classified leads, chat transcripts)
   - Crawler status and context file management
 
-### 2.6 SQLite as MVP Persistence
+### 2.6 Neon PostgreSQL as Persistence
 
 Stores:
 - Lead records with classification (urgent/normal)
@@ -142,22 +144,26 @@ Stores:
 - Configuration data (guardrail settings)
 - Archived data (retained copies after user deletion)
 
-SQLite is chosen for MVP simplicity. The schema is designed to be portable — migration to PostgreSQL requires only a connection string change, no schema redesign.
+Neon serverless PostgreSQL was chosen for production deployment on Netlify. The schema uses Drizzle ORM with the `drizzle-orm/neon-http` driver. SQLite (`better-sqlite3`) is retained as a dev dependency for fast in-memory test mocks.
 
-**Schema Definition (Drizzle):**
+**Schema Definition (Drizzle — PostgreSQL):**
 
 ```typescript
+import { pgTable, text, integer, boolean, uniqueIndex } from 'drizzle-orm/pg-core';
+
 // accounts
-export const accounts = sqliteTable('accounts', {
-  id: text('id').primaryKey(),             // nanoid
-  email: text('email').notNull().unique(),
+export const accounts = pgTable('accounts', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull(),
   password_hash: text('password_hash').notNull(),
   firm_name: text('firm_name'),
   created_at: text('created_at').notNull(), // ISO 8601
-});
+}, (table) => [
+  uniqueIndex('accounts_email_unique').on(table.email),
+]);
 
 // api_keys
-export const apiKeys = sqliteTable('api_keys', {
+export const apiKeys = pgTable('api_keys', {
   id: text('id').primaryKey(),
   account_id: text('account_id').notNull().references(() => accounts.id),
   key_hash: text('key_hash').notNull(),     // bcrypt hash of the API key
@@ -168,27 +174,27 @@ export const apiKeys = sqliteTable('api_keys', {
 });
 
 // configurations (versioned guardrails)
-export const configurations = sqliteTable('configurations', {
+export const configurations = pgTable('configurations', {
   id: text('id').primaryKey(),
   account_id: text('account_id').notNull().references(() => accounts.id),
   version: integer('version').notNull(),
   config_json: text('config_json').notNull(), // full form data as JSON
-  is_published: integer('is_published').notNull().default(0),
+  is_published: boolean('is_published').notNull().default(false),
   created_at: text('created_at').notNull(),
 });
 
 // sessions
-export const sessions = sqliteTable('sessions', {
+export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(),              // session ID sent to widget
   account_id: text('account_id').notNull().references(() => accounts.id),
   messages_json: text('messages_json').notNull().default('[]'),
-  is_preview: integer('is_preview').notNull().default(0),
+  is_preview: boolean('is_preview').notNull().default(false),
   created_at: text('created_at').notNull(),
   updated_at: text('updated_at').notNull(),
 });
 
 // leads
-export const leads = sqliteTable('leads', {
+export const leads = pgTable('leads', {
   id: text('id').primaryKey(),
   account_id: text('account_id').notNull().references(() => accounts.id),
   session_id: text('session_id').notNull().references(() => sessions.id),
@@ -206,7 +212,7 @@ export const leads = sqliteTable('leads', {
 });
 
 // archived_data (retained copies after lawyer deletes)
-export const archivedData = sqliteTable('archived_data', {
+export const archivedData = pgTable('archived_data', {
   id: text('id').primaryKey(),
   account_id: text('account_id').notNull(),
   original_table: text('original_table').notNull(), // 'leads' | 'sessions'
@@ -217,14 +223,14 @@ export const archivedData = sqliteTable('archived_data', {
 });
 
 // notifications
-export const notifications = sqliteTable('notifications', {
+export const notifications = pgTable('notifications', {
   id: text('id').primaryKey(),
   account_id: text('account_id').notNull().references(() => accounts.id),
   type: text('type').notNull(),             // 'urgent_lead' | 'escalation' | 'system'
   title: text('title').notNull(),
   body: text('body').notNull(),
   lead_id: text('lead_id').references(() => leads.id),
-  read: integer('read').notNull().default(0),
+  read: boolean('read').notNull().default(false),
   delivery_channel: text('delivery_channel').notNull().default('dashboard'),
   delivered_at: text('delivered_at'),
   created_at: text('created_at').notNull(),
@@ -245,8 +251,9 @@ const model = google('gemini-2.5-flash');
 
 The chatbot operates as a tool-calling agent with access to:
 - **Context search tool** — searches and retrieves relevant markdown files from the context store
-- **Lead classification tool** — invokes the legal case analyzer to determine urgency
-- **Intake question tool** — decides the next qualifying question based on conversation state
+- **Lead capture tool** — extracts structured lead data from the conversation, classifies urgency, and writes to the database
+
+The LLM decides when to call each tool based on conversation state. Classification (urgent/normal/unqualified) is determined by the LLM inline via the `captureLead` tool parameters, guided by the system prompt's classification criteria. Intake question flow is managed via system prompt instructions rather than a dedicated tool — the LLM naturally asks qualifying questions based on the configured question list.
 
 ### 2.9 Configuration Injection
 
@@ -292,6 +299,7 @@ npx legal-chatbot-crawl --url https://example-lawfirm.com --output ./chatbot-con
 | `--output` | Output directory for markdown files | `./chatbot-context/` |
 | `--exclude` | Glob patterns for URLs to skip | None |
 | `--max-pages` | Maximum pages to crawl | 100 |
+| `--deterministic` | Use fixed timestamps for reproducible output | `false` |
 | `--config` | Path to optional config file | `.crawlerrc.json` |
 
 ### 3.4 Input
@@ -775,7 +783,7 @@ The widget is optimized for mobile as the primary experience:
 | Message bubbles | Distinct styling for user (right-aligned) and bot (left-aligned) messages |
 | Typing indicator | Animated dots shown while the LLM is generating a response |
 | Timestamps | Relative timestamps ("2 min ago") on message groups |
-| Quick-reply chips | Suggested responses based on qualifying questions (e.g., "Personal Injury", "Family Law") |
+| Quick-reply chips | Suggested responses loaded from the firm's configured practice areas via the `/api/config` endpoint (e.g., "Criminal Defense", "DUI Defense") |
 | Chat header | Shows chatbot name, online status, and minimize/close buttons |
 | Input area | Text input with send button; auto-grows for multi-line messages |
 | Welcome screen | Displays greeting message and quick-start options before first message |
@@ -905,13 +913,13 @@ const result = await streamText({
   messages: conversationHistory,
   tools: {
     searchContext: contextSearchTool,
-    classifyLead: leadClassifierTool,
-    manageIntake: intakeManagerTool,
+    captureLead: leadCaptureTool,
   },
+  maxSteps: 5,
 });
 ```
 
-The agent operates autonomously within guardrail boundaries — it can search context, ask questions, and classify leads without human intervention, but cannot exceed the configured response boundaries.
+The agent operates autonomously within guardrail boundaries — it can search context, ask questions, and classify leads without human intervention, but cannot exceed the configured response boundaries. The `maxSteps: 5` limit prevents infinite tool-calling loops.
 
 ### 7.3 Tool: Context Search
 
@@ -940,69 +948,35 @@ const contextSearchTool = tool({
 });
 ```
 
-### 7.4 Tool: Lead Classifier
+### 7.4 Tool: Lead Capture (with inline classification)
 
-**Purpose:** Classifies the urgency and quality of a lead based on collected information.
+**Purpose:** Captures structured lead data and classifies urgency in a single tool call. Replaces the originally specified separate classifier and intake manager tools — the LLM handles both responsibilities via the tool's parameters and the system prompt's classification guidance.
 
 **Mechanism:**
-1. Invoked when sufficient intake information has been gathered
-2. Uses the legal case analyzer to assess urgency based on: case type, timeline, statute of limitations proximity, severity indicators
-3. Returns classification: `urgent` / `normal` / `unqualified`
-4. Writes classification result to SQLite
-
-**Legal Case Analyzer — Implementation:**
-
-The legal case analyzer is a structured LLM call (not an external service). It uses the same configured LLM provider but with a dedicated classification prompt:
-
-```typescript
-const classificationResult = await generateObject({
-  model: configuredModel,
-  schema: z.object({
-    classification: z.enum(['urgent', 'normal', 'unqualified']),
-    rationale: z.string(),
-    urgency_factors: z.array(z.string()),
-  }),
-  prompt: `You are a legal intake classifier. Based on the following case information, classify the lead urgency.
-
-Factors that indicate URGENT:
-- Statute of limitations expiring within 30 days
-- Active danger to person or property
-- Ongoing medical treatment from recent incident
-- Court deadlines within 2 weeks
-- Restraining order or custody emergency
-
-Factors that indicate NORMAL:
-- Valid legal matter, no immediate time pressure
-- Exploratory consultation request
-- Matter is months or years old with no deadline
-
-Factors that indicate UNQUALIFIED:
-- Matter falls outside the firm's practice areas
-- No actionable legal issue described
-- User is seeking general information, not representation
-
-Case information:
-${JSON.stringify(collectedData)}`,
-});
-```
-
-This is a separate LLM call from the main conversation — it does not share the conversation's system prompt or history. The classification rationale is stored alongside the lead for the lawyer to review in the dashboard.
+1. The LLM calls `captureLead` as soon as it understands the visitor's legal matter (does not require contact info first)
+2. The LLM determines classification (urgent/normal/unqualified) based on system prompt criteria
+3. The tool writes the lead record and classification rationale to the database
+4. For urgent leads, a notification is automatically created
 
 **Interface:**
 ```typescript
-const leadClassifierTool = tool({
-  description: 'Classify lead urgency based on collected intake information',
+const captureLead = tool({
+  description: 'Capture a qualified lead after understanding the legal matter. Call as soon as the legal issue is clear — do not wait for complete contact info.',
   parameters: z.object({
-    caseType: z.string(),
-    timeline: z.string().optional(),
-    severityIndicators: z.array(z.string()),
-    collectedData: z.record(z.string()),
+    name: z.string().nullable(),
+    contactEmail: z.string().nullable(),
+    contactPhone: z.string().nullable(),
+    caseType: z.string().nullable(),
+    incidentDate: z.string().nullable(),
+    briefDescription: z.string(),
+    classification: z.enum(['urgent', 'normal', 'unqualified']),
+    classificationRationale: z.string(),
+    urgencyFactors: z.array(z.string()),
   }),
   execute: async (params) => {
-    // 1. Invoke legal case analyzer
-    // 2. Determine classification
-    // 3. Write to SQLite leads table
-    // 4. Return classification for agent to act on
+    // 1. Write lead record to database
+    // 2. Create notification if urgent
+    // 3. Return classification for agent to act on
   },
 });
 ```
@@ -1010,37 +984,22 @@ const leadClassifierTool = tool({
 **Classification outcomes:**
 | Classification | Criteria | Agent Action |
 |---------------|----------|--------------|
-| `urgent` | Time-sensitive matter, statute of limitations, active danger | Prioritize in DB; recommend immediate contact |
+| `urgent` | Time-sensitive matter, statute of limitations, active danger, recent arrest, user requests human help | Prioritize in DB; create notification; recommend immediate contact |
 | `normal` | Valid legal matter, not time-critical | Store in DB; offer consultation scheduling |
-| `unqualified` | Outside practice areas, no actionable legal matter | Politely redirect; do not store as lead |
+| `unqualified` | Outside practice areas, no actionable legal matter | Store in DB; politely redirect |
 
-### 7.5 Tool: Intake Manager
+**Partial lead fallback:** If the LLM does not call `captureLead` during a conversation (e.g., the user abandons mid-conversation), a heuristic-based partial lead extraction runs after each chat turn. This extracts any email, phone, name, and case description from user messages and saves a partial lead with classification based on urgency signal detection (regex-based keywords like "arrested", "today", "emergency", "DUI", etc.).
+
+### 7.5 Intake Question Flow (System Prompt Driven)
 
 **Purpose:** Tracks qualifying question progress and determines what to ask next.
 
-**Mechanism:**
-1. Maintains a checklist of configured qualifying questions (from `_guardrails.md`)
-2. Tracks which questions have been answered (explicitly or implicitly from conversation)
-3. Determines the next natural question based on conversation flow
-4. Signals when intake is complete (all required questions answered)
+**Implementation:** Rather than a separate tool, intake question flow is managed through the system prompt. The configured qualifying questions (from the guardrails configuration) are listed in the system prompt with their order and required/optional status. The LLM naturally weaves these questions into the conversation, extracting implicit answers when the user volunteers information unprompted.
 
-**Interface:**
-```typescript
-const intakeManagerTool = tool({
-  description: 'Check intake progress and determine the next qualifying question to ask',
-  parameters: z.object({
-    answeredQuestions: z.array(z.object({
-      question: z.string(),
-      answer: z.string(),
-    })),
-  }),
-  execute: async ({ answeredQuestions }) => {
-    // 1. Compare against configured questions
-    // 2. Identify unanswered required questions
-    // 3. Return next question or "intake_complete" signal
-  },
-});
-```
+This approach was chosen over a dedicated tool because:
+- The LLM handles conversational flow better than a rule-based state machine
+- Implicit answer extraction (e.g., user says "I was in a car accident last week" → case type and timeline are answered) works naturally with the LLM
+- Fewer tool calls means faster response times
 
 ### 7.6 Search Strategy
 
@@ -1116,12 +1075,15 @@ The base instructions are static. Everything else is injected dynamically based 
 
 ### 7.10 Lead Data Extraction
 
-As the user answers qualifying questions, the agent extracts structured data and stores it progressively:
+Lead capture operates through two complementary mechanisms:
+
+**Primary: LLM-driven capture via `captureLead` tool**
+
+The LLM calls `captureLead` as soon as it understands the visitor's legal matter. It does not wait for complete contact information — a brief description of the legal issue is sufficient. This ensures leads are captured even when visitors ask for escalation early in the conversation.
 
 ```json
 {
   "session_id": "sess_abc123",
-  "extracted_at": "2026-05-09T16:30:00Z",
   "lead": {
     "name": "Jane Doe",
     "contact_email": "jane@example.com",
@@ -1129,14 +1091,21 @@ As the user answers qualifying questions, the agent extracts structured data and
     "case_type": "personal_injury",
     "incident_date": "2026-04-15",
     "brief_description": "Car accident on I-95, other driver at fault",
-    "urgency_indicators": ["recent_incident", "medical_treatment_ongoing"],
     "classification": "urgent",
-    "classified_at": "2026-05-09T16:32:00Z"
+    "classification_rationale": "Recent incident with ongoing medical treatment",
+    "urgency_factors": ["recent_incident", "medical_treatment_ongoing"]
   }
 }
 ```
 
-Data is written to SQLite incrementally — even if the conversation is abandoned midway, partial data is preserved.
+**Fallback: Heuristic-based partial lead extraction**
+
+After each chat turn, a regex-based extraction runs to capture any data shared in user messages (email, phone, name patterns). If the LLM did not call `captureLead`, this partial data is saved with a heuristic classification:
+- **Urgent:** Conversation contains both legal matter keywords (DUI, assault, cocaine, etc.) AND urgency signals (today, arrested, detained, emergency, human representative)
+- **Normal:** Conversation describes a legal matter without urgency signals
+- **Unqualified:** No identifiable legal matter in the conversation
+
+This ensures that even abandoned mid-conversation sessions preserve whatever information was shared.
 
 ### 7.11 Fallback Behavior
 
@@ -1196,10 +1165,11 @@ Post-MVP: OAuth providers, team invitations, role-based access.
 The full configuration form as specified in Section 4, rendered as an interactive editor:
 
 - All seven form sections (Persona, Practice Areas, Qualifying Questions, Boundaries, Escalation, Contact, Custom Instructions)
-- Save button creates a new version
-- Version history sidebar with timestamps and one-click rollback
-- "Publish" button generates `_guardrails.md` and pushes to context store
-- Unsaved changes warning on navigation
+- Save button creates a new version via `POST /api/dashboard/config` with `{ action: 'save', config: {...} }`
+- "Publish" button publishes the latest version via `POST /api/dashboard/config` with `{ action: 'publish' }`
+- Preview chat panel alongside the form for testing changes before publishing
+
+> **Implementation note:** Configuration save and publish use standard API route handlers (`POST /api/dashboard/config`) rather than Next.js server actions. This avoids server action ID mismatch issues that occur on serverless platforms like Netlify where cached HTML from a previous deploy can reference stale action hashes.
 
 ### 8.5 Leads Page
 
@@ -1262,7 +1232,7 @@ interface Notification {
 }
 ```
 
-The notification table in SQLite supports additional channels (email, SMS, webhook) via a `delivery_channel` field and `delivered_at` timestamp — wiring these up is post-MVP.
+The notification table in the database supports additional channels (email, SMS, webhook) via a `delivery_channel` field and `delivered_at` timestamp — wiring these up is post-MVP.
 
 ### 8.8 Widget Installation Page
 
@@ -1315,11 +1285,11 @@ An embedded sandboxed chat widget for testing:
 |-------|-----------|
 | Framework | Next.js (React) |
 | Styling | Tailwind CSS |
-| State management | React Server Components + `useActionState` for forms |
-| API layer | Next.js Route Handlers |
-| Database access | Drizzle ORM (SQLite) |
-| Authentication | Custom email/password (bcrypt + session cookies) |
-| Deployment | Vercel or self-hosted Node.js |
+| State management | React Client Components with `fetch` to API routes |
+| API layer | Next.js Route Handlers (no server actions — see 8.4 note) |
+| Database access | Drizzle ORM (Neon PostgreSQL) |
+| Authentication | Custom email/password (bcryptjs + iron-session cookies) |
+| Deployment | Netlify with `@netlify/plugin-nextjs` |
 
 ### 8.12 MVP Scope Boundaries
 
@@ -1343,8 +1313,8 @@ Explicitly deferred to post-MVP:
 | Frontend framework | React / Next.js | Dashboard and widget |
 | AI SDK | Vercel AI SDK (`@ai-sdk/google`) | Streaming, tool-calling, Gemini integration |
 | Styling | Tailwind CSS | Dashboard and widget theming |
-| Database | SQLite (better-sqlite3) | Leads, sessions, configuration |
-| ORM | Drizzle | Type-safe database access |
+| Database | Neon PostgreSQL (`@neondatabase/serverless`) | Leads, sessions, configuration |
+| ORM | Drizzle (`drizzle-orm/neon-http`) | Type-safe database access |
 | Crawler rendering | Playwright | Headless browser for CSR pages |
 | Validation | Zod | Schema validation across API boundaries |
 | Package manager | pnpm | Fast, disk-efficient, workspace support |
@@ -1362,15 +1332,17 @@ The Vercel AI SDK is the backbone of the LLM integration layer:
 
 Eliminates ~2000 lines of boilerplate that would otherwise be needed for streaming, retries, and model integration.
 
-### 9.3 SQLite Justification
+### 9.3 Neon PostgreSQL
 
-- **Zero-config:** No database server to run, no connection strings to manage
-- **Embedded:** Ships as a single file alongside the API server
-- **Fast for reads:** Lead queries and config lookups are sub-millisecond
-- **MVP-appropriate:** Handles thousands of leads and sessions without performance concerns
-- **Migration path:** Schema designed with Postgres compatibility in mind; switching requires only a Drizzle dialect change and connection string
+The project initially used SQLite (`better-sqlite3`) for development simplicity, then migrated to Neon serverless PostgreSQL for production deployment on Netlify:
 
-**When to migrate:** When concurrent write throughput exceeds SQLite's single-writer limitation (likely >50 active chat sessions simultaneously writing).
+- **Serverless-compatible:** No persistent filesystem required — works with Netlify Functions, Vercel, and other serverless platforms
+- **Connection pooling built-in:** Neon's HTTP driver handles connection management automatically
+- **Free tier:** 0.5 GB storage, 190 compute hours/month — sufficient for MVP
+- **Branching:** Neon supports database branching for dev/staging environments (post-MVP)
+- **Drizzle compatibility:** `drizzle-orm/neon-http` is a drop-in replacement for `drizzle-orm/better-sqlite3` with the schema ported from `sqliteTable` to `pgTable`
+
+SQLite (`better-sqlite3`) is retained as a dev dependency for in-memory test mocks, keeping tests fast and isolated without requiring a network database connection.
 
 ### 9.4 Playwright over Puppeteer
 
@@ -1388,7 +1360,7 @@ Playwright's multi-engine support ensures the crawler can render pages that beha
 
 - **Lightweight:** No binary dependencies (unlike Prisma's query engine)
 - **Type-safe:** Full TypeScript inference from schema definition to query results
-- **SQLite-native:** First-class SQLite support with `drizzle-orm/better-sqlite3`
+- **Multi-dialect:** Supports both PostgreSQL (`drizzle-orm/neon-http` for production) and SQLite (`drizzle-orm/better-sqlite3` for test mocks) with minimal schema differences
 - **Migration tooling:** `drizzle-kit` generates SQL migrations from schema changes
 - **Zero overhead:** Compiles to raw SQL with no runtime query building cost
 
@@ -1431,19 +1403,29 @@ legal-chatbot/
 - Shared `tsconfig` and lint rules
 - Single `pnpm install` for all packages
 
-### 9.7 Deployment Recommendation
+### 9.7 Deployment
+
+The system is deployed as two Netlify sites from the same monorepo:
 
 | Component | Deployment Target | Notes |
 |-----------|------------------|-------|
-| Dashboard + API | Vercel (or any Node.js host) | Next.js native on Vercel; serverless functions for API routes |
-| Widget | CDN (Vercel Edge, Cloudflare, or npm) | Static JS bundle, globally distributed |
+| Dashboard + API | Netlify (`@netlify/plugin-nextjs`) | Next.js serverless functions for API routes; base directory `packages/api` |
+| Widget + Demo site | Netlify (static) | Vite build output; `chatbot-context/` served as static assets alongside the widget |
 | Crawler | npm registry | Distributed as `npx`-executable package |
-| SQLite DB | Persistent volume on server | Turso (libSQL) as managed alternative if serverless |
+| Database | Neon (serverless PostgreSQL) | Managed, no infrastructure to maintain |
 
-**Note on serverless + SQLite:** If deploying to Vercel's serverless functions, SQLite requires a persistent filesystem. Options:
-- Use Turso (distributed SQLite) as a drop-in replacement
-- Deploy API to a VPS (Railway, Render, Fly.io) with persistent disk
-- Use Vercel for dashboard only, separate API deployment
+**Environment variables (API site):**
+- `DATABASE_URL` — Neon connection string
+- `GOOGLE_GENERATIVE_AI_API_KEY` — Gemini API key
+- `SESSION_SECRET` — iron-session encryption key (min 32 chars)
+
+**Environment variables (Widget site):**
+- `VITE_API_URL` — URL to the API site's chat endpoint (e.g., `https://api-site.netlify.app/api/chat`)
+
+**Key deployment decisions:**
+- Server actions are **not used** — all mutations go through API route handlers (`POST /api/*`) to avoid action ID mismatch issues across Netlify deploys
+- `bcrypt` (native C++ addon) was replaced with `bcryptjs` (pure JS) to eliminate native binary compilation on Netlify's build environment
+- CORS is set to `Access-Control-Allow-Origin: *` since the widget is designed to be embedded on any client's website
 
 ### 9.8 Testing Strategy
 
@@ -1466,12 +1448,13 @@ legal-chatbot/
 |---------|---------|
 | `zod` | Schema validation for API inputs, form data, tool parameters |
 | `unified` / `rehype` / `remark` | Markdown parsing and HTML-to-markdown conversion (crawler) |
-| `better-sqlite3` | Native SQLite driver (fast, synchronous API) |
+| `@neondatabase/serverless` | Neon PostgreSQL HTTP driver (production database) |
+| `better-sqlite3` | In-memory SQLite for test mocks (dev dependency only) |
 | `nanoid` | Compact, URL-safe unique ID generation (session IDs, API keys) |
 | `cheerio` | HTML parsing for static page content extraction (crawler) |
 | `p-limit` | Concurrency control for parallel page fetches (crawler) |
-| `bcrypt` | Password hashing (dashboard auth + API key hashing) |
-| `cookie` | Secure session cookie parsing (dashboard auth) |
+| `bcryptjs` | Password hashing (dashboard auth + API key hashing) — pure JS, no native binaries |
+| `iron-session` | Encrypted cookie-based session management (dashboard auth) |
 
 ### 9.10 Environment & Tooling
 
@@ -1537,7 +1520,7 @@ The chatbot faces public internet users — adversarial input is guaranteed:
 ### 11.3 Cost Monitoring
 
 LLM API costs can spike unexpectedly:
-- Log token usage (input + output) per conversation in SQLite
+- Log token usage (input + output) per conversation in the database
 - Display cumulative spend in the dashboard (approximate, based on per-token pricing)
 - Set up configurable spend alerts (e.g., "notify me if daily cost exceeds $50")
 - Consider implementing a daily budget cap that disables the chatbot (with a friendly message) if exceeded
@@ -1554,7 +1537,7 @@ The chatbot operates in a legally sensitive domain:
 
 Even for MVP, personal data collection requires consent:
 - Display a consent banner in the widget before collecting any personal data (name, email, phone)
-- Store a consent timestamp and method per session in SQLite
+- Store a consent timestamp and method per session in the database
 - Provide a data deletion mechanism in the dashboard — deletes the lawyer-facing copy while archiving a retained copy per our data retention policy
 - Draft a privacy policy template that lawyers can customize and link from the widget
 - Ensure chat transcripts can be exported on request
@@ -1564,7 +1547,7 @@ Even for MVP, personal data collection requires consent:
 
 Reduce LLM calls and improve response time for common queries:
 - Cache responses to frequently asked questions (FAQ-type queries) based on semantic similarity
-- Store cached responses in SQLite with a TTL (invalidate when context store changes)
+- Store cached responses in the database with a TTL (invalidate when context store changes)
 - FAQ detection: if the user's question closely matches a previously answered question, serve the cached response
 - Expected savings: 30-50% reduction in LLM calls for firms with predictable intake questions
 
@@ -1594,19 +1577,19 @@ Before building all features, validate assumptions:
 
 The rapid prototype testbed is a minimal local environment that simulates the full production architecture on a single developer machine. It consists of a React app (acting as a lawyer's website), the chatbot widget embedded in it, a local API server, and context files stored on the filesystem. This testbed is the primary development and demonstration environment.
 
-### 12.2 No External Dependencies (Except LLM)
+### 12.2 External Dependencies
 
-The testbed runs entirely locally with one exception — the Gemini API call:
+The testbed runs locally with two external dependencies — the Gemini API and the Neon database:
 
 | Component | Location |
 |-----------|----------|
 | React test app | `localhost:5173` (Vite) |
 | API server | `localhost:3000` (Next.js) |
 | Context store | Local filesystem (`./chatbot-context/`) |
-| SQLite database | Local file (`./data/chatbot.db`) |
+| PostgreSQL database | Neon (external — requires `DATABASE_URL`) |
 | LLM calls | External (Gemini API — requires API key) |
 
-No Docker, no cloud services, no external databases. A developer with Node.js and a Gemini API key can run the full system.
+No Docker or self-hosted databases. A developer with Node.js, a Gemini API key, and a Neon connection string can run the full system.
 
 ### 12.3 Dev Environment Setup
 
@@ -1626,24 +1609,24 @@ This concurrently starts:
 git clone <repo>
 cd legal-chatbot
 pnpm install
-cp .env.example .env          # Add GEMINI_API_KEY
-pnpm db:migrate               # Create SQLite tables
+cp .env.example .env          # Add DATABASE_URL and GOOGLE_GENERATIVE_AI_API_KEY
+pnpm db:migrate               # Create PostgreSQL tables on Neon
 pnpm db:seed                  # Create dev account + test API key
 pnpm dev                      # Everything running
 ```
 
 **Dev seed script (`pnpm db:seed`)** creates:
 - A test account (`dev@legalchatbot.com` / `password123`)
-- A dev API key: `dev_test_key` (unhashed in dev mode for convenience)
-- A published guardrails configuration (using Smith & Associates defaults)
-- `context_store_url` set to `http://localhost:5173/chatbot-context/` (served by Vite)
+- A dev API key: `dev_test_key` (bcrypt-hashed)
+- A published guardrails configuration (using Shrager Defense Attorneys defaults)
+- `context_store_url` set to `http://localhost:5173/chatbot-context/` (served by Vite; override via `CONTEXT_STORE_URL` env var)
 
 **Context store in dev mode:**
 The React test app's Vite dev server serves the `./chatbot-context/` directory as static files at `http://localhost:5173/chatbot-context/`. This mirrors production where the files would be served from the lawyer's website over HTTPS. The API server fetches from this URL identically to how it would in production — no special local-mode code paths.
 
-### 12.4 Mock Law Firm Content
+### 12.4 Law Firm Content
 
-The repo ships with a pre-written set of context files for a fictional firm — "Smith & Associates" — so development can begin immediately without crawling a real website:
+The repo ships with a pre-crawled set of context files from Shrager Defense Attorneys (a real Pittsburgh criminal defense firm) so development can begin immediately:
 
 ```
 chatbot-context/
@@ -1651,21 +1634,20 @@ chatbot-context/
 ├── _guardrails.md
 ├── pages/
 │   ├── index.md                          # Homepage: firm overview
-│   ├── about.md                          # About: 20 years experience, 3 partners
-│   ├── practice-areas--personal-injury.md # PI: car accidents, slip & fall
-│   ├── practice-areas--family-law.md      # Family: divorce, custody, adoption
-│   ├── practice-areas--estate-planning.md # Estate: wills, trusts, probate
-│   ├── attorneys--john-smith.md           # Senior partner bio
-│   ├── attorneys--jane-doe.md             # Associate bio
-│   ├── faq.md                             # Common questions
-│   └── contact.md                         # Hours, phone, email, address
+│   ├── pittsburgh-law-firm.md            # About: 50+ years, downtown Pittsburgh
+│   ├── pittsburgh-dui-attorney.md        # DUI defense
+│   ├── criminal-lawyers-pittsburgh.md    # Criminal defense overview
+│   ├── pittsburgh-drug-lawyer.md         # Drug crimes
+│   ├── pittsburgh-attorneys-david-shrager.md  # Lead attorney bio
+│   ├── contact.md                        # Hours, phone, email, address
+│   └── ... (~100 pages total)
 └── config/
     ├── qualifying-questions.md
     ├── escalation-rules.md
     └── contact-info.md
 ```
 
-This mock content provides realistic scenarios for testing: practice area questions, attorney lookup, intake qualification, and out-of-scope deflection.
+This real-world content provides realistic scenarios for testing: practice area questions, attorney lookup, intake qualification, escalation handling, and out-of-scope deflection. The `test-site/` directory in the crawler package also contains simple HTML pages for a fictional "Demo Law Firm" used for crawler unit testing.
 
 ### 12.5 Incremental Build Order
 
@@ -1679,7 +1661,7 @@ Phase 1          Phase 2              Phase 3           Phase 4          Phase 5
 └──────────┘    └────────────────┘   └─────────────┘  └────────────┘  └─────────────────┘  └───────────┘
      │                  │                   │                │                 │                   │
   Outputs MD        Searches &          Streams LLM      Renders chat     Writes leads       Config +
-  files from        retrieves           responses        in browser       to SQLite          lead view
+  files from        retrieves           responses        in browser       to PostgreSQL      lead view
   websites          context             with context                      with urgency
 ```
 
@@ -1741,7 +1723,7 @@ npx tsx scripts/test-search.ts "I was in a car accident"
 - Vercel AI SDK `streamText` with Gemini model
 - System prompt composition (guardrails + retrieved context)
 - Context search tool wired to Phase 2 module
-- Session management (create/resume sessions in SQLite)
+- Session management (create/resume sessions in PostgreSQL)
 
 **API Contract — `POST /api/chat`:**
 
@@ -1838,21 +1820,25 @@ Open `http://localhost:5173` in a browser → click chat bubble → type a quest
 
 ### 12.10 Phase 5: Lead Classification + Database
 
-**Goal:** After qualifying questions are answered, the agent classifies the lead and writes structured data to SQLite.
+**Goal:** The agent captures and classifies leads, writing structured data to the database.
 
 **Build:**
-- Intake manager tool (tracks which questions have been asked)
-- Lead classifier tool (structured Gemini call for urgency classification)
-- SQLite writes: lead record with classification, rationale, extracted data
-- Archived data table for retention policy
+- Lead capture tool (LLM calls `captureLead` with classification inline)
+- Partial lead fallback (heuristic-based extraction for abandoned sessions)
+- PostgreSQL writes: lead record with classification, rationale, extracted data
+- Urgent lead notification creation
 
 **Deliverable:**
 Simulate a full intake conversation → verify lead appears in database with classification.
 
 ```bash
-# After a test conversation:
-sqlite3 ./data/chatbot.db "SELECT name, case_type, classification FROM leads;"
-# Output: Jane Doe | personal_injury | urgent
+# After a test conversation, check via Neon SQL console or:
+DATABASE_URL=postgresql://... npx tsx -e "
+  import { neon } from '@neondatabase/serverless';
+  const sql = neon(process.env.DATABASE_URL);
+  const rows = await sql('SELECT name, case_type, classification FROM leads');
+  console.log(rows);
+"
 ```
 
 **Done when:**
@@ -1897,7 +1883,7 @@ Each phase has explicit "done when" criteria. The testing strategy is cumulative
 | 2 (Search) | Unit | Vitest | Scoring accuracy, threshold behavior, token budgeting |
 | 3 (Chat API) | Integration | Vitest + curl | Streaming, tool calls, context grounding, guardrail compliance |
 | 4 (Widget) | Manual | Browser | UI renders correctly, streaming works, responsive layout |
-| 5 (Classification) | Unit + Integration | Vitest + SQLite queries | DB writes, classification accuracy, partial data handling |
+| 5 (Classification) | Unit + Integration | Vitest + DB queries | DB writes, classification accuracy, partial data handling |
 | 6 (Dashboard) | Manual + E2E | Browser + Playwright | Pages render, forms save, data displays correctly |
 
 **Regression check between phases:**
@@ -1928,7 +1914,7 @@ pnpm test:e2e      # Runs Playwright E2E tests (added in Phase 6)
 | 4 | Guardrails form (hardcoded) + system prompt composition | Chatbot respects boundaries |
 | 5 | Crawler CLI | Automated context generation |
 | 6 | Dashboard (config + leads) | Full management interface |
-| 7 | Lead classification + SQLite persistence | Lead qualification working |
+| 7 | Lead classification + PostgreSQL persistence | Lead qualification working |
 | 8 | Mobile optimization + theming + polish | Production-ready widget |
 
 This alternative order gets a visible demo after Phase 3 (~2-3 days) using the pre-shipped mock content, deferring the crawler until the chat experience is validated. Use this order if you need to show stakeholders a working prototype before building tooling.
