@@ -1,10 +1,39 @@
 'use client';
 
-import { useActionState } from 'react';
-import { loginAction } from './actions';
+import { useState } from 'react';
 
 export default function LoginPage() {
-  const [state, formAction, pending] = useActionState(loginAction, null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setPending(true);
+    setError(null);
+
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        window.location.href = data.redirect;
+      } else {
+        setError(data.error || 'Login failed');
+      }
+    } catch {
+      setError('Network error');
+    } finally {
+      setPending(false);
+    }
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center px-4">
@@ -12,10 +41,10 @@ export default function LoginPage() {
         <h1 className="text-2xl font-bold text-center mb-2">Legal Chatbot</h1>
         <p className="text-gray-600 text-center mb-8">Sign in to your dashboard</p>
 
-        <form action={formAction} className="bg-white rounded-lg shadow p-6 space-y-4">
-          {state?.error && (
+        <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 space-y-4">
+          {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-sm">
-              {state.error}
+              {error}
             </div>
           )}
 

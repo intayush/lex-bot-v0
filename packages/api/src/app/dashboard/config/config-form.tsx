@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useActionState } from 'react';
-import { saveConfig, publishConfig } from './actions';
+import { useState } from 'react';
 import type { Configuration } from '@legal-chatbot/shared';
 
 const DEFAULT_PRACTICE_AREAS = [
@@ -26,14 +25,54 @@ const defaultConfig: Configuration = {
 export function ConfigForm({ initialConfig }: { initialConfig: Configuration | null }) {
   const [config, setConfig] = useState<Configuration>(initialConfig ?? defaultConfig);
   const [activeTab, setActiveTab] = useState(0);
-  const [saveState, saveAction, savePending] = useActionState(saveConfig, null);
-  const [pubState, pubAction, pubPending] = useActionState(publishConfig, null);
+  const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [saveResult, setSaveResult] = useState<{ success?: boolean; error?: string } | null>(null);
+  const [pubResult, setPubResult] = useState<{ success?: boolean; error?: string } | null>(null);
 
   const tabs = ['Persona', 'Practice Areas', 'Questions', 'Boundaries', 'Escalation', 'Contact', 'Custom'];
 
-  function handleSave(formData: FormData) {
-    formData.set('config', JSON.stringify(config));
-    saveAction(formData);
+  async function handleSave() {
+    setSaving(true);
+    setSaveResult(null);
+    try {
+      const res = await fetch('/api/dashboard/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save', config }),
+      });
+      const data = await res.json();
+      setSaveResult(data);
+      if (data.success) {
+        // Reload to get updated version number
+        setTimeout(() => window.location.reload(), 500);
+      }
+    } catch {
+      setSaveResult({ error: 'Network error' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handlePublish() {
+    setPublishing(true);
+    setPubResult(null);
+    try {
+      const res = await fetch('/api/dashboard/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'publish' }),
+      });
+      const data = await res.json();
+      setPubResult(data);
+      if (data.success) {
+        setTimeout(() => window.location.reload(), 500);
+      }
+    } catch {
+      setPubResult({ error: 'Network error' });
+    } finally {
+      setPublishing(false);
+    }
   }
 
   return (
@@ -66,28 +105,24 @@ export function ConfigForm({ initialConfig }: { initialConfig: Configuration | n
 
       {/* Actions */}
       <div className="mt-4 flex gap-3 items-center">
-        <form action={handleSave}>
-          <button
-            type="submit"
-            disabled={savePending}
-            className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-          >
-            {savePending ? 'Saving...' : 'Save Draft'}
-          </button>
-        </form>
-        <form action={pubAction}>
-          <button
-            type="submit"
-            disabled={pubPending}
-            className="px-4 py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50"
-          >
-            {pubPending ? 'Publishing...' : 'Publish'}
-          </button>
-        </form>
-        {saveState?.success && <span className="text-green-600 text-sm">Saved!</span>}
-        {saveState?.error && <span className="text-red-600 text-sm">{saveState.error}</span>}
-        {pubState?.success && <span className="text-green-600 text-sm">Published!</span>}
-        {pubState?.error && <span className="text-red-600 text-sm">{pubState.error}</span>}
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+        >
+          {saving ? 'Saving...' : 'Save Draft'}
+        </button>
+        <button
+          onClick={handlePublish}
+          disabled={publishing}
+          className="px-4 py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+        >
+          {publishing ? 'Publishing...' : 'Publish'}
+        </button>
+        {saveResult?.success && <span className="text-green-600 text-sm">Saved!</span>}
+        {saveResult?.error && <span className="text-red-600 text-sm">{saveResult.error}</span>}
+        {pubResult?.success && <span className="text-green-600 text-sm">Published!</span>}
+        {pubResult?.error && <span className="text-red-600 text-sm">{pubResult.error}</span>}
       </div>
     </div>
   );
@@ -340,4 +375,3 @@ function Field({ label, value, onChange }: { label: string; value: string; onCha
     </div>
   );
 }
-
