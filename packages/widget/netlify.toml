@@ -1,18 +1,11 @@
 [build]
-  command = "cd ../.. && pnpm install && pnpm --filter @legal-chatbot/shared build && cd packages/widget && pnpm build && cp -r ../../chatbot-context dist/chatbot-context"
+  command = "npm install -g pnpm && cd ../.. && pnpm install && pnpm --filter @legal-chatbot/shared build && pnpm --filter @legal-chatbot/widget build && cp -r chatbot-context packages/widget/dist/chatbot-context"
   publish = "dist"
 
 [build.environment]
   NODE_VERSION = "20"
 
-# SPA fallback — serve index.html for all routes
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-  conditions = {Role = ["admin"]}
-
-# But serve chatbot-context files directly
+# CORS headers for chatbot-context files
 [[headers]]
   for = "/chatbot-context/*"
   [headers.values]
