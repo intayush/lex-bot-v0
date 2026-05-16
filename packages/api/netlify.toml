@@ -7,3 +7,5 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # Disable Netlify CSRF protection — Next.js server actions handle their own CSRF
+  NETLIFY_NEXT_CSRF_PROTECTION = "false"
