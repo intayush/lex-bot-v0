@@ -57,7 +57,7 @@ export default function LoginPage() {
             Client intake,<br />
             on autopilot.
           </h2>
-          <p className="text-base text-white/50 max-w-sm leading-relaxed">
+          <p className="text-base text-white/75 max-w-sm leading-relaxed">
             Your AI-powered assistant qualifies leads, collects case details, and routes them to your team — 24/7.
           </p>
         </div>
