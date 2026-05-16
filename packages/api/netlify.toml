@@ -1,11 +1,10 @@
 [build]
-  command = "pnpm install --frozen-lockfile && pnpm --filter @legal-chatbot/shared build && pnpm --filter @legal-chatbot/api build"
-  publish = "packages/api/.next"
+  command = "cd ../.. && pnpm install --frozen-lockfile && pnpm --filter @legal-chatbot/shared build && cd packages/api && pnpm build"
+  publish = ".next"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
 [build.environment]
   NODE_VERSION = "20"
-  # Disable Netlify CSRF protection — Next.js server actions handle their own CSRF
   NETLIFY_NEXT_CSRF_PROTECTION = "false"
