@@ -1,9 +1,20 @@
+import type { Metadata } from 'next';
 import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'Legal Chatbot Dashboard',
+  description: 'Manage leads, configure your chatbot, and track client intake for your law firm.',
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="bg-gray-50 text-gray-900 antialiased">{children}</body>
+      <body
+        className="antialiased"
+        style={{ fontFamily: "'DM Sans', system-ui, -apple-system, sans-serif" }}
+      >
+        {children}
+      </body>
     </html>
   );
 }

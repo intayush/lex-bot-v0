@@ -78,13 +78,15 @@ export function ConfigForm({ initialConfig }: { initialConfig: Configuration | n
   return (
     <div>
       {/* Tabs */}
-      <div className="flex flex-wrap gap-1 mb-4 border-b">
+      <div className="flex flex-wrap gap-1.5 mb-6">
         {tabs.map((tab, i) => (
           <button
             key={tab}
             onClick={() => setActiveTab(i)}
-            className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${
-              activeTab === i ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+            className={`px-3.5 py-1.5 text-sm font-medium rounded-lg transition ${
+              activeTab === i
+                ? 'bg-[#171717] text-white'
+                : 'text-[#737373] hover:text-[#171717]'
             }`}
           >
             {tab}
@@ -93,7 +95,7 @@ export function ConfigForm({ initialConfig }: { initialConfig: Configuration | n
       </div>
 
       {/* Tab Content */}
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="bg-white rounded-xl border border-[#E5E5E5] p-8">
         {activeTab === 0 && <PersonaSection config={config} setConfig={setConfig} />}
         {activeTab === 1 && <PracticeAreasSection config={config} setConfig={setConfig} />}
         {activeTab === 2 && <QuestionsSection config={config} setConfig={setConfig} />}
@@ -104,25 +106,25 @@ export function ConfigForm({ initialConfig }: { initialConfig: Configuration | n
       </div>
 
       {/* Actions */}
-      <div className="mt-4 flex gap-3 items-center">
+      <div className="mt-6 flex gap-3 items-center">
         <button
           onClick={handleSave}
           disabled={saving}
-          className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+          className="bg-[#171717] hover:bg-[#262626] text-white rounded-lg px-5 py-2.5 text-sm font-medium transition disabled:opacity-50"
         >
           {saving ? 'Saving...' : 'Save Draft'}
         </button>
         <button
           onClick={handlePublish}
           disabled={publishing}
-          className="px-4 py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+          className="bg-[#059669] hover:bg-[#047857] text-white rounded-lg px-5 py-2.5 text-sm font-medium transition disabled:opacity-50"
         >
           {publishing ? 'Publishing...' : 'Publish'}
         </button>
-        {saveResult?.success && <span className="text-green-600 text-sm">Saved!</span>}
-        {saveResult?.error && <span className="text-red-600 text-sm">{saveResult.error}</span>}
-        {pubResult?.success && <span className="text-green-600 text-sm">Published!</span>}
-        {pubResult?.error && <span className="text-red-600 text-sm">{pubResult.error}</span>}
+        {saveResult?.success && <span className="text-[#059669] text-sm">&#10003; Saved!</span>}
+        {saveResult?.error && <span className="text-[#DC2626] text-sm">{saveResult.error}</span>}
+        {pubResult?.success && <span className="text-[#059669] text-sm">&#10003; Published!</span>}
+        {pubResult?.error && <span className="text-[#DC2626] text-sm">{pubResult.error}</span>}
       </div>
     </div>
   );
@@ -137,23 +139,23 @@ function PersonaSection({ config, setConfig }: SectionProps) {
   const update = (fields: Partial<typeof p>) => setConfig({ ...config, persona: { ...p, ...fields } });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <Field label="Firm Name" value={p.firm_name} onChange={(v) => update({ firm_name: v })} />
       <Field label="Chatbot Name" value={p.chatbot_name} onChange={(v) => update({ chatbot_name: v })} />
       <div>
-        <label className="block text-sm font-medium mb-1">Greeting Message</label>
+        <label className="block text-sm font-medium text-[#171717] mb-1.5">Greeting Message</label>
         <textarea
           value={p.greeting_message}
           onChange={(e) => update({ greeting_message: e.target.value })}
-          className="w-full border rounded px-3 py-2 text-sm h-20"
+          className="w-full border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm h-24 focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
         />
       </div>
       <div>
-        <label className="block text-sm font-medium mb-1">Tone</label>
+        <label className="block text-sm font-medium text-[#171717] mb-1.5">Tone</label>
         <select
           value={p.tone}
           onChange={(e) => update({ tone: e.target.value as 'formal' | 'friendly' | 'neutral' })}
-          className="border rounded px-3 py-2 text-sm"
+          className="w-full border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
         >
           <option value="formal">Formal</option>
           <option value="friendly">Friendly</option>
@@ -183,34 +185,45 @@ function PracticeAreasSection({ config, setConfig }: SectionProps) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div>
-        <label className="block text-sm font-medium mb-2">Active Practice Areas</label>
-        <div className="grid grid-cols-2 gap-2">
+        <label className="block text-sm font-medium text-[#171717] mb-2">Active Practice Areas</label>
+        <div className="grid grid-cols-2 gap-2.5">
           {DEFAULT_PRACTICE_AREAS.map((area) => (
-            <label key={area} className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={pa.active.includes(area)} onChange={() => toggleArea(area)} />
+            <label key={area} className="flex items-center gap-2.5 text-sm">
+              <input
+                type="checkbox"
+                checked={pa.active.includes(area)}
+                onChange={() => toggleArea(area)}
+                className="w-4 h-4 rounded border-[#E5E5E5] accent-[#2563EB]"
+              />
               {area}
             </label>
           ))}
         </div>
       </div>
       <div>
-        <label className="block text-sm font-medium mb-1">Custom Practice Areas</label>
-        {pa.custom.map((c, i) => (
-          <div key={i} className="flex gap-2 mb-2">
-            <input value={c} onChange={(e) => setCustom(i, e.target.value)} className="flex-1 border rounded px-3 py-1 text-sm" />
-            <button onClick={() => removeCustom(i)} className="text-red-500 text-sm">Remove</button>
-          </div>
-        ))}
-        <button onClick={addCustom} className="text-blue-600 text-sm">+ Add custom area</button>
+        <label className="block text-sm font-medium text-[#171717] mb-1.5">Custom Practice Areas</label>
+        <div className="space-y-2">
+          {pa.custom.map((c, i) => (
+            <div key={i} className="bg-[#FAFAFA] rounded-lg p-3 border border-[#F5F5F5] border-l-2 border-l-[#2563EB] flex gap-2.5 items-center">
+              <input
+                value={c}
+                onChange={(e) => setCustom(i, e.target.value)}
+                className="flex-1 border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm bg-white focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
+              />
+              <button onClick={() => removeCustom(i)} className="text-[#A3A3A3] hover:text-[#DC2626] text-xs transition">Remove</button>
+            </div>
+          ))}
+        </div>
+        <button onClick={addCustom} className="text-[#2563EB] text-sm font-medium hover:text-[#1D4ED8] mt-2.5 transition">+ Add custom area</button>
       </div>
       <div>
-        <label className="block text-sm font-medium mb-1">Out-of-Scope Response</label>
+        <label className="block text-sm font-medium text-[#171717] mb-1.5">Out-of-Scope Response</label>
         <textarea
           value={pa.out_of_scope_response}
           onChange={(e) => update({ out_of_scope_response: e.target.value })}
-          className="w-full border rounded px-3 py-2 text-sm h-20"
+          className="w-full border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm h-24 focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
         />
       </div>
     </div>
@@ -230,25 +243,32 @@ function QuestionsSection({ config, setConfig }: SectionProps) {
   };
 
   return (
-    <div className="space-y-3">
-      <label className="block text-sm font-medium">Qualifying Questions (in order)</label>
-      {qs.map((q, i) => (
-        <div key={i} className="flex gap-2 items-start">
-          <span className="text-xs text-gray-400 pt-2 w-5">{i + 1}.</span>
-          <input
-            value={q.question}
-            onChange={(e) => set(i, { question: e.target.value })}
-            className="flex-1 border rounded px-3 py-1 text-sm"
-            placeholder="Enter question..."
-          />
-          <label className="flex items-center gap-1 text-xs whitespace-nowrap">
-            <input type="checkbox" checked={q.required} onChange={(e) => set(i, { required: e.target.checked })} />
-            Required
-          </label>
-          <button onClick={() => remove(i)} className="text-red-500 text-xs">Remove</button>
-        </div>
-      ))}
-      <button onClick={add} className="text-blue-600 text-sm">+ Add question</button>
+    <div className="space-y-4">
+      <label className="block text-sm font-medium text-[#171717]">Qualifying Questions (in order)</label>
+      <div className="space-y-2">
+        {qs.map((q, i) => (
+          <div key={i} className="bg-[#FAFAFA] rounded-lg p-3 border border-[#F5F5F5] border-l-2 border-l-[#2563EB] flex gap-2.5 items-start">
+            <span className="text-xs text-[#A3A3A3] pt-2.5 w-5 font-medium">{i + 1}.</span>
+            <input
+              value={q.question}
+              onChange={(e) => set(i, { question: e.target.value })}
+              className="flex-1 border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm bg-white focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
+              placeholder="Enter question..."
+            />
+            <label className="flex items-center gap-2 text-xs whitespace-nowrap pt-2.5">
+              <input
+                type="checkbox"
+                checked={q.required}
+                onChange={(e) => set(i, { required: e.target.checked })}
+                className="w-4 h-4 rounded border-[#E5E5E5] accent-[#2563EB]"
+              />
+              Required
+            </label>
+            <button onClick={() => remove(i)} className="text-[#A3A3A3] hover:text-[#DC2626] text-xs pt-2.5 transition">Remove</button>
+          </div>
+        ))}
+      </div>
+      <button onClick={add} className="text-[#2563EB] text-sm font-medium hover:text-[#1D4ED8] transition">+ Add question</button>
     </div>
   );
 }
@@ -262,15 +282,22 @@ function BoundariesSection({ config, setConfig }: SectionProps) {
   const set = (i: number, v: string) => { const r = [...rules]; r[i] = v; update(r); };
 
   return (
-    <div className="space-y-3">
-      <label className="block text-sm font-medium">&quot;Never Say&quot; Rules</label>
-      {rules.map((rule, i) => (
-        <div key={i} className="flex gap-2">
-          <input value={rule} onChange={(e) => set(i, e.target.value)} className="flex-1 border rounded px-3 py-1 text-sm" placeholder="Never..." />
-          <button onClick={() => remove(i)} className="text-red-500 text-xs">Remove</button>
-        </div>
-      ))}
-      <button onClick={add} className="text-blue-600 text-sm">+ Add rule</button>
+    <div className="space-y-4">
+      <label className="block text-sm font-medium text-[#171717]">&quot;Never Say&quot; Rules</label>
+      <div className="space-y-2">
+        {rules.map((rule, i) => (
+          <div key={i} className="bg-[#FAFAFA] rounded-lg p-3 border border-[#F5F5F5] border-l-2 border-l-[#2563EB] flex gap-2.5 items-center">
+            <input
+              value={rule}
+              onChange={(e) => set(i, e.target.value)}
+              className="flex-1 border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm bg-white focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
+              placeholder="Never..."
+            />
+            <button onClick={() => remove(i)} className="text-[#A3A3A3] hover:text-[#DC2626] text-xs transition">Remove</button>
+          </div>
+        ))}
+      </div>
+      <button onClick={add} className="text-[#2563EB] text-sm font-medium hover:text-[#1D4ED8] transition">+ Add rule</button>
     </div>
   );
 }
@@ -285,23 +312,29 @@ function EscalationSection({ config, setConfig }: SectionProps) {
   const setTrigger = (i: number, v: string) => { const t = [...triggers]; t[i] = v; update({ triggers: t }); };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <div>
-        <label className="block text-sm font-medium mb-1">Escalation Triggers</label>
-        {triggers.map((t, i) => (
-          <div key={i} className="flex gap-2 mb-2">
-            <input value={t} onChange={(e) => setTrigger(i, e.target.value)} className="flex-1 border rounded px-3 py-1 text-sm" />
-            <button onClick={() => removeTrigger(i)} className="text-red-500 text-xs">Remove</button>
-          </div>
-        ))}
-        <button onClick={addTrigger} className="text-blue-600 text-sm">+ Add trigger</button>
+        <label className="block text-sm font-medium text-[#171717] mb-1.5">Escalation Triggers</label>
+        <div className="space-y-2">
+          {triggers.map((t, i) => (
+            <div key={i} className="bg-[#FAFAFA] rounded-lg p-3 border border-[#F5F5F5] border-l-2 border-l-[#2563EB] flex gap-2.5 items-center">
+              <input
+                value={t}
+                onChange={(e) => setTrigger(i, e.target.value)}
+                className="flex-1 border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm bg-white focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
+              />
+              <button onClick={() => removeTrigger(i)} className="text-[#A3A3A3] hover:text-[#DC2626] text-xs transition">Remove</button>
+            </div>
+          ))}
+        </div>
+        <button onClick={addTrigger} className="text-[#2563EB] text-sm font-medium hover:text-[#1D4ED8] mt-2.5 transition">+ Add trigger</button>
       </div>
       <div>
-        <label className="block text-sm font-medium mb-1">Escalation Message</label>
+        <label className="block text-sm font-medium text-[#171717] mb-1.5">Escalation Message</label>
         <textarea
           value={esc.message}
           onChange={(e) => update({ message: e.target.value })}
-          className="w-full border rounded px-3 py-2 text-sm h-20"
+          className="w-full border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm h-24 focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
         />
       </div>
     </div>
@@ -321,30 +354,44 @@ function ContactSection({ config, setConfig }: SectionProps) {
   const removeHour = (i: number) => update({ office_hours: c.office_hours.filter((_, idx) => idx !== i) });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <Field label="Phone" value={c.phone} onChange={(v) => update({ phone: v })} />
       <Field label="Email" value={c.email} onChange={(v) => update({ email: v })} />
       <div>
-        <label className="block text-sm font-medium mb-1">Office Hours</label>
-        {c.office_hours.map((h, i) => (
-          <div key={i} className="flex gap-2 mb-2 items-center">
-            <select value={h.day} onChange={(e) => setHour(i, { day: e.target.value })} className="border rounded px-2 py-1 text-sm">
-              {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
-            <input value={h.open} onChange={(e) => setHour(i, { open: e.target.value })} className="border rounded px-2 py-1 text-sm w-24" />
-            <span className="text-sm">to</span>
-            <input value={h.close} onChange={(e) => setHour(i, { close: e.target.value })} className="border rounded px-2 py-1 text-sm w-24" />
-            <button onClick={() => removeHour(i)} className="text-red-500 text-xs">Remove</button>
-          </div>
-        ))}
-        <button onClick={addHour} className="text-blue-600 text-sm">+ Add hours</button>
+        <label className="block text-sm font-medium text-[#171717] mb-1.5">Office Hours</label>
+        <div className="space-y-2">
+          {c.office_hours.map((h, i) => (
+            <div key={i} className="bg-[#FAFAFA] rounded-lg p-3 border border-[#F5F5F5] border-l-2 border-l-[#2563EB] flex gap-2.5 items-center flex-wrap">
+              <select
+                value={h.day}
+                onChange={(e) => setHour(i, { day: e.target.value })}
+                className="border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm bg-white focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
+              >
+                {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+              <input
+                value={h.open}
+                onChange={(e) => setHour(i, { open: e.target.value })}
+                className="border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm w-28 bg-white focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
+              />
+              <span className="text-sm text-[#737373]">to</span>
+              <input
+                value={h.close}
+                onChange={(e) => setHour(i, { close: e.target.value })}
+                className="border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm w-28 bg-white focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
+              />
+              <button onClick={() => removeHour(i)} className="text-[#A3A3A3] hover:text-[#DC2626] text-xs transition">Remove</button>
+            </div>
+          ))}
+        </div>
+        <button onClick={addHour} className="text-[#2563EB] text-sm font-medium hover:text-[#1D4ED8] mt-2.5 transition">+ Add hours</button>
       </div>
       <div>
-        <label className="block text-sm font-medium mb-1">After-Hours Message</label>
+        <label className="block text-sm font-medium text-[#171717] mb-1.5">After-Hours Message</label>
         <textarea
           value={c.after_hours_message}
           onChange={(e) => update({ after_hours_message: e.target.value })}
-          className="w-full border rounded px-3 py-2 text-sm h-20"
+          className="w-full border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm h-24 focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
         />
       </div>
     </div>
@@ -354,11 +401,11 @@ function ContactSection({ config, setConfig }: SectionProps) {
 function CustomSection({ config, setConfig }: SectionProps) {
   return (
     <div>
-      <label className="block text-sm font-medium mb-1">Custom Instructions</label>
+      <label className="block text-sm font-medium text-[#171717] mb-1.5">Custom Instructions</label>
       <textarea
         value={config.custom_instructions}
         onChange={(e) => setConfig({ ...config, custom_instructions: e.target.value })}
-        className="w-full border rounded px-3 py-2 text-sm h-40"
+        className="w-full border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm h-44 focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
         placeholder="Any additional behavioral instructions for the chatbot..."
       />
     </div>
@@ -370,8 +417,12 @@ function CustomSection({ config, setConfig }: SectionProps) {
 function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <label className="block text-sm font-medium mb-1">{label}</label>
-      <input value={value} onChange={(e) => onChange(e.target.value)} className="w-full border rounded px-3 py-2 text-sm" />
+      <label className="block text-sm font-medium text-[#171717] mb-1.5">{label}</label>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
+      />
     </div>
   );
 }
