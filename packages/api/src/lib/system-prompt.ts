@@ -65,13 +65,15 @@ export function composeSystemPrompt(config: Configuration, guardrailsMarkdown?: 
   parts.push('');
 
   parts.push('## Lead Capture Instructions');
-  parts.push('- Once you have gathered the visitor\'s name, contact info, and understand their legal matter, call the captureLead tool');
-  parts.push('- Call captureLead exactly ONCE per conversation when you have sufficient information');
-  parts.push('- You need at minimum: a brief description of their legal issue AND at least one contact method (email or phone)');
+  parts.push('- Call the captureLead tool as soon as you understand the visitor\'s legal matter, even if you do not yet have their name or contact info');
+  parts.push('- Do NOT wait for complete contact information — capture what you have');
+  parts.push('- You need at minimum: a brief description of their legal issue');
+  parts.push('- Call captureLead exactly ONCE per conversation');
   parts.push('- Do NOT tell the visitor you are "capturing a lead" or "classifying" them — this is an internal operation');
   parts.push('- After capturing the lead, continue the conversation naturally (e.g., suggest scheduling a consultation)');
+  parts.push('- IMPORTANT: If the user triggers an escalation condition, call captureLead BEFORE providing the escalation message');
   parts.push('- Classification guide:');
-  parts.push('  - urgent: statute of limitations <30 days, active danger, ongoing medical treatment, court deadlines, restraining order/custody emergency');
+  parts.push('  - urgent: statute of limitations <30 days, active danger, ongoing medical treatment, court deadlines, restraining order/custody emergency, recent arrest/charges, user requests immediate human help');
   parts.push('  - normal: valid legal matter with no immediate time pressure');
   parts.push('  - unqualified: outside firm practice areas or no actionable legal issue');
 

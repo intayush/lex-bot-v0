@@ -21,7 +21,7 @@ vi.mock('../db/schema.js', async () => {
 });
 
 // Import module under test AFTER mock declaration (vitest hoists vi.mock)
-import { extractPartialLeadData, savePartialLead } from './partial-lead.js';
+import { extractPartialLeadData, savePartialLead, classifyPartialLead } from './partial-lead.js';
 import { db } from '../db/index.js';
 import * as schema from '../db/test-schema.js';
 
@@ -247,12 +247,13 @@ describe('extractPartialLeadData', () => {
 // ---------------------------------------------------------------------------
 describe('savePartialLead', () => {
   it('saves partial lead when there is useful data', async () => {
+    const messages = [{ role: 'user', content: 'My email is jane@example.com' }];
     await savePartialLead(TEST_ACCOUNT_ID, TEST_SESSION_ID, {
       name: 'Jane',
       contactEmail: 'jane@example.com',
       contactPhone: null,
       briefDescription: null,
-    });
+    }, messages);
 
     const rows = (db as any)
       .select()
@@ -263,10 +264,6 @@ describe('savePartialLead', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].name).toBe('Jane');
     expect(rows[0].contact_email).toBe('jane@example.com');
-    expect(rows[0].classification).toBe('unqualified');
-    expect(rows[0].classification_rationale).toBe(
-      'Partial data from abandoned session',
-    );
   });
 
   it('skips saving when no useful data is present', async () => {
@@ -275,7 +272,7 @@ describe('savePartialLead', () => {
       contactEmail: null,
       contactPhone: null,
       briefDescription: null,
-    });
+    }, []);
 
     const rows = (db as any)
       .select()
@@ -313,7 +310,7 @@ describe('savePartialLead', () => {
       contactEmail: 'different@example.com',
       contactPhone: null,
       briefDescription: null,
-    });
+    }, [{ role: 'user', content: 'different@example.com' }]);
 
     const rows = (db as any)
       .select()
@@ -327,12 +324,13 @@ describe('savePartialLead', () => {
   });
 
   it('saves when only briefDescription is available', async () => {
+    const messages = [{ role: 'user', content: 'I was in a car accident and need help' }];
     await savePartialLead(TEST_ACCOUNT_ID, TEST_SESSION_ID, {
       name: null,
       contactEmail: null,
       contactPhone: null,
       briefDescription: 'I was in a car accident and need help',
-    });
+    }, messages);
 
     const rows = (db as any)
       .select()
@@ -352,7 +350,7 @@ describe('savePartialLead', () => {
       contactEmail: null,
       contactPhone: '555-123-4567',
       briefDescription: null,
-    });
+    }, [{ role: 'user', content: '555-123-4567' }]);
 
     const rows = (db as any)
       .select()
@@ -370,7 +368,7 @@ describe('savePartialLead', () => {
       contactEmail: null,
       contactPhone: null,
       briefDescription: null,
-    });
+    }, [{ role: 'user', content: 'Just A Name' }]);
 
     const rows = (db as any)
       .select()
@@ -380,5 +378,52 @@ describe('savePartialLead', () => {
 
     // Name alone doesn't trigger save — need email, phone, or description
     expect(rows).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// classifyPartialLead — pure function tests
+// ---------------------------------------------------------------------------
+describe('classifyPartialLead', () => {
+  it('classifies as urgent when legal matter + urgency signals present', () => {
+    const messages = [
+      { role: 'user', content: 'I was arrested for cocaine possession today' },
+      { role: 'user', content: 'I want a human representative immediately' },
+    ];
+    const result = classifyPartialLead(messages);
+    expect(result.classification).toBe('urgent');
+  });
+
+  it('classifies as urgent for recent DUI arrest', () => {
+    const messages = [
+      { role: 'user', content: 'I got a DUI last night and was detained' },
+    ];
+    const result = classifyPartialLead(messages);
+    expect(result.classification).toBe('urgent');
+  });
+
+  it('classifies as normal for legal matter without urgency', () => {
+    const messages = [
+      { role: 'user', content: 'I need help with a theft charge from a few months ago' },
+    ];
+    const result = classifyPartialLead(messages);
+    expect(result.classification).toBe('normal');
+  });
+
+  it('classifies as unqualified when no legal matter detected', () => {
+    const messages = [
+      { role: 'user', content: 'Hello, what services do you offer?' },
+    ];
+    const result = classifyPartialLead(messages);
+    expect(result.classification).toBe('unqualified');
+  });
+
+  it('ignores assistant messages', () => {
+    const messages = [
+      { role: 'assistant', content: 'I was arrested and need urgent help with DUI' },
+      { role: 'user', content: 'Hi there' },
+    ];
+    const result = classifyPartialLead(messages);
+    expect(result.classification).toBe('unqualified');
   });
 });

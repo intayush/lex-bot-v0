@@ -157,7 +157,7 @@ export async function POST(req: Request) {
       // information shared before an abandoned session is not lost.
       const allMessages = [...fullMessages, { role: 'assistant', content: text }];
       const partial = extractPartialLeadData(allMessages);
-      await savePartialLead(auth.accountId, sessionId!, partial);
+      await savePartialLead(auth.accountId, sessionId!, partial, allMessages);
     },
   });
 
