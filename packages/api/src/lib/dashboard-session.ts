@@ -8,7 +8,7 @@ export interface SessionData {
 }
 
 const sessionOptions: SessionOptions = {
-  password: process.env.SESSION_SECRET || 'dev-secret-must-be-at-least-32-characters-long!!',
+  password: process.env.SESSION_SECRET ?? '',
   cookieName: 'legal_chatbot_session',
   cookieOptions: {
     httpOnly: true,
