@@ -75,7 +75,7 @@ export function Sidebar({ firmName, email }: SidebarProps) {
             className="text-[0.9375rem] font-semibold tracking-tight"
             style={{ color: 'var(--color-text-primary)' }}
           >
-            Legal Chatbot
+            Lex Bot
           </span>
         </div>
       </div>
@@ -181,7 +181,7 @@ export function Sidebar({ firmName, email }: SidebarProps) {
             </svg>
           </div>
           <span className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-            Legal Chatbot
+            Lex Bot
           </span>
         </div>
         <button

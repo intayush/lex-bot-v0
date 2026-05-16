@@ -16,7 +16,8 @@ export function composeSystemPrompt(config: Configuration, guardrailsMarkdown?: 
   parts.push('');
 
   parts.push('## Practice Areas (In Scope)');
-  for (const area of config.practice_areas.active) {
+  const allPracticeAreas = [...config.practice_areas.active, ...config.practice_areas.custom.filter(Boolean)];
+  for (const area of allPracticeAreas) {
     parts.push(`- ${area}`);
   }
   parts.push('');
@@ -42,6 +43,16 @@ export function composeSystemPrompt(config: Configuration, guardrailsMarkdown?: 
   parts.push('## Contact Information');
   parts.push(`- Phone: ${config.contact.phone}`);
   parts.push(`- Email: ${config.contact.email}`);
+  if (config.contact.office_hours.length > 0) {
+    parts.push('- Office Hours:');
+    for (const h of config.contact.office_hours) {
+      parts.push(`  - ${h.day}: ${h.open} – ${h.close}`);
+    }
+  }
+  if (config.contact.after_hours_message) {
+    parts.push(`- After-hours message: "${config.contact.after_hours_message}"`);
+    parts.push('- If a visitor contacts outside of office hours, include the after-hours message in your response');
+  }
   parts.push('');
 
   if (config.custom_instructions) {

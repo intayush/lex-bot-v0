@@ -40,7 +40,7 @@ export async function GET(req: Request) {
     {
       chatbot_name: config.persona.chatbot_name,
       greeting_message: config.persona.greeting_message,
-      practice_areas: config.practice_areas.active,
+      practice_areas: [...config.practice_areas.active, ...config.practice_areas.custom.filter(Boolean)],
       phone: config.contact.phone,
     },
     { headers: configCorsHeaders }

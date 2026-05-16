@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Legal Chatbot Dashboard',
+  title: 'Lex Bot Dashboard',
   description: 'Manage leads, configure your chatbot, and track client intake for your law firm.',
 };
 

@@ -18,7 +18,7 @@ const defaultConfig: Configuration = {
   qualifying_questions: [{ question: '', required: true, order: 1 }],
   boundaries: { never_say: [''] },
   escalation: { triggers: [''], message: '' },
-  contact: { phone: '', email: '', office_hours: [{ day: 'Monday', open: '9:00 AM', close: '5:00 PM' }], after_hours_message: '' },
+  contact: { phone: '', email: '', office_hours: [{ day: 'Monday', open: '09:00', close: '17:00' }], after_hours_message: '' },
   custom_instructions: '',
 };
 
@@ -188,16 +188,16 @@ function PracticeAreasSection({ config, setConfig }: SectionProps) {
     <div className="space-y-5">
       <div>
         <label className="block text-sm font-medium text-[#171717] mb-2">Active Practice Areas</label>
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-2 gap-3">
           {DEFAULT_PRACTICE_AREAS.map((area) => (
-            <label key={area} className="flex items-center gap-2.5 text-sm">
+            <label key={area} className="cursor-pointer group text-sm" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <input
                 type="checkbox"
                 checked={pa.active.includes(area)}
                 onChange={() => toggleArea(area)}
-                className="w-4 h-4 rounded border-[#E5E5E5] accent-[#2563EB]"
+                style={{ width: '18px', height: '18px', accentColor: '#2563EB', margin: 0, flexShrink: 0, verticalAlign: 'middle' }}
               />
-              {area}
+              <span style={{ lineHeight: '18px', verticalAlign: 'middle' }}>{area}</span>
             </label>
           ))}
         </div>
@@ -247,24 +247,29 @@ function QuestionsSection({ config, setConfig }: SectionProps) {
       <label className="block text-sm font-medium text-[#171717]">Qualifying Questions (in order)</label>
       <div className="space-y-2">
         {qs.map((q, i) => (
-          <div key={i} className="bg-[#FAFAFA] rounded-lg p-3 border border-[#F5F5F5] border-l-2 border-l-[#2563EB] flex gap-2.5 items-start">
-            <span className="text-xs text-[#A3A3A3] pt-2.5 w-5 font-medium">{i + 1}.</span>
-            <input
-              value={q.question}
-              onChange={(e) => set(i, { question: e.target.value })}
-              className="flex-1 border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm bg-white focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
-              placeholder="Enter question..."
-            />
-            <label className="flex items-center gap-2 text-xs whitespace-nowrap pt-2.5">
+          <div key={i} className="bg-[#FAFAFA] rounded-lg p-3 border border-[#F5F5F5] border-l-2 border-l-[#2563EB]">
+            <div className="flex gap-2.5 items-start">
+              <span className="text-xs text-[#A3A3A3] pt-2.5 w-5 flex-shrink-0 font-medium">{i + 1}.</span>
               <input
-                type="checkbox"
-                checked={q.required}
-                onChange={(e) => set(i, { required: e.target.checked })}
-                className="w-4 h-4 rounded border-[#E5E5E5] accent-[#2563EB]"
+                value={q.question}
+                onChange={(e) => set(i, { question: e.target.value })}
+                className="flex-1 min-w-0 border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm bg-white focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
+                placeholder="Enter question..."
               />
-              Required
-            </label>
-            <button onClick={() => remove(i)} className="text-[#A3A3A3] hover:text-[#DC2626] text-xs pt-2.5 transition">Remove</button>
+            </div>
+            <div className="flex items-center gap-4 mt-2 ml-8 pl-1">
+              <label className="cursor-pointer group text-xs whitespace-nowrap" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="checkbox"
+                  checked={q.required}
+                  onChange={(e) => set(i, { required: e.target.checked })}
+                  style={{ width: '16px', height: '16px', accentColor: '#2563EB', margin: 0, flexShrink: 0, verticalAlign: 'middle' }}
+                />
+                <span style={{ lineHeight: '16px', verticalAlign: 'middle' }}>Required</span>
+              </label>
+              <span className="text-[#E5E5E5]">|</span>
+              <button onClick={() => remove(i)} className="text-[#A3A3A3] hover:text-[#DC2626] text-xs transition" style={{ lineHeight: '16px' }}>Remove</button>
+            </div>
           </div>
         ))}
       </div>
@@ -350,7 +355,7 @@ function ContactSection({ config, setConfig }: SectionProps) {
     hours[i] = { ...hours[i], ...fields };
     update({ office_hours: hours });
   };
-  const addHour = () => update({ office_hours: [...c.office_hours, { day: 'Monday', open: '9:00 AM', close: '5:00 PM' }] });
+  const addHour = () => update({ office_hours: [...c.office_hours, { day: 'Monday', open: '09:00', close: '17:00' }] });
   const removeHour = (i: number) => update({ office_hours: c.office_hours.filter((_, idx) => idx !== i) });
 
   return (
@@ -370,15 +375,17 @@ function ContactSection({ config, setConfig }: SectionProps) {
                 {DAYS.map((d) => <option key={d} value={d}>{d}</option>)}
               </select>
               <input
+                type="time"
                 value={h.open}
                 onChange={(e) => setHour(i, { open: e.target.value })}
-                className="border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm w-28 bg-white focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
+                className="border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm w-32 bg-white focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
               />
               <span className="text-sm text-[#737373]">to</span>
               <input
+                type="time"
                 value={h.close}
                 onChange={(e) => setHour(i, { close: e.target.value })}
-                className="border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm w-28 bg-white focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
+                className="border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm w-32 bg-white focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
               />
               <button onClick={() => removeHour(i)} className="text-[#A3A3A3] hover:text-[#DC2626] text-xs transition">Remove</button>
             </div>

@@ -49,15 +49,15 @@ export default function LoginPage() {
                 <path d="M12 6v9" />
               </svg>
             </div>
-            <span className="text-lg font-semibold tracking-tight">Legal Chatbot</span>
+            <span className="text-lg font-semibold tracking-tight">Lex Bot</span>
           </div>
 
           {/* Tagline */}
-          <h2 className="text-3xl font-bold leading-snug tracking-tight mb-4" style={{ letterSpacing: '-0.025em' }}>
+          <h2 className="text-3xl font-bold leading-snug tracking-tight mb-4 text-white" style={{ letterSpacing: '-0.025em' }}>
             Client intake,<br />
             on autopilot.
           </h2>
-          <p className="text-base text-white/75 max-w-sm leading-relaxed">
+          <p className="text-base text-white/90 max-w-sm leading-relaxed">
             Your AI-powered assistant qualifies leads, collects case details, and routes them to your team — 24/7.
           </p>
         </div>
@@ -69,29 +69,21 @@ export default function LoginPage() {
         }} />
 
         <div className="text-xs text-white/30">
-          &copy; {new Date().getFullYear()} Legal Chatbot &middot; All rights reserved
+           &copy; {new Date().getFullYear()} Lex Bot &middot; All rights reserved
         </div>
       </div>
 
       {/* ── Right: login form ── */}
       <div className="flex-1 flex items-center justify-center px-6 py-12" style={{ backgroundColor: '#FAFAFA' }}>
         <div className="w-full max-w-[400px]">
-          {/* Mobile brand header */}
+          {/* Mobile brand header — logo only, name is in the SVG */}
           <div className="lg:hidden mb-10 text-center">
-            <div className="inline-flex items-center gap-2.5 mb-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'var(--color-accent)' }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 6h18l-1.5 9H4.5L3 6z" />
-                  <path d="M8 6V3h8v3" />
-                  <path d="M12 6v9" />
-                </svg>
-              </div>
-              <span className="text-lg font-semibold tracking-tight" style={{ color: 'var(--color-text-primary)' }}>Legal Chatbot</span>
-            </div>
+            <img src="/lex-bot-ico.svg" alt="Lex Bot" className="mx-auto" style={{ width: '180px', aspectRatio: '4/3', objectFit: 'contain', mixBlendMode: 'multiply' }} />
           </div>
 
           {/* Form header */}
-          <div className="mb-8">
+          <div className="mb-8 text-center">
+            <img src="/lex-bot-ico.svg" alt="Lex Bot" className="hidden lg:block mx-auto mb-6" style={{ width: '240px', aspectRatio: '4/3', objectFit: 'contain', mixBlendMode: 'multiply' }} />
             <h1 className="text-2xl font-bold tracking-tight mb-1.5" style={{ color: 'var(--color-text-primary)', letterSpacing: '-0.025em' }}>
               Welcome back
             </h1>

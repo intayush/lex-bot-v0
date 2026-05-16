@@ -1,8 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { getAuthSession } from '../../../../lib/dashboard-session';
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const session = await getAuthSession();
   session.destroy();
-  return NextResponse.redirect(new URL('/login', process.env.NEXT_PUBLIC_URL || 'http://localhost:3000'));
+  const url = new URL('/login', req.nextUrl.origin);
+  return NextResponse.redirect(url);
 }
