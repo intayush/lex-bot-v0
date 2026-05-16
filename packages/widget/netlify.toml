@@ -1,6 +1,6 @@
 [build]
-  command = "cd ../.. && pnpm install --frozen-lockfile && pnpm --filter @legal-chatbot/shared build && pnpm --filter @legal-chatbot/widget build && cp -r chatbot-context packages/widget/dist/chatbot-context"
-  publish = "dist"
+  command = "pnpm install --frozen-lockfile && pnpm --filter @legal-chatbot/shared build && pnpm --filter @legal-chatbot/widget build && cp -r chatbot-context packages/widget/dist/chatbot-context"
+  publish = "packages/widget/dist"
 
 [build.environment]
   NODE_VERSION = "20"

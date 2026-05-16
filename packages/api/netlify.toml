@@ -1,6 +1,6 @@
 [build]
-  command = "cd ../.. && pnpm install --frozen-lockfile && pnpm --filter @legal-chatbot/shared build && pnpm --filter @legal-chatbot/api build"
-  publish = ".next"
+  command = "pnpm install --frozen-lockfile && pnpm --filter @legal-chatbot/shared build && pnpm --filter @legal-chatbot/api build"
+  publish = "packages/api/.next"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
