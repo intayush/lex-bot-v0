@@ -131,3 +131,39 @@ describe('composeSystemPrompt', () => {
     expect(promptNoCustom).not.toContain('Additional Instructions');
   });
 });
+
+// ---------------------------------------------------------------------------
+// 010-sop-workflow T021: optional SOP parameters preserve legacy behavior.
+// The full SOP block composition arrives in T030 (Phase 3 US1). This test
+// asserts the signature change is backward-compatible.
+// ---------------------------------------------------------------------------
+describe('composeSystemPrompt — SOP signature (T021, no-op until T030)', () => {
+  it('produces identical output when called with no SOP params vs. all undefined', () => {
+    const promptDefault = composeSystemPrompt(testConfig);
+    const promptUndefined = composeSystemPrompt(testConfig, undefined, undefined, undefined, undefined);
+    expect(promptUndefined).toBe(promptDefault);
+  });
+
+  it('produces identical output when called with empty goodbyePhrases (legacy branch)', () => {
+    // Until T030 wires composeSopBlock, even a populated SOP state should
+    // not change the output. This guards against accidental coupling.
+    const sopState = {
+      sop_configuration_id: 'cfg_x',
+      sop_version: 1,
+      conversation_anchor_iso: '2026-05-23T10:00:00.000Z',
+      steps: [],
+      qualified_lead_threshold: 5,
+      current_progress: 0,
+      is_finalized: false,
+      out_of_scope_termination: false,
+    } as const;
+    const promptDefault = composeSystemPrompt(testConfig);
+    const promptWithSop = composeSystemPrompt(testConfig, undefined, sopState, undefined, []);
+    expect(promptWithSop).toBe(promptDefault);
+  });
+
+  it('still renders the legacy Qualifying Questions block (until T030)', () => {
+    const prompt = composeSystemPrompt(testConfig);
+    expect(prompt).toContain('## Qualifying Questions');
+  });
+});

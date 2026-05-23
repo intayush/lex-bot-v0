@@ -74,7 +74,7 @@ description: "Tasks for SOP Workflow"
 
 ### Foundation 2E — System-Prompt Composer Hook (Block 4 stub)
 
-- [ ] T021 Refactor `packages/api/src/lib/system-prompt.ts → composeSystemPrompt` signature to accept three new optional params: `sopState?: SOPState`, `sopConfig?: SOPConfiguration`, `goodbyePhrases?: string[]`; preserve all existing behavior when params are undefined (legacy `composeLegacyIntakeBlock` path remains as-is); add unit test in `packages/api/src/lib/system-prompt.test.ts` covering both branches
+- [X] T021 Refactor `packages/api/src/lib/system-prompt.ts → composeSystemPrompt` signature to accept three new optional params: `sopState?: SOPState`, `sopConfig?: SOPConfiguration`, `goodbyePhrases?: string[]`; preserve all existing behavior when params are undefined (legacy `composeLegacyIntakeBlock` path remains as-is); add unit test in `packages/api/src/lib/system-prompt.test.ts` covering both branches
 
 **Checkpoint**: After Phase 2 the schema is migrated, shared schemas exist, the dev account has a published SOP with case types + sub-types + goodbye phrases, the CORS header is exposed, and the system-prompt composer accepts the new optional SOP params (still no-op). User stories can now proceed in parallel.
 

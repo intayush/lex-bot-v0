@@ -1,6 +1,33 @@
-import type { Configuration } from '@legal-chatbot/shared';
+import type { Configuration, SOPConfiguration, SOPState } from '@legal-chatbot/shared';
 
-export function composeSystemPrompt(config: Configuration, guardrailsMarkdown?: string): string {
+/**
+ * Compose the chat-API system prompt for a given account configuration.
+ *
+ * 010-sop-workflow extension (T021): signature accepts three new optional
+ * parameters. When any of them is undefined, the legacy
+ * `qualifying_questions` block is rendered (preserving backward compat for
+ * accounts that have not yet migrated to SOP). When all three are present,
+ * T030 will replace the legacy block with the SOP block via
+ * `lib/sop/system-prompt-extension.ts → composeSopBlock`.
+ *
+ * Today (T021 only): the new params are accepted but not yet used. Body
+ * behavior is unchanged. T030 wires the SOP path on top.
+ */
+export function composeSystemPrompt(
+  config: Configuration,
+  guardrailsMarkdown?: string,
+  sopState?: SOPState,
+  sopConfig?: SOPConfiguration,
+  goodbyePhrases?: string[],
+): string {
+  // Acknowledge new params without using them yet so the typecheck enforces
+  // the contract surface. T030 will replace this with composeSopBlock(...).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  void sopState;
+  void sopConfig;
+  void goodbyePhrases;
+  void guardrailsMarkdown;
+
   const parts: string[] = [];
 
   parts.push(`You are ${config.persona.chatbot_name}, a virtual assistant for ${config.persona.firm_name}.`);
@@ -61,6 +88,8 @@ export function composeSystemPrompt(config: Configuration, guardrailsMarkdown?: 
     parts.push('');
   }
 
+  // Block 4 — Intake state. T030 will replace this with the SOP block when
+  // sopState + sopConfig are present (see contracts/system-prompt-extension-contract.md).
   parts.push('## Qualifying Questions');
   parts.push('Ask these questions naturally during conversation to qualify the lead:');
   for (const q of config.qualifying_questions) {
