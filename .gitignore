@@ -13,3 +13,6 @@ dist/
 .specify/feature.json
 packages/crawler/test-site/crawl-output/
 packages/*/tsconfig.tsbuildinfo
+# Playwright E2E artifacts (010-sop-workflow Phase 8e)
+packages/*/test-results/
+packages/*/playwright-report/
