@@ -67,8 +67,6 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
   const breakpoint = useBreakpoint();
   const [widgetConfig, setWidgetConfig] = useState<WidgetConfig | null>(null);
 
-  const sessionId = useMemo(() => getSessionId(), []);
-
   useEffect(() => {
     const baseUrl = apiUrl.replace(/\/api\/chat\/?$/, '');
     const configUrl = `${baseUrl}/api/config`;
@@ -90,11 +88,27 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
   const { sopState, onResponse: onSOPResponse } = useSOPState();
   const reducedMotion = useReducedMotion();
 
+  // Custom fetch that reads the session id from sessionStorage at REQUEST
+  // time rather than at component-mount time. Critical for multi-turn
+  // conversations: the first fetch returns a new session id (which we
+  // save in onResponse below); subsequent fetches must include that id
+  // so the server resumes the same session. The previous useMemo-captured
+  // headers approach never re-read sessionStorage, so every turn created
+  // a fresh server-side session.
+  const sessionAwareFetch: typeof fetch = (input, init) => {
+    const id = getSessionId();
+    const headers = new Headers(init?.headers);
+    if (id && !headers.has('x-session-id')) {
+      headers.set('x-session-id', id);
+    }
+    return fetch(input, { ...init, headers });
+  };
+
   const { messages, input, handleInputChange, handleSubmit, isLoading, error, append } = useChat({
     api: apiUrl,
+    fetch: sessionAwareFetch,
     headers: {
       'x-api-key': apiKey,
-      ...(sessionId ? { 'x-session-id': sessionId } : {}),
     },
     onResponse(response) {
       const newSessionId = response.headers.get('x-session-id');
