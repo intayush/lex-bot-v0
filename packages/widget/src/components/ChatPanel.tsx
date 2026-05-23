@@ -2,7 +2,9 @@ import { useChat } from '@ai-sdk/react';
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { QuickReplies } from './QuickReplies';
 import { Chips } from './Chips';
+import { ProgressBar } from './ProgressBar';
 import { useSOPState } from '../hooks/useSOPState';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import {
   computeActiveChips,
   type WidgetSOP,
@@ -86,6 +88,7 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
   }, [apiUrl, apiKey]);
 
   const { sopState, onResponse: onSOPResponse } = useSOPState();
+  const reducedMotion = useReducedMotion();
 
   const { messages, input, handleInputChange, handleSubmit, isLoading, error, append } = useChat({
     api: apiUrl,
@@ -170,6 +173,15 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
 
   return (
     <div style={panelStyle}>
+      {/* SOP progress bar — pinned at the very top across all breakpoints
+          per contracts/progress-bar-contract.md. Returns null when
+          total === 0 (no SOP active for the account). */}
+      <ProgressBar
+        current={sopState?.current ?? 0}
+        total={sopState?.total ?? 0}
+        reducedMotion={reducedMotion}
+      />
+
       {/* Header */}
       <div
         style={{
