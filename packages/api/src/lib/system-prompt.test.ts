@@ -133,37 +133,151 @@ describe('composeSystemPrompt', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 010-sop-workflow T021: optional SOP parameters preserve legacy behavior.
-// The full SOP block composition arrives in T030 (Phase 3 US1). This test
-// asserts the signature change is backward-compatible.
+// 010-sop-workflow T021 + T030: optional SOP parameters drive Block 4.
+//
+// When all three SOP params are provided AND the published SOP exists,
+// composeSystemPrompt MUST replace the legacy "## Qualifying Questions"
+// block with the SOP block. When any SOP param is missing, the legacy
+// block remains (backward compat for accounts that haven't migrated).
+//
+// This block was originally a no-op-until-T030 placeholder; rewritten
+// after the verification pass (2026-05-23) revealed the legacy block was
+// leaking into the SOP-active prompt.
 // ---------------------------------------------------------------------------
-describe('composeSystemPrompt — SOP signature (T021, no-op until T030)', () => {
+
+import type { SOPConfiguration, SOPState } from '@legal-chatbot/shared';
+
+const ANCHOR = '2026-05-23T10:00:00.000Z';
+
+function buildSampleSOPConfig(): SOPConfiguration {
+  return {
+    id: 'cfg_test',
+    account_id: 'acct_test',
+    version: 1,
+    qualified_lead_threshold: 5,
+    is_published: true,
+    derived_from_legacy: false,
+    created_at: ANCHOR,
+    steps: [
+      {
+        id: 'step_1',
+        sop_configuration_id: 'cfg_test',
+        position: 1,
+        slug: 'case_type',
+        question_text: 'What kind of legal matter can we help you with?',
+        chip_source: 'case_types',
+        inline_chips_json: null,
+        accepts_free_text: true,
+        is_required: true,
+        counts_toward_threshold: true,
+        is_default: true,
+        skip_condition_json: null,
+      },
+      {
+        id: 'step_2',
+        sop_configuration_id: 'cfg_test',
+        position: 2,
+        slug: 'where',
+        question_text: 'Where did this happen?',
+        chip_source: null,
+        inline_chips_json: null,
+        accepts_free_text: true,
+        is_required: true,
+        counts_toward_threshold: true,
+        is_default: true,
+        skip_condition_json: null,
+      },
+    ],
+  };
+}
+
+function buildSampleSOPState(sopConfig: SOPConfiguration): SOPState {
+  return {
+    sop_configuration_id: sopConfig.id,
+    sop_version: sopConfig.version,
+    conversation_anchor_iso: ANCHOR,
+    steps: sopConfig.steps.map((s) => ({
+      step_id: s.id,
+      slug: s.slug,
+      status: 'pending' as const,
+      captured_value: null,
+      captured_at: null,
+      inferred: false,
+    })),
+    qualified_lead_threshold: sopConfig.qualified_lead_threshold,
+    current_progress: 0,
+    is_finalized: false,
+    out_of_scope_termination: false,
+  };
+}
+
+const SAMPLE_GOODBYES = ['bye', 'goodbye', 'thanks'];
+
+describe('composeSystemPrompt — legacy path (no SOP)', () => {
   it('produces identical output when called with no SOP params vs. all undefined', () => {
     const promptDefault = composeSystemPrompt(testConfig);
     const promptUndefined = composeSystemPrompt(testConfig, undefined, undefined, undefined, undefined);
     expect(promptUndefined).toBe(promptDefault);
   });
 
-  it('produces identical output when called with empty goodbyePhrases (legacy branch)', () => {
-    // Until T030 wires composeSopBlock, even a populated SOP state should
-    // not change the output. This guards against accidental coupling.
-    const sopState = {
-      sop_configuration_id: 'cfg_x',
-      sop_version: 1,
-      conversation_anchor_iso: '2026-05-23T10:00:00.000Z',
-      steps: [],
-      qualified_lead_threshold: 5,
-      current_progress: 0,
-      is_finalized: false,
-      out_of_scope_termination: false,
-    } as const;
-    const promptDefault = composeSystemPrompt(testConfig);
-    const promptWithSop = composeSystemPrompt(testConfig, undefined, sopState, undefined, []);
-    expect(promptWithSop).toBe(promptDefault);
-  });
-
-  it('still renders the legacy Qualifying Questions block (until T030)', () => {
+  it('renders the legacy Qualifying Questions block when no SOP params are provided', () => {
     const prompt = composeSystemPrompt(testConfig);
     expect(prompt).toContain('## Qualifying Questions');
+  });
+
+  it('renders the legacy Qualifying Questions block when only some SOP params are provided', () => {
+    // Defensive: the SOP path requires ALL three params (state + config +
+    // phrases). Missing any one falls back to legacy. Without this, the
+    // route handler accidentally activating partial SOP would produce a
+    // broken prompt.
+    const sopConfig = buildSampleSOPConfig();
+    const sopState = buildSampleSOPState(sopConfig);
+
+    // sopState only — no config
+    const promptStateOnly = composeSystemPrompt(testConfig, undefined, sopState, undefined, SAMPLE_GOODBYES);
+    expect(promptStateOnly).toContain('## Qualifying Questions');
+
+    // sopConfig only — no state
+    const promptConfigOnly = composeSystemPrompt(testConfig, undefined, undefined, sopConfig, SAMPLE_GOODBYES);
+    expect(promptConfigOnly).toContain('## Qualifying Questions');
+  });
+});
+
+describe('composeSystemPrompt — SOP path (T030 wiring)', () => {
+  it('REPLACES the legacy Qualifying Questions block with the SOP block when SOP is active', () => {
+    const sopConfig = buildSampleSOPConfig();
+    const sopState = buildSampleSOPState(sopConfig);
+    const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES);
+    // The legacy block MUST NOT be present.
+    expect(prompt).not.toContain('## Qualifying Questions');
+    // The SOP block MUST be present.
+    expect(prompt).toContain('## SOP State');
+  });
+
+  it('embeds the pending step\'s question text from the SOP block', () => {
+    const sopConfig = buildSampleSOPConfig();
+    const sopState = buildSampleSOPState(sopConfig);
+    const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES);
+    expect(prompt).toContain('What kind of legal matter can we help you with?');
+  });
+
+  it('embeds the goodbye phrase list (FR-029)', () => {
+    const sopConfig = buildSampleSOPConfig();
+    const sopState = buildSampleSOPState(sopConfig);
+    const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES);
+    expect(prompt).toContain('"bye"');
+    expect(prompt).toContain('"goodbye"');
+  });
+
+  it('does NOT include legacy qualifying-questions content even if config has them populated', () => {
+    // The legacy testConfig has 3 qualifying_questions defined. The SOP
+    // path MUST NOT leak any of them into the prompt — that was the bug
+    // verified live on 2026-05-23.
+    const sopConfig = buildSampleSOPConfig();
+    const sopState = buildSampleSOPState(sopConfig);
+    const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES);
+    for (const q of testConfig.qualifying_questions) {
+      expect(prompt).not.toContain(q.question);
+    }
   });
 });

@@ -1,17 +1,15 @@
 import type { Configuration, SOPConfiguration, SOPState } from '@legal-chatbot/shared';
+import { composeSopBlock } from './sop/system-prompt-extension';
 
 /**
  * Compose the chat-API system prompt for a given account configuration.
  *
- * 010-sop-workflow extension (T021): signature accepts three new optional
- * parameters. When any of them is undefined, the legacy
- * `qualifying_questions` block is rendered (preserving backward compat for
- * accounts that have not yet migrated to SOP). When all three are present,
- * T030 will replace the legacy block with the SOP block via
- * `lib/sop/system-prompt-extension.ts → composeSopBlock`.
- *
- * Today (T021 only): the new params are accepted but not yet used. Body
- * behavior is unchanged. T030 wires the SOP path on top.
+ * 010-sop-workflow Block 4 routing:
+ *   - When all three SOP params (`sopState`, `sopConfig`, `goodbyePhrases`)
+ *     are provided, the legacy "## Qualifying Questions" block is REPLACED
+ *     by the SOP block produced by `composeSopBlock`.
+ *   - When any SOP param is missing, the legacy block is rendered (preserves
+ *     backward compatibility for accounts that haven't migrated to SOP yet).
  */
 export function composeSystemPrompt(
   config: Configuration,
@@ -20,13 +18,10 @@ export function composeSystemPrompt(
   sopConfig?: SOPConfiguration,
   goodbyePhrases?: string[],
 ): string {
-  // Acknowledge new params without using them yet so the typecheck enforces
-  // the contract surface. T030 will replace this with composeSopBlock(...).
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  void sopState;
-  void sopConfig;
-  void goodbyePhrases;
+  // guardrailsMarkdown is reserved for a future block 3 hook; not used today.
   void guardrailsMarkdown;
+
+  const sopActive = !!(sopState && sopConfig && goodbyePhrases);
 
   const parts: string[] = [];
 
@@ -88,15 +83,22 @@ export function composeSystemPrompt(
     parts.push('');
   }
 
-  // Block 4 — Intake state. T030 will replace this with the SOP block when
-  // sopState + sopConfig are present (see contracts/system-prompt-extension-contract.md).
-  parts.push('## Qualifying Questions');
-  parts.push('Ask these questions naturally during conversation to qualify the lead:');
-  for (const q of config.qualifying_questions) {
-    const marker = q.required ? '(required)' : '(optional)';
-    parts.push(`${q.order}. ${q.question} ${marker}`);
+  // Block 4 — Intake state. SOP path (010-sop-workflow) replaces the
+  // legacy qualifying-questions block when SOP runtime is active for the
+  // account. Legacy path remains for accounts that haven't migrated yet
+  // OR whose request didn't pass full SOP context.
+  if (sopActive) {
+    parts.push(composeSopBlock(sopState!, sopConfig!, goodbyePhrases!));
+    parts.push('');
+  } else {
+    parts.push('## Qualifying Questions');
+    parts.push('Ask these questions naturally during conversation to qualify the lead:');
+    for (const q of config.qualifying_questions) {
+      const marker = q.required ? '(required)' : '(optional)';
+      parts.push(`${q.order}. ${q.question} ${marker}`);
+    }
+    parts.push('');
   }
-  parts.push('');
 
   parts.push('## Instructions for Using Context');
   parts.push('- Use the searchContext tool to find relevant information before answering questions about the firm');
