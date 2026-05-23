@@ -2,10 +2,10 @@
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
 
-- Active plan: `specs/003-context-search/plan.md`
-- Research: `specs/003-context-search/research.md`
-- Data model: `specs/003-context-search/data-model.md`
-- Contracts: `specs/003-context-search/contracts/`
-- Quickstart: `specs/003-context-search/quickstart.md`
+- Active plan: `specs/004-chat-api-agent/plan.md`
+- Research: `specs/004-chat-api-agent/research.md`
+- Data model: `specs/004-chat-api-agent/data-model.md`
+- Contracts: `specs/004-chat-api-agent/contracts/`
+- Quickstart: `specs/004-chat-api-agent/quickstart.md`
 - Constitution: `.specify/memory/constitution.md`
 <!-- SPECKIT END -->
