@@ -20,6 +20,7 @@
     "@dnd-kit/accessibility": "^3.1.1",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@legal-chatbot/shared": "workspace:*",
     "@neondatabase/serverless": "^1.1.0",
     "@tailwindcss/postcss": "^4.3.0",
