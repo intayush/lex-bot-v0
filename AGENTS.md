@@ -2,10 +2,10 @@
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
 
-- Active plan: `specs/002-crawler-cli/plan.md`
-- Research: `specs/002-crawler-cli/research.md`
-- Data model: `specs/002-crawler-cli/data-model.md`
-- Contracts: `specs/002-crawler-cli/contracts/`
-- Quickstart: `specs/002-crawler-cli/quickstart.md`
+- Active plan: `specs/003-context-search/plan.md`
+- Research: `specs/003-context-search/research.md`
+- Data model: `specs/003-context-search/data-model.md`
+- Contracts: `specs/003-context-search/contracts/`
+- Quickstart: `specs/003-context-search/quickstart.md`
 - Constitution: `.specify/memory/constitution.md`
 <!-- SPECKIT END -->
