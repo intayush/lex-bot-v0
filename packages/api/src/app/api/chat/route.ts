@@ -17,6 +17,7 @@ import { extractPartialLeadData, savePartialLead } from '../../../lib/partial-le
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { initSOPState } from '../../../lib/sop/state-machine';
 import { advanceForVisitorMessage } from '../../../lib/sop/advancer';
+import { isOffTopic } from '../../../lib/sop/off-sop-detour';
 import { analyzeAndFollowUpTool } from '../../../lib/sop/follow-up-tool';
 import { corsHeaders } from './cors';
 import type { Manifest, SOPState, SOPStateHeaderPayload } from '@legal-chatbot/shared';
@@ -124,18 +125,30 @@ export async function POST(req: Request) {
     sopState = initSOPState(sopBundle.sop, conversationAnchorIso);
   }
 
-  // Advance state for the latest visitor message (v0 advancer; Phase 4
-  // skip-detector replaces this).
+  // Advance state for the latest visitor message (Phase 4 skip-detector).
+  // Capture detector matches + pre-advance pending step so the off-SOP
+  // detour detector can decide whether to add a directive to the system
+  // prompt this turn (Phase 5 / US3).
+  let isOffTopicNow = false;
   if (sopState && sopBundle.sop) {
     const userText = typeof newUserMessage?.content === 'string'
       ? newUserMessage.content
       : '';
     if (userText) {
-      sopState = await advanceForVisitorMessage({
+      const advanced = await advanceForVisitorMessage({
         state: sopState,
         sopConfig: sopBundle.sop,
         caseTypes: sopBundle.caseTypes,
         message: userText,
+      });
+      sopState = advanced.state;
+      // Off-SOP detour signal: skip-detector found nothing AND a pending
+      // step exists AND the message has minimal keyword overlap with the
+      // pending question.
+      isOffTopicNow = isOffTopic({
+        message: userText,
+        pendingStep: advanced.pendingStepBefore,
+        skipDetectorMatches: advanced.matches,
       });
     }
   }
@@ -146,6 +159,7 @@ export async function POST(req: Request) {
     sopState ?? undefined,
     sopBundle.sop ?? undefined,
     sopBundle.goodbyePhrases.length > 0 ? sopBundle.goodbyePhrases : undefined,
+    isOffTopicNow,
   );
   const contextStoreUrl = auth.contextStoreUrl;
 

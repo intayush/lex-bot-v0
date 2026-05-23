@@ -27,6 +27,14 @@ export function composeSopBlock(
   sopState: SOPState,
   sopConfig: SOPConfiguration,
   goodbyePhrases: readonly string[],
+  /**
+   * When true, the off-SOP detour detector flagged the CURRENT visitor
+   * message as unrelated to the pending step. The block adds a directive
+   * section nudging the agent to answer + re-prompt deterministically
+   * rather than relying on the generic "if unrelated..." rule alone
+   * (010-sop-workflow T045).
+   */
+  isOffTopicNow: boolean = false,
 ): string {
   const lines: string[] = [];
 
@@ -97,6 +105,20 @@ export function composeSopBlock(
       'EARLIEST pending unanswered step next.',
     );
     lines.push('');
+
+    if (isOffTopicNow) {
+      lines.push('### Detour required NOW');
+      lines.push('');
+      lines.push(
+        'The visitor\'s CURRENT message is off-topic relative to the pending ' +
+        'SOP step. Do this:\n' +
+        '  1. Answer their question briefly within your guardrail boundaries.\n' +
+        '  2. End your response by asking the pending step\'s question ' +
+        `verbatim: "${earliestPending.question_text}"\n` +
+        'Do NOT skip step 2.',
+      );
+      lines.push('');
+    }
 
     lines.push('### Off-SOP detour rule');
     lines.push('');

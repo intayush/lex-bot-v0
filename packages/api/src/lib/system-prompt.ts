@@ -17,6 +17,13 @@ export function composeSystemPrompt(
   sopState?: SOPState,
   sopConfig?: SOPConfiguration,
   goodbyePhrases?: string[],
+  /**
+   * When true, the off-SOP detour detector flagged the visitor's CURRENT
+   * message as off-topic relative to the pending step. Forwarded to
+   * `composeSopBlock` (010-sop-workflow T045). No-op when SOP is not
+   * active.
+   */
+  isOffTopicNow: boolean = false,
 ): string {
   // guardrailsMarkdown is reserved for a future block 3 hook; not used today.
   void guardrailsMarkdown;
@@ -88,7 +95,7 @@ export function composeSystemPrompt(
   // account. Legacy path remains for accounts that haven't migrated yet
   // OR whose request didn't pass full SOP context.
   if (sopActive) {
-    parts.push(composeSopBlock(sopState!, sopConfig!, goodbyePhrases!));
+    parts.push(composeSopBlock(sopState!, sopConfig!, goodbyePhrases!, isOffTopicNow));
     parts.push('');
   } else {
     parts.push('## Qualifying Questions');

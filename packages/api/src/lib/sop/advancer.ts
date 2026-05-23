@@ -11,8 +11,8 @@
  * multi-step matches per FR-016.
  */
 import type { CaseType, SOPConfiguration, SOPState } from '@legal-chatbot/shared';
-import { advanceSOP } from './state-machine';
-import { detectSkippedSteps } from './skip-detector';
+import { advanceSOP, nextPendingStep } from './state-machine';
+import { detectSkippedSteps, type SkipDetectorMatch } from './skip-detector';
 import { inferDate } from './date-inferer';
 
 export interface AdvanceForVisitorMessageInput {
@@ -25,13 +25,30 @@ export interface AdvanceForVisitorMessageInput {
   inferDateImpl?: typeof inferDate;
 }
 
+export interface AdvanceForVisitorMessageResult {
+  /** New SOP state after applying detected captures. */
+  state: SOPState;
+  /** Skip-detector matches found for this message (empty if none). */
+  matches: SkipDetectorMatch[];
+  /**
+   * The pending step BEFORE this turn's advancement, captured for
+   * downstream off-topic detection. Null when no step was pending
+   * (SOP already complete or finalized).
+   */
+  pendingStepBefore: SOPConfiguration['steps'][number] | null;
+}
+
 export async function advanceForVisitorMessage(
   input: AdvanceForVisitorMessageInput,
-): Promise<SOPState> {
+): Promise<AdvanceForVisitorMessageResult> {
   const { sopConfig, caseTypes, message } = input;
   const capturedAt = input.capturedAt ?? new Date().toISOString();
 
-  if (input.state.is_finalized) return input.state;
+  const pendingStepBefore = nextPendingStep(input.state, sopConfig);
+
+  if (input.state.is_finalized) {
+    return { state: input.state, matches: [], pendingStepBefore };
+  }
 
   const matches = await detectSkippedSteps({
     message,
@@ -41,7 +58,9 @@ export async function advanceForVisitorMessage(
     inferDateImpl: input.inferDateImpl,
   });
 
-  if (matches.length === 0) return input.state;
+  if (matches.length === 0) {
+    return { state: input.state, matches, pendingStepBefore };
+  }
 
   // Apply each match as a capture_step action. Skip-detector already
   // de-duplicates per step; applying in match order is safe.
@@ -70,5 +89,17 @@ export async function advanceForVisitorMessage(
     next = advanceSOP(next, { type: 'finalize_out_of_scope' }, sopConfig);
   }
 
-  return next;
+  return { state: next, matches, pendingStepBefore };
+}
+
+/**
+ * Convenience wrapper that returns just the new SOPState. Used by tests
+ * (which don't care about matches / pendingStepBefore). Production
+ * callers should use advanceForVisitorMessage to retain the full result.
+ */
+export async function advanceStateForVisitorMessage(
+  input: AdvanceForVisitorMessageInput,
+): Promise<SOPState> {
+  const result = await advanceForVisitorMessage(input);
+  return result.state;
 }

@@ -255,3 +255,47 @@ describe('composeSopBlock — determinism', () => {
     expect(a).toBe(b);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 010-sop-workflow T045: off-topic-now directive (US3 detour signal)
+// ---------------------------------------------------------------------------
+
+describe('composeSopBlock — off-topic-now directive (US3)', () => {
+  it('does NOT include the directive when isOffTopicNow=false (default)', () => {
+    const sopConfig = buildSOPConfig();
+    const state = initSOPState(sopConfig, ANCHOR);
+    const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES);
+    expect(block).not.toContain('### Detour required NOW');
+  });
+
+  it('includes the directive when isOffTopicNow=true', () => {
+    const sopConfig = buildSOPConfig();
+    const state = initSOPState(sopConfig, ANCHOR);
+    const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES, true);
+    expect(block).toContain('### Detour required NOW');
+  });
+
+  it('embeds the pending step\'s question verbatim in the directive', () => {
+    const sopConfig = buildSOPConfig();
+    const state = initSOPState(sopConfig, ANCHOR);
+    const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES, true);
+    // The directive should quote the pending step's question text exactly.
+    expect(block).toMatch(/"What kind of legal matter can we help you with\?"/);
+  });
+
+  it('does NOT include the directive when SOP is finalized (no pending step to re-prompt)', () => {
+    const sopConfig = buildSOPConfig();
+    let state = initSOPState(sopConfig, ANCHOR);
+    // Capture all and finalize.
+    for (const step of state.steps) {
+      state = advanceSOP(
+        state,
+        { type: 'capture_step', step_id: step.step_id, value: 'x', capturedAt: T1 },
+        sopConfig,
+      );
+    }
+    state = advanceSOP(state, { type: 'finalize' }, sopConfig);
+    const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES, true);
+    expect(block).not.toContain('### Detour required NOW');
+  });
+});

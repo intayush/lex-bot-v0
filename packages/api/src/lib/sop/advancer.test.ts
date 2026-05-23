@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import type { CaseType, SOPConfiguration } from '@legal-chatbot/shared';
 import { initSOPState } from './state-machine';
-import { advanceForVisitorMessage } from './advancer';
+import { advanceStateForVisitorMessage as advanceForVisitorMessage } from './advancer';
 
 const ANCHOR = '2026-05-23T10:00:00.000Z';
 const T1 = '2026-05-23T10:01:00.000Z';
