@@ -321,3 +321,44 @@ describe('advanceForVisitorMessage — defensive', () => {
     expect(next).toBe(initial);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Multi-step capture (Phase 4 US2 — exercises the full skip-detector +
+// advancer path)
+// ---------------------------------------------------------------------------
+
+describe('advanceForVisitorMessage — multi-step capture (US2)', () => {
+  it('"I had a DUI yesterday" advances both case_type and when in one turn', async () => {
+    const sopConfig = buildSOPConfig();
+    const initial = initSOPState(sopConfig, ANCHOR);
+    const after = await advanceForVisitorMessage({
+      state: initial, sopConfig, caseTypes: CASE_TYPES,
+      message: 'I had a DUI yesterday', capturedAt: T1,
+      inferDateImpl: ALWAYS_YESTERDAY,
+    });
+
+    const caseTypeStep = after.steps.find((s) => s.slug === 'case_type')!;
+    expect(caseTypeStep.status).toBe('complete');
+    expect(caseTypeStep.captured_value).toBe('dui');
+    expect(caseTypeStep.inferred).toBe(true);
+
+    const whenStep = after.steps.find((s) => s.slug === 'when')!;
+    expect(whenStep.status).toBe('complete');
+    expect(whenStep.captured_value).toBe('2026-05-22');
+
+    // current_progress should reflect both captures.
+    expect(after.current_progress).toBeGreaterThanOrEqual(2);
+  });
+
+  it('out-of-scope case_type in a multi-step message still triggers finalize_out_of_scope', async () => {
+    const sopConfig = buildSOPConfig();
+    const initial = initSOPState(sopConfig, ANCHOR);
+    const after = await advanceForVisitorMessage({
+      state: initial, sopConfig, caseTypes: CASE_TYPES,
+      message: 'I need help with estate planning', capturedAt: T1,
+      inferDateImpl: ALWAYS_NULL,
+    });
+    expect(after.is_finalized).toBe(true);
+    expect(after.out_of_scope_termination).toBe(true);
+  });
+});
