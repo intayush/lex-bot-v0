@@ -160,6 +160,7 @@ export async function POST(req: Request) {
     sopBundle.sop ?? undefined,
     sopBundle.goodbyePhrases.length > 0 ? sopBundle.goodbyePhrases : undefined,
     isOffTopicNow,
+    sopBundle.caseTypes.length > 0 ? sopBundle.caseTypes : undefined,
   );
   const contextStoreUrl = auth.contextStoreUrl;
 
