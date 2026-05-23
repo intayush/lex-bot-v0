@@ -48,6 +48,7 @@ CREATE TABLE \`sessions\` (
   \`account_id\` text NOT NULL,
   \`messages_json\` text DEFAULT '[]' NOT NULL,
   \`is_preview\` integer DEFAULT 0 NOT NULL,
+  \`sop_state_json\` text,
   \`created_at\` text NOT NULL,
   \`updated_at\` text NOT NULL,
   FOREIGN KEY (\`account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE no action
@@ -66,6 +67,7 @@ CREATE TABLE \`leads\` (
   \`classification\` text NOT NULL,
   \`classification_rationale\` text,
   \`urgency_factors_json\` text,
+  \`sop_state_snapshot\` text,
   \`status\` text DEFAULT 'new' NOT NULL,
   \`created_at\` text NOT NULL,
   FOREIGN KEY (\`account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE no action,

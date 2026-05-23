@@ -8,6 +8,13 @@
       "when": 1778417616223,
       "tag": "0000_quick_cerebro",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1779556115898,
+      "tag": "0001_heavy_excalibur",
+      "breakpoints": true
     }
   ]
 }

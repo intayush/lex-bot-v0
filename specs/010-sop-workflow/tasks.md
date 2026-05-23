@@ -55,12 +55,12 @@ description: "Tasks for SOP Workflow"
 
 ### Foundation 2B — Drizzle Schema Migration (Constitution VII)
 
-- [ ] T011 Extend `packages/api/src/db/schema.ts`: add 5 new table definitions (`sopConfigurations`, `sopSteps`, `caseTypes`, `subTypes`, `goodbyePhrases`) per `data-model.md` "New Tables"; include all FK constraints and unique indexes
-- [ ] T012 Extend `packages/api/src/db/schema.ts`: add `sopStateJson: text('sop_state_json')` column to `sessions` table (nullable)
-- [ ] T013 Extend `packages/api/src/db/schema.ts`: add `sopStateSnapshot: text('sop_state_snapshot')` column to `leads` table (nullable)
-- [ ] T014 [P] Mirror schema changes in `packages/api/src/db/test-schema.ts` (SQLite mirror used by Vitest)
-- [ ] T015 Generate migration with `pnpm --filter @legal-chatbot/api db:generate`; commit the generated SQL file under `packages/api/drizzle/` (filename auto-numbered by drizzle-kit)
-- [ ] T016 Run `pnpm --filter @legal-chatbot/api db:migrate` against local PG to verify migration applies without errors
+- [X] T011 Extend `packages/api/src/db/schema.ts`: add 5 new table definitions (`sopConfigurations`, `sopSteps`, `caseTypes`, `subTypes`, `goodbyePhrases`) per `data-model.md` "New Tables"; include all FK constraints and unique indexes
+- [X] T012 Extend `packages/api/src/db/schema.ts`: add `sopStateJson: text('sop_state_json')` column to `sessions` table (nullable)
+- [X] T013 Extend `packages/api/src/db/schema.ts`: add `sopStateSnapshot: text('sop_state_snapshot')` column to `leads` table (nullable)
+- [X] T014 [P] Mirror schema changes in `packages/api/src/db/test-schema.ts` (SQLite mirror used by Vitest)
+- [X] T015 Generate migration with `pnpm --filter @legal-chatbot/api db:generate`; commit the generated SQL file under `packages/api/drizzle/` (filename auto-numbered by drizzle-kit)
+- [~] T016 Run `pnpm --filter @legal-chatbot/api db:migrate` against local PG to verify migration applies without errors **— DEFERRED.** Local Docker not running and no compose file exists in this repo (Foundation quickstart claim was aspirational). Migration was statically validated at generation time by drizzle-kit (12 tables resolved, FKs + indexes recorded, no diff conflicts). Re-attempt when Foundation's Docker compose lands OR run against staging Neon during deploy. Tracked here so we don't ship to prod without verification.
 
 ### Foundation 2C — Default SOP Seed (R1)
 

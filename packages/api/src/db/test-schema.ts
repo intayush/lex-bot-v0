@@ -37,6 +37,8 @@ export const sessions = sqliteTable('sessions', {
   account_id: text('account_id').notNull().references(() => accounts.id),
   messages_json: text('messages_json').notNull().default('[]'),
   is_preview: integer('is_preview', { mode: 'boolean' }).notNull().default(false),
+  /** SOP runtime state (010-sop-workflow). JSON-serialized SOPState. */
+  sop_state_json: text('sop_state_json'),
   created_at: text('created_at').notNull(),
   updated_at: text('updated_at').notNull(),
 });
@@ -54,6 +56,8 @@ export const leads = sqliteTable('leads', {
   classification: text('classification').notNull(),
   classification_rationale: text('classification_rationale'),
   urgency_factors_json: text('urgency_factors_json'),
+  /** SOP snapshot (010-sop-workflow). JSON-serialized SOPState. */
+  sop_state_snapshot: text('sop_state_snapshot'),
   status: text('status').notNull().default('new'),
   created_at: text('created_at').notNull(),
 });
@@ -78,5 +82,60 @@ export const notifications = sqliteTable('notifications', {
   read: integer('read', { mode: 'boolean' }).notNull().default(false),
   delivery_channel: text('delivery_channel').notNull().default('dashboard'),
   delivered_at: text('delivered_at'),
+  created_at: text('created_at').notNull(),
+});
+
+// ---------------------------------------------------------------------------
+// SOP Workflow tables (010-sop-workflow) — SQLite mirror for tests
+// ---------------------------------------------------------------------------
+
+export const sopConfigurations = sqliteTable('sop_configurations', {
+  id: text('id').primaryKey(),
+  account_id: text('account_id').notNull().references(() => accounts.id),
+  version: integer('version').notNull(),
+  qualified_lead_threshold: integer('qualified_lead_threshold').notNull().default(5),
+  is_published: integer('is_published', { mode: 'boolean' }).notNull().default(false),
+  derived_from_legacy: integer('derived_from_legacy', { mode: 'boolean' }).notNull().default(false),
+  created_at: text('created_at').notNull(),
+});
+
+export const sopSteps = sqliteTable('sop_steps', {
+  id: text('id').primaryKey(),
+  sop_configuration_id: text('sop_configuration_id').notNull().references(() => sopConfigurations.id),
+  position: integer('position').notNull(),
+  slug: text('slug').notNull(),
+  question_text: text('question_text').notNull(),
+  chip_source: text('chip_source'),
+  inline_chips_json: text('inline_chips_json'),
+  accepts_free_text: integer('accepts_free_text', { mode: 'boolean' }).notNull().default(true),
+  is_required: integer('is_required', { mode: 'boolean' }).notNull().default(true),
+  counts_toward_threshold: integer('counts_toward_threshold', { mode: 'boolean' }).notNull().default(true),
+  is_default: integer('is_default', { mode: 'boolean' }).notNull().default(false),
+  skip_condition_json: text('skip_condition_json'),
+});
+
+export const caseTypes = sqliteTable('case_types', {
+  id: text('id').primaryKey(),
+  account_id: text('account_id').notNull().references(() => accounts.id),
+  slug: text('slug').notNull(),
+  label: text('label').notNull(),
+  position: integer('position').notNull(),
+  is_in_scope: integer('is_in_scope', { mode: 'boolean' }).notNull().default(true),
+  created_at: text('created_at').notNull(),
+});
+
+export const subTypes = sqliteTable('sub_types', {
+  id: text('id').primaryKey(),
+  case_type_id: text('case_type_id').notNull().references(() => caseTypes.id),
+  slug: text('slug').notNull(),
+  label: text('label').notNull(),
+  position: integer('position').notNull(),
+  created_at: text('created_at').notNull(),
+});
+
+export const goodbyePhrases = sqliteTable('goodbye_phrases', {
+  id: text('id').primaryKey(),
+  account_id: text('account_id').notNull().references(() => accounts.id),
+  phrase: text('phrase').notNull(),
   created_at: text('created_at').notNull(),
 });
