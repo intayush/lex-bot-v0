@@ -36,14 +36,43 @@ export const chipSchema = z.object({
 export type Chip = z.infer<typeof chipSchema>;
 
 /**
- * Source for a step's chip list:
- * - `case_types` → live `case_types` rows for the account
- * - `sub_types`  → live `sub_types` rows scoped to the prior step's captured case_type
- * - `inline`     → static array stored in the step row itself (`inline_chips_json`)
- * - `null`       → no chips; step expects free text only
+ * Source for a step's chip list (or input form):
+ * - `case_types`   → live `case_types` rows for the account
+ * - `sub_types`    → live `sub_types` rows scoped to the prior step's captured case_type
+ * - `inline`       → static array stored in the step row itself (`inline_chips_json`)
+ * - `contact_form` → renders a contact-input form in the widget (name +
+ *                    phone/email). Captured value is a JSON-stringified
+ *                    `{ name, contact_email, contact_phone }` blob. Step
+ *                    typically marks the SOP as fully complete (default
+ *                    SOP threshold is 6 with the contact step at position 6).
+ * - `null`         → no chips/form; step expects free text only
  */
-export const chipSourceSchema = z.enum(['case_types', 'sub_types', 'inline']).nullable();
+export const chipSourceSchema = z.enum(['case_types', 'sub_types', 'inline', 'contact_form']).nullable();
 export type ChipSource = z.infer<typeof chipSourceSchema>;
+
+// ---------------------------------------------------------------------------
+// Contact-form submission shape (chip_source='contact_form' steps)
+// ---------------------------------------------------------------------------
+
+/**
+ * Payload submitted when the visitor fills in the contact-info form
+ * inside the chat widget. Validated when the advancer captures it; the
+ * stringified JSON form is stored as the step's captured_value.
+ *
+ * Required: name AND at least one of (contact_email, contact_phone).
+ * Validation enforced via the schema's `.refine` clause below.
+ */
+export const contactFormPayloadSchema = z
+  .object({
+    name: z.string().min(1).max(120),
+    contact_email: z.string().email().nullable(),
+    contact_phone: z.string().min(3).max(40).nullable(),
+  })
+  .refine(
+    (p) => p.contact_email !== null || p.contact_phone !== null,
+    { message: 'At least one of contact_email or contact_phone is required.' },
+  );
+export type ContactFormPayload = z.infer<typeof contactFormPayloadSchema>;
 
 // ---------------------------------------------------------------------------
 // SOP Step (a single ordered question in an SOP)

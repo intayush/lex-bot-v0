@@ -2,7 +2,8 @@ import { nanoid } from 'nanoid';
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
 import { leads, notifications } from '../db/schema';
-import type { SOPState } from '@legal-chatbot/shared';
+import type { ContactFormPayload, SOPState } from '@legal-chatbot/shared';
+import { contactFormPayloadSchema } from '@legal-chatbot/shared';
 
 interface CaptureLeadInput {
   accountId: string;
@@ -213,11 +214,46 @@ export async function updateLeadSOPState(
   const newIncidentDate =
     sopISODate && !currentIsISO ? sopISODate : existingRow.incident_date;
 
+  // Contact-step backfill (010-sop-workflow contact step). When the
+  // visitor submits the contact form, the contact step's captured value
+  // is a JSON-stringified ContactFormPayload. Populate the lead row's
+  // dedicated columns from it — but only fill columns currently null,
+  // so we don't clobber values the LLM already supplied via captureLead.
+  const contactStep = sopState.steps.find((s) => s.slug === 'contact');
+  let contactPayload: ContactFormPayload | null = null;
+  if (
+    contactStep?.status === 'complete' &&
+    contactStep.captured_value
+  ) {
+    try {
+      const parsed = contactFormPayloadSchema.safeParse(
+        JSON.parse(contactStep.captured_value),
+      );
+      if (parsed.success) contactPayload = parsed.data;
+    } catch {
+      // Captured value isn't JSON — older format, ignore.
+    }
+  }
+  const newName = contactPayload?.name && !existingRow.name
+    ? contactPayload.name
+    : existingRow.name;
+  const newEmail =
+    contactPayload?.contact_email && !existingRow.contact_email
+      ? contactPayload.contact_email
+      : existingRow.contact_email;
+  const newPhone =
+    contactPayload?.contact_phone && !existingRow.contact_phone
+      ? contactPayload.contact_phone
+      : existingRow.contact_phone;
+
   await db
     .update(leads)
     .set({
       sop_state_snapshot: JSON.stringify(sopState),
       incident_date: newIncidentDate,
+      name: newName,
+      contact_email: newEmail,
+      contact_phone: newPhone,
     })
     .where(eq(leads.id, existingRow.id));
 }

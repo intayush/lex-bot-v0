@@ -75,6 +75,20 @@ function buildSOPConfig(): SOPConfiguration {
         skip_condition_json: null,
       },
       {
+        id: 'step_4',
+        sop_configuration_id: 'cfg_test',
+        position: 4,
+        slug: 'what',
+        question_text: 'What happened?',
+        chip_source: null,
+        inline_chips_json: null,
+        accepts_free_text: true,
+        is_required: true,
+        counts_toward_threshold: true,
+        is_default: true,
+        skip_condition_json: null,
+      },
+      {
         id: 'step_5',
         sop_configuration_id: 'cfg_test',
         position: 5,
@@ -86,6 +100,20 @@ function buildSOPConfig(): SOPConfiguration {
           { label: 'Yesterday', slug: 'yesterday' },
         ]),
         accepts_free_text: true,
+        is_required: true,
+        counts_toward_threshold: true,
+        is_default: true,
+        skip_condition_json: null,
+      },
+      {
+        id: 'step_6',
+        sop_configuration_id: 'cfg_test',
+        position: 6,
+        slug: 'contact',
+        question_text: 'Last step — please share your contact info so we can follow up.',
+        chip_source: 'contact_form',
+        inline_chips_json: null,
+        accepts_free_text: false,
         is_required: true,
         counts_toward_threshold: true,
         is_default: true,
@@ -199,6 +227,7 @@ describe('advanceForVisitorMessage — when step (date inference)', () => {
     s = await advanceForVisitorMessage({ state: s, sopConfig, caseTypes: CASE_TYPES, message: 'dui',           capturedAt: T1, inferDateImpl: ALWAYS_NULL });
     s = await advanceForVisitorMessage({ state: s, sopConfig, caseTypes: CASE_TYPES, message: 'first offense', capturedAt: T1, inferDateImpl: ALWAYS_NULL });
     s = await advanceForVisitorMessage({ state: s, sopConfig, caseTypes: CASE_TYPES, message: '5th and Main',  capturedAt: T1, inferDateImpl: ALWAYS_NULL });
+    s = await advanceForVisitorMessage({ state: s, sopConfig, caseTypes: CASE_TYPES, message: 'arrested',      capturedAt: T1, inferDateImpl: ALWAYS_NULL });
     return s;
   }
 
@@ -219,8 +248,9 @@ describe('advanceForVisitorMessage — when step (date inference)', () => {
     // Inject a SOP where the when step has chip_source=null so we exercise
     // the free-text branch.
     const sopConfig = buildSOPConfig();
-    sopConfig.steps[3]!.chip_source = null;
-    sopConfig.steps[3]!.inline_chips_json = null;
+    const whenIdx = sopConfig.steps.findIndex((s) => s.slug === 'when');
+    sopConfig.steps[whenIdx]!.chip_source = null;
+    sopConfig.steps[whenIdx]!.inline_chips_json = null;
     const before = await walkToWhenPending(sopConfig);
     const after = await advanceForVisitorMessage({
       state: before, sopConfig, caseTypes: CASE_TYPES,
@@ -235,8 +265,9 @@ describe('advanceForVisitorMessage — when step (date inference)', () => {
   it('low-confidence free-text inference leaves the step pending (FR-014)', async () => {
     // Free-text branch with inferDate returning null (below threshold).
     const sopConfig = buildSOPConfig();
-    sopConfig.steps[3]!.chip_source = null;
-    sopConfig.steps[3]!.inline_chips_json = null;
+    const whenIdx = sopConfig.steps.findIndex((s) => s.slug === 'when');
+    sopConfig.steps[whenIdx]!.chip_source = null;
+    sopConfig.steps[whenIdx]!.inline_chips_json = null;
     const before = await walkToWhenPending(sopConfig);
     const after = await advanceForVisitorMessage({
       state: before, sopConfig, caseTypes: CASE_TYPES,
@@ -471,5 +502,116 @@ describe('advanceForVisitorMessage — change-of-mind correction', () => {
     expect(s.steps[0]!.captured_value).toBe('dui'); // unchanged
     expect(s.steps[1]!.captured_value).toBe('repeat_offense');
     expect(s.current_progress).toBe(2); // both still complete
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Contact-form short-circuit (010-sop-workflow contact step)
+// ---------------------------------------------------------------------------
+
+describe('advanceForVisitorMessage — contact-form step', () => {
+  /** Walk to contact step pending (capture all 5 prior steps). */
+  async function walkToContactPending(sopConfig: SOPConfiguration) {
+    let s = initSOPState(sopConfig, ANCHOR);
+    for (const [stepId, val] of [
+      ['step_1', 'dui'],
+      ['step_2', 'first_offense'],
+      ['step_3', 'wherever'],
+      ['step_4', 'whatever'],
+      ['step_5', 'today'],
+    ] as const) {
+      s = await advanceForVisitorMessage({
+        state: s, sopConfig, caseTypes: CASE_TYPES,
+        message: val, capturedAt: T1,
+        // ALWAYS_NULL so free-text messages on where/what don't get
+        // wrongly inferred into the when step. The "today" chip on
+        // step_5 captures regardless (skip-detector's inline-chip
+        // path falls through to the chip slug if inference fails).
+        inferDateImpl: ALWAYS_NULL,
+      });
+    }
+    return s;
+  }
+
+  it('captures the contact step from a well-formed form-submit message', async () => {
+    const sopConfig = buildSOPConfig();
+    let s = await walkToContactPending(sopConfig);
+    expect(s.steps.find((st) => st.slug === 'contact')!.status).toBe('pending');
+
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: 'My name is Jane Doe, my email is jane@example.com, my phone is 555-867-5309',
+      capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+
+    const contactStep = s.steps.find((st) => st.slug === 'contact')!;
+    expect(contactStep.status).toBe('complete');
+    const payload = JSON.parse(contactStep.captured_value!);
+    expect(payload.name).toBe('Jane Doe');
+    expect(payload.contact_email).toBe('jane@example.com');
+    expect(payload.contact_phone).toBe('555-867-5309');
+  });
+
+  it('captures with name + email (phone omitted)', async () => {
+    const sopConfig = buildSOPConfig();
+    let s = await walkToContactPending(sopConfig);
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: "I'm Jane Doe, my email is jane@example.com",
+      capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+
+    const contactStep = s.steps.find((st) => st.slug === 'contact')!;
+    expect(contactStep.status).toBe('complete');
+    const payload = JSON.parse(contactStep.captured_value!);
+    expect(payload.name).toBe('Jane Doe');
+    expect(payload.contact_email).toBe('jane@example.com');
+    expect(payload.contact_phone).toBeNull();
+  });
+
+  it('does NOT capture when extraction fails (incomplete form-submit)', async () => {
+    // Visitor's message lacks a name pattern. Form should re-render.
+    const sopConfig = buildSOPConfig();
+    const before = await walkToContactPending(sopConfig);
+    const after = await advanceForVisitorMessage({
+      state: before, sopConfig, caseTypes: CASE_TYPES,
+      message: "jane@example.com",
+      capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+    expect(after).toBe(before); // same reference; no-op
+  });
+
+  it('does NOT advance other steps when pending is contact_form (short-circuit)', async () => {
+    // Even if the message contained a case_type slug, when contact is
+    // pending we don't run the regular skip-detector pass — that would
+    // risk re-capturing some other step.
+    const sopConfig = buildSOPConfig();
+    let s = await walkToContactPending(sopConfig);
+
+    // Capture contact via well-formed message that ALSO mentions DUI.
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: "My name is Jane DUI Doe, my email is jane@example.com",
+      capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+    // case_type stays as 'dui' (already captured); not re-detected.
+    expect(s.steps.find((st) => st.slug === 'case_type')!.captured_value).toBe('dui');
+    // contact step captured.
+    expect(s.steps.find((st) => st.slug === 'contact')!.status).toBe('complete');
+  });
+
+  it('current_progress increments to 6 when contact captured (default 6-step SOP)', async () => {
+    const sopConfig = buildSOPConfig();
+    // Bump threshold to 6 to mirror the default seed.
+    sopConfig.qualified_lead_threshold = 6;
+    let s = await walkToContactPending(sopConfig);
+    expect(s.current_progress).toBe(5);
+
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: "My name is Jane, my email is jane@x.com",
+      capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+    expect(s.current_progress).toBe(6);
   });
 });

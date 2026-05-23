@@ -14,6 +14,7 @@ import type { CaseType, SOPConfiguration, SOPState } from '@legal-chatbot/shared
 import { advanceSOP, nextPendingStep } from './state-machine';
 import { detectSkippedSteps, type SkipDetectorMatch } from './skip-detector';
 import { inferDate } from './date-inferer';
+import { extractContactPayload } from './contact-form';
 
 export interface AdvanceForVisitorMessageInput {
   state: SOPState;
@@ -47,6 +48,51 @@ export async function advanceForVisitorMessage(
   const pendingStepBefore = nextPendingStep(input.state, sopConfig);
 
   if (input.state.is_finalized) {
+    return { state: input.state, matches: [], pendingStepBefore };
+  }
+
+  // Contact-form short-circuit: when the pending step is a contact_form
+  // step (e.g., the default SOP's 'contact' step at position 6), try to
+  // extract a structured contact payload from the visitor's message.
+  // The widget normally dispatches a well-formed sentence ('My name is
+  // Jane, my email is jane@example.com') after the visitor fills the
+  // form, so extraction succeeds reliably. Free-text "I'm Jane,
+  // jane@x.com" also works (same regex patterns).
+  //
+  // On success: capture the step with the JSON-stringified payload and
+  // skip the regular skip-detector pass — the contact step is the
+  // explicit answer to the pending question and shouldn't be diluted
+  // with case_type/sub_type/when re-detection.
+  if (pendingStepBefore?.chip_source === 'contact_form') {
+    const payload = extractContactPayload(message);
+    if (payload) {
+      const next = advanceSOP(
+        input.state,
+        {
+          type: 'capture_step',
+          step_id: pendingStepBefore.id,
+          value: JSON.stringify(payload),
+          capturedAt,
+          inferred: false,
+        },
+        sopConfig,
+      );
+      return {
+        state: next,
+        matches: [{
+          step_id: pendingStepBefore.id,
+          slug: pendingStepBefore.slug,
+          captured_value: JSON.stringify(payload),
+          out_of_scope: false,
+          source: 'free_text',
+        }],
+        pendingStepBefore,
+      };
+    }
+    // Extraction failed: leave step pending. The widget keeps the
+    // form rendered; the visitor can re-submit. We DON'T fall through
+    // to skip-detector because that would risk capturing the message
+    // into some other step incorrectly.
     return { state: input.state, matches: [], pendingStepBefore };
   }
 

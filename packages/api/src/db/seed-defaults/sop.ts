@@ -91,6 +91,21 @@ const _RAW_DEFAULT_SOP_STEPS: SOPStepInput[] = [
     is_default: true,
     skip_condition_json: null,
   },
+  {
+    slug: 'contact',
+    position: 6,
+    question_text: 'Last step — please share your contact info so we can follow up.',
+    chip_source: 'contact_form',
+    inline_chips_json: null,
+    // The widget renders a form, not free-text inputs in the message
+    // stream. accepts_free_text=false ensures the advancer doesn't try to
+    // capture stray text into this step.
+    accepts_free_text: false,
+    is_required: true,
+    counts_toward_threshold: true,
+    is_default: true,
+    skip_condition_json: null,
+  },
 ];
 
 /** 5 default SOP steps validated against the shared schema. */
@@ -201,5 +216,6 @@ export const DEFAULT_GOODBYE_PHRASES: readonly string[] = Object.freeze([
   'that\u2019s all',
 ]);
 
-/** Default qualified-lead threshold (FR-002). 5 = the default-step count. */
-export const DEFAULT_QUALIFIED_LEAD_THRESHOLD = 5;
+/** Default qualified-lead threshold (FR-002). 6 = the default-step count
+ *  (5 intake steps + the contact-form step that completes the lead). */
+export const DEFAULT_QUALIFIED_LEAD_THRESHOLD = 6;

@@ -814,3 +814,121 @@ describe('updateLeadSOPState — onFinish backfill helper', () => {
     expect(notifsAfter).toHaveLength(1); // unchanged
   });
 });
+
+// ---------------------------------------------------------------------------
+// 010-sop-workflow contact step: updateLeadSOPState backfills name/email/phone
+// from the contact step's captured value (JSON-stringified ContactFormPayload)
+// ---------------------------------------------------------------------------
+
+describe('updateLeadSOPState — contact step backfill', () => {
+  function buildSOPStateWithContact(payload: { name: string; email?: string; phone?: string } | null) {
+    const contactValue = payload
+      ? JSON.stringify({
+          name: payload.name,
+          contact_email: payload.email ?? null,
+          contact_phone: payload.phone ?? null,
+        })
+      : null;
+    return {
+      sop_configuration_id: 'cfg_test',
+      sop_version: 1,
+      conversation_anchor_iso: '2026-05-23T10:00:00.000Z',
+      steps: [
+        { step_id: 'step_1', slug: 'case_type', status: 'complete' as const,
+          captured_value: 'dui', captured_at: '2026-05-23T10:01:00.000Z', inferred: false },
+        { step_id: 'step_6', slug: 'contact',
+          status: (contactValue ? 'complete' : 'pending') as 'complete' | 'pending',
+          captured_value: contactValue,
+          captured_at: contactValue ? '2026-05-23T10:01:00.000Z' : null, inferred: false },
+      ],
+      qualified_lead_threshold: 6,
+      current_progress: contactValue ? 6 : 1,
+      is_finalized: false,
+      out_of_scope_termination: false,
+    };
+  }
+
+  it('populates null name/email/phone columns from contact step payload', async () => {
+    // captureLead fired with all contact fields null (visitor hadn't given them yet)
+    await captureLead(makeLeadInput({
+      name: null, contactEmail: null, contactPhone: null,
+    }));
+
+    // SOP advances; contact step captured. Backfill runs.
+    await updateLeadSOPState(
+      TEST_SESSION_ID,
+      buildSOPStateWithContact({ name: 'Jane Doe', email: 'jane@example.com', phone: '555-867-5309' }),
+    );
+
+    const row = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+      .get();
+    expect(row.name).toBe('Jane Doe');
+    expect(row.contact_email).toBe('jane@example.com');
+    expect(row.contact_phone).toBe('555-867-5309');
+  });
+
+  it('does NOT clobber existing non-null name/email/phone (LLM may have captured them earlier)', async () => {
+    // captureLead fired with the LLM having extracted partial info
+    await captureLead(makeLeadInput({
+      name: 'LLM-extracted Name',
+      contactEmail: 'llm@example.com',
+      contactPhone: null,
+    }));
+
+    // Contact step captured with different values (visitor typed a richer form)
+    await updateLeadSOPState(
+      TEST_SESSION_ID,
+      buildSOPStateWithContact({ name: 'Form Name', email: 'form@example.com', phone: '555-867-5309' }),
+    );
+
+    const row = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+      .get();
+    // Existing non-null values preserved.
+    expect(row.name).toBe('LLM-extracted Name');
+    expect(row.contact_email).toBe('llm@example.com');
+    // Previously-null phone gets backfilled from the form.
+    expect(row.contact_phone).toBe('555-867-5309');
+  });
+
+  it('skips backfill when contact step is still pending', async () => {
+    await captureLead(makeLeadInput({ name: null, contactEmail: null, contactPhone: null }));
+    await updateLeadSOPState(TEST_SESSION_ID, buildSOPStateWithContact(null));
+
+    const row = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+      .get();
+    expect(row.name).toBeNull();
+    expect(row.contact_email).toBeNull();
+    expect(row.contact_phone).toBeNull();
+  });
+
+  it('handles malformed contact payload gracefully (skips backfill, no throw)', async () => {
+    await captureLead(makeLeadInput({ name: null, contactEmail: null, contactPhone: null }));
+
+    const sopState: any = {
+      sop_configuration_id: 'cfg_test',
+      sop_version: 1,
+      conversation_anchor_iso: '2026-05-23T10:00:00.000Z',
+      steps: [
+        { step_id: 'step_6', slug: 'contact', status: 'complete',
+          captured_value: 'this is not JSON', captured_at: '2026-05-23T10:01:00.000Z', inferred: false },
+      ],
+      qualified_lead_threshold: 6,
+      current_progress: 6,
+      is_finalized: false,
+      out_of_scope_termination: false,
+    };
+    await expect(updateLeadSOPState(TEST_SESSION_ID, sopState)).resolves.not.toThrow();
+
+    const row = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+      .get();
+    expect(row.name).toBeNull();
+  });
+});

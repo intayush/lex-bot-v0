@@ -19,7 +19,7 @@ export interface WidgetSOPStep {
   slug: string;
   position: number;
   question_text: string;
-  chip_source: 'case_types' | 'sub_types' | 'inline' | null;
+  chip_source: 'case_types' | 'sub_types' | 'inline' | 'contact_form' | null;
   inline_chips_json: string | null;
   accepts_free_text: boolean;
   is_required: boolean;
@@ -65,6 +65,9 @@ export function computeActiveChips(input: ComputeChipsInput): Chip[] {
 
   const step = sop.steps.find((s) => s.slug === pendingStepSlug);
   if (!step || step.chip_source === null) return [];
+  // contact_form steps render an input form (not chips). Return empty;
+  // ChatPanel renders <ContactForm> instead.
+  if (step.chip_source === 'contact_form') return [];
 
   if (step.chip_source === 'case_types') {
     return caseTypes

@@ -2,6 +2,7 @@ import { useChat } from '@ai-sdk/react';
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { QuickReplies } from './QuickReplies';
 import { Chips } from './Chips';
+import { ContactForm } from './ContactForm';
 import { ProgressBar } from './ProgressBar';
 import { useSOPState } from '../hooks/useSOPState';
 import { useReducedMotion } from '../hooks/useReducedMotion';
@@ -135,6 +136,18 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
       }),
     [widgetConfig, sopState],
   );
+
+  // 010-sop-workflow contact step: when the pending SOP step is a
+  // contact_form step, render <ContactForm> instead of chips. The form
+  // dispatches a well-formed message that the advancer's contact-form
+  // short-circuit captures.
+  const pendingStepIsContactForm = useMemo(() => {
+    if (!widgetConfig?.sop || !sopState?.pending_step_slug || sopState.is_finalized) {
+      return false;
+    }
+    const step = widgetConfig.sop.steps.find((s) => s.slug === sopState.pending_step_slug);
+    return step?.chip_source === 'contact_form';
+  }, [widgetConfig, sopState]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -340,6 +353,21 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
               chips={activeChips}
               onSelect={(label) => append({ role: 'user', content: label })}
               ariaLabel="Choose an option"
+            />
+          )}
+
+        {/* 010-sop-workflow contact step: form rendered when the pending
+            SOP step's chip_source='contact_form'. The form captures
+            name + email/phone with browser-native validation; on submit
+            it dispatches a human-readable sentence that the advancer's
+            contact-form short-circuit parses. */}
+        {!isLoading
+          && messages.length > 0
+          && messages[messages.length - 1]?.role === 'assistant'
+          && pendingStepIsContactForm
+          && (
+            <ContactForm
+              onSubmit={(message) => append({ role: 'user', content: message })}
             />
           )}
 
