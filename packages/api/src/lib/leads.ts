@@ -24,6 +24,28 @@ interface CaptureLeadInput {
   sopState?: SOPState | null;
 }
 
+/** ISO-8601 calendar date pattern: YYYY-MM-DD. */
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * If the SOP runtime captured a valid ISO date for the `when` step, that
+ * value is the source of truth — override whatever the LLM passed as
+ * incidentDate. Verbatim phrases like "last night" or "yesterday" pass
+ * through unchanged when the SOP didn't supply an ISO.
+ */
+function resolveIncidentDate(
+  llmIncidentDate: string | null,
+  sopState: SOPState | null | undefined,
+): string | null {
+  if (!sopState) return llmIncidentDate;
+  const whenStep = sopState.steps.find((s) => s.slug === 'when');
+  const captured = whenStep?.captured_value;
+  if (whenStep?.status === 'complete' && captured && ISO_DATE_REGEX.test(captured)) {
+    return captured;
+  }
+  return llmIncidentDate;
+}
+
 /**
  * Insert OR update the lead row for a session.
  *
@@ -39,10 +61,15 @@ interface CaptureLeadInput {
  *     context). Fires an urgent_lead notification ONLY if classification
  *     transitions FROM non-urgent TO urgent on this update.
  *
+ * incidentDate is also overridden by the SOP's when-step ISO value when
+ * available — the SOP runtime is more reliable than the LLM's
+ * interpretation of conversation phrases.
+ *
  * Returns the (existing or newly-created) leadId either way.
  */
 export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: string; classification: string }> {
   const now = new Date().toISOString();
+  const resolvedIncidentDate = resolveIncidentDate(input.incidentDate, input.sopState);
 
   const existing = await db
     .select()
@@ -62,7 +89,7 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
         contact_email: input.contactEmail,
         contact_phone: input.contactPhone,
         case_type: input.caseType,
-        incident_date: input.incidentDate,
+        incident_date: resolvedIncidentDate,
         brief_description: input.briefDescription,
         classification: input.classification,
         classification_rationale: input.classificationRationale,
@@ -102,7 +129,7 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
     contact_email: input.contactEmail,
     contact_phone: input.contactPhone,
     case_type: input.caseType,
-    incident_date: input.incidentDate,
+    incident_date: resolvedIncidentDate,
     brief_description: input.briefDescription,
     classification: input.classification,
     classification_rationale: input.classificationRationale,
@@ -128,4 +155,69 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
   }
 
   return { leadId, classification: input.classification };
+}
+
+/**
+ * Backfill an existing lead row's SOP state and incident_date with the
+ * latest SOP runtime state. Called from the chat route's onFinish hook so
+ * that even if the LLM invoked captureLead before SOP captures completed,
+ * the lead row reflects the final SOP state by the end of the turn.
+ *
+ * No-ops when:
+ *   - No lead exists for the session yet (captureLead was never called).
+ *   - sopState is null (account has no SOP, or SOP wasn't initialized).
+ *
+ * Updates ONLY:
+ *   - sop_state_snapshot (always overwritten with latest)
+ *   - incident_date (only if SOP when-step has a valid ISO and the row
+ *     currently has null/non-ISO; never overwrites an existing ISO).
+ *
+ * Does NOT touch:
+ *   - classification, classification_rationale, urgency_factors_json
+ *     (those are the LLM's judgment; the server doesn't second-guess)
+ *   - name, contact_email, contact_phone, case_type, brief_description
+ *     (LLM-supplied; partial-lead extractor handles its own backfill)
+ *
+ * Safe to call multiple times per turn — idempotent against the same
+ * SOP state.
+ */
+export async function updateLeadSOPState(
+  sessionId: string,
+  sopState: SOPState | null,
+): Promise<void> {
+  if (!sopState) return;
+
+  const existing = await db
+    .select()
+    .from(leads)
+    .where(eq(leads.session_id, sessionId))
+    .limit(1);
+  if (existing.length === 0) return;
+
+  const existingRow = existing[0]!;
+
+  // Compute the override value (if any) from the latest SOP state.
+  const whenStep = sopState.steps.find((s) => s.slug === 'when');
+  const sopISODate =
+    whenStep?.status === 'complete' &&
+    whenStep.captured_value &&
+    ISO_DATE_REGEX.test(whenStep.captured_value)
+      ? whenStep.captured_value
+      : null;
+
+  // Only override incident_date if the row currently lacks an ISO.
+  // This avoids clobbering a future LLM correction.
+  const currentIsISO =
+    existingRow.incident_date &&
+    ISO_DATE_REGEX.test(existingRow.incident_date);
+  const newIncidentDate =
+    sopISODate && !currentIsISO ? sopISODate : existingRow.incident_date;
+
+  await db
+    .update(leads)
+    .set({
+      sop_state_snapshot: JSON.stringify(sopState),
+      incident_date: newIncidentDate,
+    })
+    .where(eq(leads.id, existingRow.id));
 }

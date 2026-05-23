@@ -12,7 +12,7 @@ import {
   sessionExists,
 } from '../../../lib/session';
 import { searchContext, fetchManifest } from '../../../lib/context-search';
-import { captureLead } from '../../../lib/leads';
+import { captureLead, updateLeadSOPState } from '../../../lib/leads';
 import { extractPartialLeadData, savePartialLead } from '../../../lib/partial-lead';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { initSOPState } from '../../../lib/sop/state-machine';
@@ -234,6 +234,13 @@ export async function POST(req: Request) {
         ],
         sopState,
       );
+
+      // 010-sop-workflow: backfill the lead row's sop_state_snapshot and
+      // (if eligible) incident_date with the latest SOP runtime state.
+      // Handles the case where captureLead fired earlier in the
+      // conversation before the when-step ISO date was captured. No-ops
+      // when no lead exists for the session yet.
+      await updateLeadSOPState(sessionId!, sopState);
 
       // Extract and save partial lead data from the conversation so that
       // information shared before an abandoned session is not lost.

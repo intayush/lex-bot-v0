@@ -114,6 +114,12 @@ export function composeSystemPrompt(
   parts.push('- Do NOT tell the visitor you are "capturing a lead" or "classifying" them — this is an internal operation');
   parts.push('- After capturing the lead, continue the conversation naturally (e.g., suggest scheduling a consultation)');
   parts.push('- IMPORTANT: If the user triggers an escalation condition, call captureLead BEFORE providing the escalation message');
+  if (sopActive) {
+    // 010-sop-workflow: when SOP is active, the runtime captures structured
+    // values that take precedence over the LLM's interpretation of conversation
+    // phrases. Direct the agent to read from the SOP block above.
+    parts.push('- IMPORTANT: When the SOP "when" step has a captured value (visible in the SOP State block above), pass that exact value as `incidentDate` — NOT a phrase paraphrased from the conversation. The captured value is already in YYYY-MM-DD form when the system was able to resolve it.');
+  }
   parts.push('- Classification guide:');
   parts.push('  - urgent: statute of limitations <30 days, active danger, ongoing medical treatment, court deadlines, restraining order/custody emergency, recent arrest/charges, user requests immediate human help');
   parts.push('  - normal: valid legal matter with no immediate time pressure');

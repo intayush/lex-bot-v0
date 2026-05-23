@@ -23,7 +23,7 @@ vi.mock('../db/schema.js', async () => {
 });
 
 // Import module under test AFTER mock declaration (vitest hoists vi.mock)
-import { captureLead } from './leads.js';
+import { captureLead, updateLeadSOPState } from './leads.js';
 import { db } from '../db/index.js';
 import * as schema from '../db/test-schema.js';
 
@@ -538,5 +538,279 @@ describe('captureLead — per-session dedup (multi-call fix)', () => {
     const parsed = JSON.parse(lead.sop_state_snapshot);
     expect(parsed.current_progress).toBe(5);
     expect(parsed.is_finalized).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 010-sop-workflow: server-side incident_date override from SOP when-step
+// ---------------------------------------------------------------------------
+//
+// Live verification on 2026-05-23 surfaced this: the LLM passed verbatim
+// phrases like 'last night' as incidentDate even when the SOP runtime had
+// captured an ISO date in the when step. The SOP runtime is the source of
+// truth; the LLM's interpretation is advisory. captureLead now overrides
+// incidentDate with the SOP's when-step value when it's a valid ISO date.
+
+describe('captureLead — SOP when-step incident_date override', () => {
+  const T1 = '2026-05-23T10:01:00.000Z';
+
+  function buildSOPStateWithWhen(whenValue: string | null) {
+    return {
+      sop_configuration_id: 'cfg_test',
+      sop_version: 1,
+      conversation_anchor_iso: '2026-05-23T10:00:00.000Z',
+      steps: [
+        { step_id: 'step_1', slug: 'case_type', status: 'complete' as const,
+          captured_value: 'dui', captured_at: T1, inferred: false },
+        { step_id: 'step_5', slug: 'when',
+          status: (whenValue ? 'complete' : 'pending') as 'complete' | 'pending',
+          captured_value: whenValue, captured_at: whenValue ? T1 : null, inferred: false },
+      ],
+      qualified_lead_threshold: 5,
+      current_progress: whenValue ? 2 : 1,
+      is_finalized: false,
+      out_of_scope_termination: false,
+    };
+  }
+
+  it('overrides LLM incidentDate with SOP when-step ISO value', async () => {
+    const result = await captureLead(makeLeadInput({
+      incidentDate: 'last night', // LLM's verbatim phrase
+      sopState: buildSOPStateWithWhen('2026-05-22'),
+    }));
+    const row = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.id, result.leadId))
+      .get();
+    expect(row.incident_date).toBe('2026-05-22');
+  });
+
+  it('overrides on UPDATE path too (second call)', async () => {
+    await captureLead(makeLeadInput({
+      incidentDate: null,
+      sopState: buildSOPStateWithWhen(null),
+    }));
+    const result = await captureLead(makeLeadInput({
+      incidentDate: 'yesterday afternoon', // LLM's verbatim phrase
+      sopState: buildSOPStateWithWhen('2026-05-22'),
+    }));
+    const row = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.id, result.leadId))
+      .get();
+    expect(row.incident_date).toBe('2026-05-22');
+  });
+
+  it('falls through to LLM value when SOP when-step is pending', async () => {
+    const result = await captureLead(makeLeadInput({
+      incidentDate: 'sometime last week',
+      sopState: buildSOPStateWithWhen(null), // when not yet captured
+    }));
+    const row = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.id, result.leadId))
+      .get();
+    expect(row.incident_date).toBe('sometime last week');
+  });
+
+  it('falls through to LLM value when SOP when-step has non-ISO captured value', async () => {
+    // Defensive: advancer fallback path captures the chip slug ('yesterday')
+    // when date inference fails. That's not a date — pass through LLM value
+    // (which may also not be an ISO, but we don't second-guess).
+    const result = await captureLead(makeLeadInput({
+      incidentDate: 'yesterday',
+      sopState: buildSOPStateWithWhen('yesterday'), // slug not ISO
+    }));
+    const row = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.id, result.leadId))
+      .get();
+    expect(row.incident_date).toBe('yesterday');
+  });
+
+  it('passes through unchanged when sopState is omitted', async () => {
+    const result = await captureLead(makeLeadInput({
+      incidentDate: 'last night',
+      sopState: null,
+    }));
+    const row = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.id, result.leadId))
+      .get();
+    expect(row.incident_date).toBe('last night');
+  });
+
+  it('passes through unchanged when SOP has no when-slug step at all', async () => {
+    // Lawyer customized the SOP without a 'when' step.
+    const customSOPState = {
+      sop_configuration_id: 'cfg_test',
+      sop_version: 1,
+      conversation_anchor_iso: '2026-05-23T10:00:00.000Z',
+      steps: [
+        { step_id: 'step_1', slug: 'case_type', status: 'complete' as const,
+          captured_value: 'dui', captured_at: T1, inferred: false },
+      ],
+      qualified_lead_threshold: 1,
+      current_progress: 1,
+      is_finalized: true,
+      out_of_scope_termination: false,
+    };
+    const result = await captureLead(makeLeadInput({
+      incidentDate: 'last night',
+      sopState: customSOPState,
+    }));
+    const row = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.id, result.leadId))
+      .get();
+    expect(row.incident_date).toBe('last night');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 010-sop-workflow: updateLeadSOPState — onFinish backfill helper
+// ---------------------------------------------------------------------------
+//
+// Even with the captureLead override, a lead row can end up stale if the
+// agent invoked captureLead BEFORE the SOP runtime captured the when-step
+// ISO date and didn't call captureLead again later. updateLeadSOPState
+// runs in the chat route's onFinish hook to backfill the lead row's
+// sop_state_snapshot AND incident_date with the latest SOP runtime
+// state for the session.
+
+describe('updateLeadSOPState — onFinish backfill helper', () => {
+  const T1 = '2026-05-23T10:01:00.000Z';
+
+  function buildSOPStateWithWhen(whenValue: string | null) {
+    return {
+      sop_configuration_id: 'cfg_test',
+      sop_version: 1,
+      conversation_anchor_iso: '2026-05-23T10:00:00.000Z',
+      steps: [
+        { step_id: 'step_1', slug: 'case_type', status: 'complete' as const,
+          captured_value: 'dui', captured_at: T1, inferred: false },
+        { step_id: 'step_5', slug: 'when',
+          status: (whenValue ? 'complete' : 'pending') as 'complete' | 'pending',
+          captured_value: whenValue, captured_at: whenValue ? T1 : null, inferred: false },
+      ],
+      qualified_lead_threshold: 5,
+      current_progress: whenValue ? 5 : 4,
+      is_finalized: false,
+      out_of_scope_termination: false,
+    };
+  }
+
+  it('no-ops when no lead exists for the session', async () => {
+    await updateLeadSOPState(TEST_SESSION_ID, buildSOPStateWithWhen('2026-05-22'));
+    const all = (db as any).select().from(schema.leads).all();
+    expect(all).toHaveLength(0);
+  });
+
+  it('no-ops when sopState is null', async () => {
+    const r = await captureLead(makeLeadInput({ incidentDate: 'last night', sopState: null }));
+    await updateLeadSOPState(TEST_SESSION_ID, null);
+    const row = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.id, r.leadId))
+      .get();
+    // Row unchanged.
+    expect(row.incident_date).toBe('last night');
+    expect(row.sop_state_snapshot).toBeNull();
+  });
+
+  it('backfills sop_state_snapshot with latest SOP state', async () => {
+    // captureLead fired at turn 4 with when=pending snapshot
+    const partialState = buildSOPStateWithWhen(null);
+    await captureLead(makeLeadInput({ sopState: partialState }));
+
+    // Later: SOP advanced to when=complete with ISO. onFinish runs the backfill.
+    const fullState = buildSOPStateWithWhen('2026-05-22');
+    await updateLeadSOPState(TEST_SESSION_ID, fullState);
+
+    const row = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+      .get();
+    const parsed = JSON.parse(row.sop_state_snapshot);
+    expect(parsed.current_progress).toBe(5);
+    expect(parsed.steps.find((s: any) => s.slug === 'when').captured_value).toBe('2026-05-22');
+  });
+
+  it('backfills incident_date with SOP ISO when row currently has non-ISO', async () => {
+    // captureLead fired with LLM's "last night" + partial SOP (when pending)
+    await captureLead(makeLeadInput({
+      incidentDate: 'last night',
+      sopState: buildSOPStateWithWhen(null),
+    }));
+
+    // SOP advanced; backfill picks up the ISO.
+    await updateLeadSOPState(TEST_SESSION_ID, buildSOPStateWithWhen('2026-05-22'));
+
+    const row = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+      .get();
+    expect(row.incident_date).toBe('2026-05-22');
+  });
+
+  it('does NOT clobber an existing ISO incident_date', async () => {
+    // captureLead fired with proper ISO from the override path.
+    await captureLead(makeLeadInput({
+      incidentDate: 'last night',
+      sopState: buildSOPStateWithWhen('2026-05-20'),
+    }));
+
+    // Later backfill with a different ISO from a later SOP advance.
+    // Should preserve the existing ISO (don't overwrite a good value).
+    await updateLeadSOPState(TEST_SESSION_ID, buildSOPStateWithWhen('2026-05-22'));
+
+    const row = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+      .get();
+    // Existing ISO from captureLead override stays put.
+    expect(row.incident_date).toBe('2026-05-20');
+  });
+
+  it('does NOT touch classification, name, contact_email, or other LLM-supplied fields', async () => {
+    await captureLead(makeLeadInput({
+      classification: 'urgent',
+      name: 'Jane Doe',
+      contactEmail: 'jane@example.com',
+      caseType: 'DUI',
+      sopState: buildSOPStateWithWhen(null),
+    }));
+
+    await updateLeadSOPState(TEST_SESSION_ID, buildSOPStateWithWhen('2026-05-22'));
+
+    const row = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+      .get();
+    expect(row.classification).toBe('urgent');
+    expect(row.name).toBe('Jane Doe');
+    expect(row.contact_email).toBe('jane@example.com');
+    expect(row.case_type).toBe('DUI');
+  });
+
+  it('does NOT fire a notification on backfill (notifications come from captureLead)', async () => {
+    await captureLead(makeLeadInput({
+      classification: 'urgent',
+      sopState: buildSOPStateWithWhen(null),
+    }));
+
+    const notifsBefore = (db as any)
+      .select().from(schema.notifications)
+      .where(eq(schema.notifications.account_id, TEST_ACCOUNT_ID))
+      .all();
+    expect(notifsBefore).toHaveLength(1); // from captureLead
+
+    await updateLeadSOPState(TEST_SESSION_ID, buildSOPStateWithWhen('2026-05-22'));
+
+    const notifsAfter = (db as any)
+      .select().from(schema.notifications)
+      .where(eq(schema.notifications.account_id, TEST_ACCOUNT_ID))
+      .all();
+    expect(notifsAfter).toHaveLength(1); // unchanged
   });
 });

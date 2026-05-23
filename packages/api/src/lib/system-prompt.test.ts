@@ -280,4 +280,21 @@ describe('composeSystemPrompt — SOP path (T030 wiring)', () => {
       expect(prompt).not.toContain(q.question);
     }
   });
+
+  it('instructs the agent to use the SOP-captured when value as incidentDate (when SOP active)', () => {
+    // 2026-05-23 verification surfaced that the LLM was passing verbatim
+    // phrases like "last night" as incidentDate even when the SOP runtime
+    // had captured an ISO date. The system prompt now nudges the agent
+    // to read from the SOP block.
+    const sopConfig = buildSampleSOPConfig();
+    const sopState = buildSampleSOPState(sopConfig);
+    const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES);
+    expect(prompt).toContain('incidentDate');
+    expect(prompt).toMatch(/SOP "when" step has a captured value/i);
+  });
+
+  it('does NOT include the SOP-incidentDate nudge in the legacy path', () => {
+    const prompt = composeSystemPrompt(testConfig);
+    expect(prompt).not.toMatch(/SOP "when" step has a captured value/i);
+  });
 });
