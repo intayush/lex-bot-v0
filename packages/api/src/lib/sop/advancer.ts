@@ -10,19 +10,29 @@
  *     OR chip label of the *currently pending* step → capture that step.
  *   - Free-text fallback: the pending step has chip_source=null AND
  *     accepts_free_text=true → capture the verbatim message as the value.
+ *   - When-step date inference: if the pending step's slug is 'when',
+ *     route the captured text through `inferDate` (R3) so the stored
+ *     value is an ISO 8601 date rather than the verbatim phrase
+ *     ("yesterday" → "2026-05-22"). Inference confidence < 0.6
+ *     (per R3 threshold) leaves the step pending and lets the agent
+ *     ask a clarifying question (FR-014).
  *   - Otherwise: state unchanged. The agent will ask the pending step's
  *     question; the visitor can chip-select on a future turn.
  *
  * Does NOT do:
  *   - Multi-step skip detection (covered by Phase 4 skip-detector).
- *   - Date inference for "when" steps (covered by Phase 4 wiring of
- *     date-inferer; this v0 just captures the verbatim text).
- *   - LLM disambiguation.
+ *   - LLM disambiguation for ambiguous case-type free text.
  *
- * The function is pure — no DB, no LLM, no I/O.
+ * The function is async because of date inference. Pure besides that —
+ * no DB writes; only an LLM call inside `inferDate` when the when step
+ * is pending.
  */
 import type { CaseType, SOPConfiguration, SOPState } from '@legal-chatbot/shared';
 import { advanceSOP, nextPendingStep } from './state-machine';
+import { inferDate } from './date-inferer';
+
+/** Slug convention for the date-bearing SOP step. */
+const WHEN_STEP_SLUG = 'when';
 
 export interface AdvanceForVisitorMessageInput {
   state: SOPState;
@@ -32,13 +42,19 @@ export interface AdvanceForVisitorMessageInput {
   message: string;
   /** Captured-at timestamp (defaults to now). */
   capturedAt?: string;
+  /**
+   * Optional date-inferer injection for tests. Production callers omit
+   * this and the real Gemini-backed inferDate is used.
+   */
+  inferDateImpl?: typeof inferDate;
 }
 
-export function advanceForVisitorMessage(
+export async function advanceForVisitorMessage(
   input: AdvanceForVisitorMessageInput,
-): SOPState {
+): Promise<SOPState> {
   const { state, sopConfig, caseTypes, message } = input;
   const capturedAt = input.capturedAt ?? new Date().toISOString();
+  const inferDateFn = input.inferDateImpl ?? inferDate;
 
   if (state.is_finalized) return state;
 
@@ -50,13 +66,36 @@ export function advanceForVisitorMessage(
 
   const lower = trimmed.toLowerCase();
 
-  // Try chip slug / label matching first.
+  // Try chip slug / label matching first. Even when the slug is 'when',
+  // chip selection should resolve through the chip's slug (e.g. "yesterday")
+  // BEFORE date inference — the chip slug IS the date expression we feed
+  // into inferDate.
   const chipMatch = matchChip(lower, pendingStep, caseTypes, state);
   if (chipMatch) {
     // Out-of-scope case_type chip → finalize_out_of_scope after capture.
+    let captured: string = chipMatch.value;
+
+    // When-step chip selection: convert chip slug ("yesterday", "today",
+    // "this_week", ...) to an ISO date via inferDate.
+    if (pendingStep.slug === WHEN_STEP_SLUG) {
+      const result = await inferDateFn({
+        userText: chipMatch.value,
+        conversationAnchorIso: state.conversation_anchor_iso,
+      });
+      if (result.iso_date === null) {
+        // Inference failed for a chip we ourselves provided — that's a
+        // real Gemini failure. Fall back to capturing the verbatim slug
+        // rather than leaving the step pending; the lead-capture LLM can
+        // still surface the slug ("yesterday") as the incidentDate.
+        captured = chipMatch.value;
+      } else {
+        captured = result.iso_date;
+      }
+    }
+
     let next = advanceSOP(
       state,
-      { type: 'capture_step', step_id: pendingStep.id, value: chipMatch.value, capturedAt },
+      { type: 'capture_step', step_id: pendingStep.id, value: captured, capturedAt },
       sopConfig,
     );
     if (chipMatch.outOfScope) {
@@ -65,13 +104,28 @@ export function advanceForVisitorMessage(
     return next;
   }
 
-  // Free-text fallback: only if the step accepts free text. Avoid capturing
-  // when chip_source is set (chip-only steps shouldn't accept arbitrary
-  // text as a successful capture).
+  // Free-text fallback: only if the step accepts free text.
   if (pendingStep.accepts_free_text && !pendingStep.chip_source) {
+    let captured = trimmed;
+
+    // When-step free-text: route through date inference. If confidence is
+    // below R3's 0.6 threshold, inferDate returns iso_date=null and we
+    // leave the step pending so the agent asks a clarifying question
+    // (FR-014).
+    if (pendingStep.slug === WHEN_STEP_SLUG) {
+      const result = await inferDateFn({
+        userText: trimmed,
+        conversationAnchorIso: state.conversation_anchor_iso,
+      });
+      if (result.iso_date === null) {
+        return state; // pending; agent asks clarifying
+      }
+      captured = result.iso_date;
+    }
+
     return advanceSOP(
       state,
-      { type: 'capture_step', step_id: pendingStep.id, value: trimmed, capturedAt },
+      { type: 'capture_step', step_id: pendingStep.id, value: captured, capturedAt },
       sopConfig,
     );
   }

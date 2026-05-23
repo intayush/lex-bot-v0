@@ -131,7 +131,7 @@ export async function POST(req: Request) {
       ? newUserMessage.content
       : '';
     if (userText) {
-      sopState = advanceForVisitorMessage({
+      sopState = await advanceForVisitorMessage({
         state: sopState,
         sopConfig: sopBundle.sop,
         caseTypes: sopBundle.caseTypes,
