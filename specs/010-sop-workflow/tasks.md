@@ -29,13 +29,13 @@ description: "Tasks for SOP Workflow"
 
 **Purpose**: Install the new dashboard drag-and-drop dependency and stub out the new directory tree so subsequent tasks have file-paths to write into. No runtime behavior changes here.
 
-- [ ] T001 Add `@dnd-kit/sortable`, `@dnd-kit/core`, `@dnd-kit/accessibility` as dependencies of `packages/api` via `pnpm --filter @legal-chatbot/api add @dnd-kit/sortable @dnd-kit/core @dnd-kit/accessibility`; verify `package.json` lists them under `dependencies` (NOT devDependencies, per plan.md Constitution IV note)
-- [ ] T002 [P] Verify `@dnd-kit/sortable` ships no native binaries by running `find packages/api/node_modules/@dnd-kit -name "*.node"`; output MUST be empty (Constitution IV invariant); record verification in plan.md Complexity Tracking note if any binary appears
-- [ ] T003 [P] Create empty directory `packages/api/src/lib/sop/` with a `.gitkeep` placeholder
-- [ ] T004 [P] Create empty directory `packages/api/src/db/seed-defaults/` with a `.gitkeep` placeholder
-- [ ] T005 [P] Create empty directory `packages/api/src/app/dashboard/sop/` with a `.gitkeep` placeholder
-- [ ] T006 [P] Create empty directory `packages/api/src/app/api/dashboard/sop/` with a `.gitkeep` placeholder
-- [ ] T007 [P] Create empty directory `packages/api/tests/e2e/` if absent (it should exist from Phase 8); idempotent
+- [X] T001 Add `@dnd-kit/sortable`, `@dnd-kit/core`, `@dnd-kit/accessibility` as dependencies of `packages/api` via `pnpm --filter @legal-chatbot/api add @dnd-kit/sortable @dnd-kit/core @dnd-kit/accessibility`; verify `package.json` lists them under `dependencies` (NOT devDependencies, per plan.md Constitution IV note)
+- [X] T002 [P] Verify `@dnd-kit/sortable` ships no native binaries by running `find packages/api/node_modules/@dnd-kit -name "*.node"`; output MUST be empty (Constitution IV invariant); record verification in plan.md Complexity Tracking note if any binary appears
+- [X] T003 [P] Create empty directory `packages/api/src/lib/sop/` with a `.gitkeep` placeholder
+- [X] T004 [P] Create empty directory `packages/api/src/db/seed-defaults/` with a `.gitkeep` placeholder
+- [X] T005 [P] Create empty directory `packages/api/src/app/dashboard/sop/` with a `.gitkeep` placeholder
+- [X] T006 [P] Create empty directory `packages/api/src/app/api/dashboard/sop/` with a `.gitkeep` placeholder
+- [X] T007 [P] Create empty directory `packages/api/tests/e2e/` if absent (it should exist from Phase 8); idempotent
 
 **Checkpoint**: After Phase 1 the repo has the new dep, the directory tree exists, and the constitution-required pure-JS check has passed. No runtime changes yet.
 
