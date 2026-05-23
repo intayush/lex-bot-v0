@@ -294,3 +294,98 @@ describe('captureLead', () => {
     expect(notif!.lead_id).toBe(result.leadId);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 010-sop-workflow T026: SOP state snapshot persistence (paired with T032)
+// ---------------------------------------------------------------------------
+describe('captureLead — SOP state snapshot (010-sop-workflow)', () => {
+  const SAMPLE_SOP_STATE = {
+    sop_configuration_id: 'cfg_test',
+    sop_version: 1,
+    conversation_anchor_iso: '2026-05-23T10:00:00.000Z',
+    steps: [
+      {
+        step_id: 'step_1',
+        slug: 'case_type',
+        status: 'complete' as const,
+        captured_value: 'dui',
+        captured_at: '2026-05-23T10:01:00.000Z',
+        inferred: false,
+      },
+    ],
+    qualified_lead_threshold: 5,
+    current_progress: 1,
+    is_finalized: true,
+    out_of_scope_termination: false,
+  };
+
+  it('with sopState=null persists null sop_state_snapshot (legacy backward compat)', async () => {
+    const result = await captureLead(makeLeadInput({ sopState: null }));
+
+    const row = (db as any)
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.id, result.leadId))
+      .get();
+
+    expect(row!.sop_state_snapshot).toBeNull();
+  });
+
+  it('with sopState omitted entirely persists null sop_state_snapshot', async () => {
+    // Backward compatibility: existing call sites that don't pass the
+    // optional `sopState` parameter must continue to work.
+    const result = await captureLead(makeLeadInput());
+
+    const row = (db as any)
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.id, result.leadId))
+      .get();
+
+    expect(row!.sop_state_snapshot).toBeNull();
+  });
+
+  it('with populated sopState persists JSON-serialized snapshot', async () => {
+    const result = await captureLead(makeLeadInput({ sopState: SAMPLE_SOP_STATE }));
+
+    const row = (db as any)
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.id, result.leadId))
+      .get();
+
+    expect(row!.sop_state_snapshot).not.toBeNull();
+    const parsed = JSON.parse(row!.sop_state_snapshot);
+    expect(parsed.sop_configuration_id).toBe('cfg_test');
+    expect(parsed.is_finalized).toBe(true);
+    expect(parsed.steps[0].slug).toBe('case_type');
+  });
+
+  it('snapshot roundtrips Zod-valid against sopStateSchema', async () => {
+    const { sopStateSchema } = await import('@legal-chatbot/shared');
+    const result = await captureLead(makeLeadInput({ sopState: SAMPLE_SOP_STATE }));
+
+    const row = (db as any)
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.id, result.leadId))
+      .get();
+
+    const parsed = JSON.parse(row!.sop_state_snapshot);
+    expect(() => sopStateSchema.parse(parsed)).not.toThrow();
+  });
+
+  it('preserves out_of_scope_termination flag through the roundtrip', async () => {
+    const oosState = { ...SAMPLE_SOP_STATE, out_of_scope_termination: true };
+    const result = await captureLead(makeLeadInput({ sopState: oosState }));
+
+    const row = (db as any)
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.id, result.leadId))
+      .get();
+
+    const parsed = JSON.parse(row!.sop_state_snapshot);
+    expect(parsed.out_of_scope_termination).toBe(true);
+  });
+});

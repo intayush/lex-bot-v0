@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid';
 import { db } from '../db';
 import { leads, notifications } from '../db/schema';
+import type { SOPState } from '@legal-chatbot/shared';
 
 interface CaptureLeadInput {
   accountId: string;
@@ -14,6 +15,12 @@ interface CaptureLeadInput {
   classification: 'urgent' | 'normal' | 'unqualified';
   classificationRationale: string;
   urgencyFactors: string[];
+  /**
+   * SOP runtime state snapshot at capture time (010-sop-workflow). Set
+   * when the agent invokes captureLead from inside an SOP-driven flow;
+   * null for legacy / non-SOP captures.
+   */
+  sopState?: SOPState | null;
 }
 
 export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: string; classification: string }> {
@@ -33,6 +40,7 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
     classification: input.classification,
     classification_rationale: input.classificationRationale,
     urgency_factors_json: JSON.stringify(input.urgencyFactors),
+    sop_state_snapshot: input.sopState ? JSON.stringify(input.sopState) : null,
     status: 'new',
     created_at: now,
   });
