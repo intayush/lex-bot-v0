@@ -31,6 +31,18 @@ const navItems = [
       </svg>
     ),
   },
+  {
+    label: 'SOP',
+    href: '/dashboard/sop',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 11h6" />
+        <path d="M9 15h6" />
+        <path d="M9 7h6" />
+        <rect x="4" y="3" width="16" height="18" rx="2" />
+      </svg>
+    ),
+  },
 ];
 
 export function Sidebar({ firmName, email }: SidebarProps) {

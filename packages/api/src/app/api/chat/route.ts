@@ -91,10 +91,13 @@ export async function POST(req: Request) {
     return Response.json({ error: 'internal', message: 'No published configuration found' }, { status: 500, headers: corsHeaders });
   }
 
-  // 010-sop-workflow T031: load SOP, case types, and goodbye phrases for
-  // the account. Any of these may be empty (account hasn't migrated to
-  // SOP yet); we treat that as the legacy intake-question path.
-  const sopBundle = await getSOPBundle(auth.accountId);
+  // 010-sop-workflow T031 + T069: load SOP, case types, and goodbye phrases
+  // for the account. Any of these may be empty (account hasn't migrated to
+  // SOP yet); we treat that as the legacy intake-question path. In Preview
+  // & Test mode (`x-preview: true`) the loader returns the latest SOP
+  // regardless of its is_published flag, so the lawyer can chat against
+  // an unpublished draft before publishing it.
+  const sopBundle = await getSOPBundle(auth.accountId, { isPreview });
 
   const body = await req.json();
   const messages = body.messages;
