@@ -186,3 +186,160 @@ export async function restoreDefaultSop(request: APIRequestContext): Promise<voi
     throw new Error(`restoreDefaultSop publish failed: ${pub.status()} ${await pub.text()}`);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Widget helpers (used by US1-US5 walk specs)
+// ---------------------------------------------------------------------------
+
+import type { Locator, Response as PlaywrightResponse } from '@playwright/test';
+import { expect } from '@playwright/test';
+
+export const WIDGET_URL = process.env.E2E_WIDGET_URL ?? 'http://localhost:5173';
+
+export interface SopStateHeaderPayload {
+  current: number;
+  total: number;
+  pending_step_id: string | null;
+  pending_step_slug: string | null;
+  is_finalized: boolean;
+  captured_case_type_slug?: string | null;
+}
+
+/**
+ * Open the widget test site and click the chat bubble open. Waits for the
+ * input to be ready (proves the panel mounted and useChat initialized).
+ *
+ * Also installs a response listener that captures the `x-sop-state` header
+ * from every `/api/chat` response and pushes the parsed payload onto a
+ * caller-supplied array — handy for assertion ordering.
+ */
+export async function openWidget(
+  page: import('@playwright/test').Page,
+  sopStateLog?: SopStateHeaderPayload[],
+) {
+  if (sopStateLog) {
+    page.on('response', (res: PlaywrightResponse) => {
+      if (!res.url().includes('/api/chat')) return;
+      const headerValue = res.headers()['x-sop-state'];
+      if (!headerValue) return;
+      try {
+        sopStateLog.push(JSON.parse(headerValue));
+      } catch {
+        // Header was missing or malformed; ignore for the spec's purposes.
+      }
+    });
+  }
+
+  await page.goto(WIDGET_URL, { waitUntil: 'commit' });
+
+  // Open the bubble.
+  const bubble = page.getByRole('button', { name: 'Open chat' });
+  await expect(bubble).toBeVisible({ timeout: 15_000 });
+  await bubble.click();
+
+  // Wait for the input to be ready.
+  const input = page.getByPlaceholder('Type your message...');
+  await expect(input).toBeVisible({ timeout: 10_000 });
+
+  return { input, page };
+}
+
+/**
+ * Type a message and click Send. Returns the response promise that resolves
+ * when /api/chat finishes — useful so callers can await the SOP state
+ * snapshot for that turn.
+ */
+export async function sendMessage(
+  page: import('@playwright/test').Page,
+  text: string,
+): Promise<PlaywrightResponse> {
+  const input = page.getByPlaceholder('Type your message...');
+  await input.fill(text);
+
+  const responsePromise = page.waitForResponse(
+    (res) => res.url().includes('/api/chat') && res.request().method() === 'POST',
+    { timeout: 60_000 },
+  );
+
+  // Click Send. The button is identified by aria-label='Send message'.
+  await page.getByRole('button', { name: 'Send message' }).click();
+  return responsePromise;
+}
+
+/**
+ * Click a chip with the given label (case-insensitive substring match
+ * against `aria-label`, so 'DUI' matches the chip with that label exactly).
+ * Returns the /api/chat response promise — chip click dispatches the
+ * label as a user message via useChat.
+ */
+export async function clickChip(
+  page: import('@playwright/test').Page,
+  label: string,
+): Promise<PlaywrightResponse> {
+  const chip = page.locator(`[role='group'][aria-label='Quick reply options'] button`, {
+    hasText: label,
+  }).first();
+  await expect(chip, `chip "${label}" should be visible`).toBeVisible({ timeout: 10_000 });
+
+  const responsePromise = page.waitForResponse(
+    (res) => res.url().includes('/api/chat') && res.request().method() === 'POST',
+    { timeout: 60_000 },
+  );
+  await chip.click();
+  return responsePromise;
+}
+
+/**
+ * Wait for the typing indicator to disappear, signalling the agent
+ * finished streaming its response.
+ */
+export async function waitForAgentResponse(page: import('@playwright/test').Page) {
+  const typing = page.locator('.lc-typing');
+  // The typing indicator shows up when the agent is mid-stream. Wait for
+  // it to disappear (response complete). It may not appear at all if the
+  // server responded faster than React rendered, so use a permissive
+  // assertion: not visible within the timeout (which is true if it
+  // appeared and then disappeared, or never appeared).
+  await expect(typing).not.toBeVisible({ timeout: 60_000 });
+}
+
+/**
+ * Read the most recent SOP state payload from the response listener log.
+ * Throws if the log is empty.
+ */
+export function lastSopState(log: SopStateHeaderPayload[]): SopStateHeaderPayload {
+  const last = log[log.length - 1];
+  if (!last) throw new Error('SOP state log is empty');
+  return last;
+}
+
+/**
+ * Read the current progress-bar value from the rendered widget.
+ * Returns { current, total } from the `aria-valuenow` / `aria-valuemax`
+ * attributes. Returns null if the bar isn't rendered (no SOP threshold).
+ */
+export async function readProgressBar(
+  page: import('@playwright/test').Page,
+): Promise<{ current: number; total: number } | null> {
+  const bar = page.locator("[role='progressbar']");
+  if ((await bar.count()) === 0) return null;
+  const valuenow = await bar.first().getAttribute('aria-valuenow');
+  const valuemax = await bar.first().getAttribute('aria-valuemax');
+  if (valuenow === null || valuemax === null) return null;
+  return { current: Number(valuenow), total: Number(valuemax) };
+}
+
+/**
+ * Force-clear the widget's sessionStorage so each spec starts a fresh
+ * conversation. Without this, the widget would resume the previous
+ * spec's session.
+ */
+export async function resetWidgetSession(page: import('@playwright/test').Page) {
+  await page.context().clearCookies();
+  // Best-effort: only valid after a navigation has happened.
+  try {
+    await page.evaluate(() => sessionStorage.clear());
+  } catch {
+    // Page might not have any document yet (pre-navigation). Safe to ignore.
+  }
+}

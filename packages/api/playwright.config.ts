@@ -21,7 +21,14 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  fullyParallel: false, // Specs share Neon dev DB; serialize to keep state predictable.
+  // SEQUENTIAL execution is intentional, not a perf tradeoff:
+  //   - Specs share the Neon dev DB; parallel runs would race on
+  //     sop_configurations writes.
+  //   - For headed `pnpm e2e:walk`, parallel workers would open
+  //     multiple Chromium windows that overlap on screen, defeating
+  //     the eyes-on multi-use-case visualization. One window,
+  //     specs running in order, is the explicit goal.
+  fullyParallel: false,
   workers: 1,
   retries: 0,
   reporter: process.env.CI ? 'github' : 'list',
@@ -35,16 +42,28 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
 
-  webServer: {
-    command: 'pnpm dev',
-    url: 'http://localhost:3000/api/config',
-    reuseExistingServer: true,
-    timeout: 60_000,
-    // The dev server expects the request to be authorized; /api/config
-    // returns 401 without an x-api-key header, but Playwright accepts
-    // any HTTP response (incl. 401) as "server is up".
-    ignoreHTTPSErrors: true,
-  },
+  webServer: [
+    {
+      command: 'pnpm dev',
+      url: 'http://localhost:3000/api/config',
+      reuseExistingServer: true,
+      timeout: 60_000,
+      // /api/config returns 401 without an x-api-key header, but Playwright
+      // accepts any HTTP response (incl. 401) as "server is up".
+      ignoreHTTPSErrors: true,
+    },
+    {
+      // Widget dev server on :5173. Used by the LLM-driven walk specs
+      // (US1 happy path / US2 skip detection / US3 off-SOP detour /
+      // US5 no-goodbye) which navigate to the test-site host page and
+      // drive the embedded <ChatWidget>. Reused if already running.
+      command: 'pnpm --filter @legal-chatbot/widget dev',
+      url: 'http://localhost:5173',
+      reuseExistingServer: true,
+      timeout: 60_000,
+      cwd: '../..',
+    },
+  ],
 
   projects: [
     // Default headless run — one project, one browser. CI-friendly.
