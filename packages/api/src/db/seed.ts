@@ -1,8 +1,15 @@
 import { neon } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-http';
+import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { nanoid } from 'nanoid';
 import * as schema from './schema.js';
+import {
+  DEFAULT_SOP_STEPS,
+  DEFAULT_CASE_TYPES,
+  DEFAULT_GOODBYE_PHRASES,
+  DEFAULT_QUALIFIED_LEAD_THRESHOLD,
+} from './seed-defaults/sop.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -13,12 +20,102 @@ if (!DATABASE_URL) {
 const sql = neon(DATABASE_URL);
 const db = drizzle(sql, { schema });
 
+/**
+ * Seed the default SOP, case types, sub-types, and goodbye phrases for a
+ * given account. Idempotent: if the account already has any
+ * `sop_configurations` row, this function exits early without inserting.
+ *
+ * Per FR-004 and R1: shipped with every fresh account; lazy migration
+ * helper for legacy accounts is in `migrate-legacy-qualifying-questions.ts`
+ * (T071).
+ */
+export async function seedSopForAccount(accountId: string): Promise<void> {
+  const existing = await db
+    .select({ id: schema.sopConfigurations.id })
+    .from(schema.sopConfigurations)
+    .where(eq(schema.sopConfigurations.account_id, accountId));
+  if (existing.length > 0) {
+    console.log(`  SOP already seeded for account ${accountId}; skipping.`);
+    return;
+  }
+
+  const now = new Date().toISOString();
+  const sopConfigId = nanoid();
+
+  // 1. SOP configuration row
+  await db.insert(schema.sopConfigurations).values({
+    id: sopConfigId,
+    account_id: accountId,
+    version: 1,
+    qualified_lead_threshold: DEFAULT_QUALIFIED_LEAD_THRESHOLD,
+    is_published: true,
+    derived_from_legacy: false,
+    created_at: now,
+  });
+
+  // 2. SOP step rows (5 default steps)
+  for (const step of DEFAULT_SOP_STEPS) {
+    await db.insert(schema.sopSteps).values({
+      id: nanoid(),
+      sop_configuration_id: sopConfigId,
+      ...step,
+    });
+  }
+
+  // 3. Case types (6) + sub-types (≥3 each)
+  for (const ct of DEFAULT_CASE_TYPES) {
+    const caseTypeId = nanoid();
+    await db.insert(schema.caseTypes).values({
+      id: caseTypeId,
+      account_id: accountId,
+      slug: ct.slug,
+      label: ct.label,
+      position: ct.position,
+      is_in_scope: ct.is_in_scope,
+      created_at: now,
+    });
+    for (const st of ct.sub_types) {
+      await db.insert(schema.subTypes).values({
+        id: nanoid(),
+        case_type_id: caseTypeId,
+        slug: st.slug,
+        label: st.label,
+        position: st.position,
+        created_at: now,
+      });
+    }
+  }
+
+  // 4. Goodbye phrases
+  for (const phrase of DEFAULT_GOODBYE_PHRASES) {
+    await db.insert(schema.goodbyePhrases).values({
+      id: nanoid(),
+      account_id: accountId,
+      phrase,
+      created_at: now,
+    });
+  }
+
+  const subTypeCount = DEFAULT_CASE_TYPES.reduce((acc, ct) => acc + ct.sub_types.length, 0);
+  console.log(
+    `  SOP seeded for account ${accountId}: ` +
+    `1 config, ${DEFAULT_SOP_STEPS.length} steps, ` +
+    `${DEFAULT_CASE_TYPES.length} case types, ${subTypeCount} sub-types, ` +
+    `${DEFAULT_GOODBYE_PHRASES.length} goodbye phrases.`,
+  );
+}
+
 async function seed() {
   // Clear existing data for idempotent re-runs
   // Order matters due to foreign keys
   await db.delete(schema.notifications);
   await db.delete(schema.leads);
   await db.delete(schema.sessions);
+  await db.delete(schema.subTypes);
+  await db.delete(schema.caseTypes);
+  await db.delete(schema.goodbyePhrases);
+  await db.delete(schema.sopSteps);
+  await db.delete(schema.sopConfigurations);
   await db.delete(schema.configurations);
   await db.delete(schema.apiKeys);
   await db.delete(schema.archivedData);
@@ -116,6 +213,9 @@ async function seed() {
     is_published: true,
     created_at: now,
   });
+
+  // Seed default SOP, case types, sub-types, goodbye phrases (010-sop-workflow R1)
+  await seedSopForAccount(accountId);
 
   console.log('Seed complete.');
   console.log(`  Account: dev@legalchatbot.com / password123`);

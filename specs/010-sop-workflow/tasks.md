@@ -64,9 +64,9 @@ description: "Tasks for SOP Workflow"
 
 ### Foundation 2C — Default SOP Seed (R1)
 
-- [ ] T017 [P] Create `packages/api/src/db/seed-defaults/sop.ts` exporting the `DEFAULT_SOP_STEPS`, `DEFAULT_CASE_TYPES`, `DEFAULT_GOODBYE_PHRASES` constants per `data-model.md` "Default Seed (TS Constants)"; constants MUST be Zod-validated at module-load time via `sopStepSchema.array().parse(...)` etc. (Constitution II)
-- [ ] T018 Extend `packages/api/src/db/seed.ts` to invoke a new `seedSopForAccount(accountId)` helper for the dev account; helper inserts one `sop_configurations` row (`version=1, is_published=true, qualified_lead_threshold=5`), 5 `sop_steps` rows from `DEFAULT_SOP_STEPS`, 6 `case_types` rows + nested sub_types from `DEFAULT_CASE_TYPES`, 7 `goodbye_phrases` rows from `DEFAULT_GOODBYE_PHRASES`. Idempotent: if account already has an `sop_configurations` row, skip.
-- [ ] T019 Run `pnpm --filter @legal-chatbot/api db:seed` and confirm via `db:query` that the dev account has 1 SOP, 5 steps, 6 case types, ≥18 sub-types, 7 goodbye phrases
+- [X] T017 [P] Create `packages/api/src/db/seed-defaults/sop.ts` exporting the `DEFAULT_SOP_STEPS`, `DEFAULT_CASE_TYPES`, `DEFAULT_GOODBYE_PHRASES` constants per `data-model.md` "Default Seed (TS Constants)"; constants MUST be Zod-validated at module-load time via `sopStepSchema.array().parse(...)` etc. (Constitution II)
+- [X] T018 Extend `packages/api/src/db/seed.ts` to invoke a new `seedSopForAccount(accountId)` helper for the dev account; helper inserts one `sop_configurations` row (`version=1, is_published=true, qualified_lead_threshold=5`), 5 `sop_steps` rows from `DEFAULT_SOP_STEPS`, 6 `case_types` rows + nested sub_types from `DEFAULT_CASE_TYPES`, 7 `goodbye_phrases` rows from `DEFAULT_GOODBYE_PHRASES`. Idempotent: if account already has an `sop_configurations` row, skip.
+- [~] T019 Run `pnpm --filter @legal-chatbot/api db:seed` and confirm via `db:query` that the dev account has 1 SOP, 5 steps, 6 case types, ≥18 sub-types, 7 goodbye phrases **— DEFERRED.** Same constraint as T016 (Docker not running locally; seed depends on T016 migration which itself is deferred). The seed code is statically typed against the same shared schemas and runs Zod validation on module-load (T017's `Object.freeze(...parse(...))` pattern). Re-run after T016 lands.
 
 ### Foundation 2D — CORS Header Exposure (Constitution IV)
 
