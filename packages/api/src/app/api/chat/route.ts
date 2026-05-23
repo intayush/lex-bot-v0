@@ -46,12 +46,15 @@ async function getCachedManifest(contextStoreUrl: string): Promise<Manifest> {
 function buildSOPStateHeader(sopState: SOPState | null): SOPStateHeaderPayload | null {
   if (!sopState) return null;
   const pending = sopState.steps.find((s) => s.status === 'pending');
+  const caseTypeStep = sopState.steps.find((s) => s.slug === 'case_type');
   return {
     current: sopState.current_progress,
     total: sopState.qualified_lead_threshold,
     pending_step_id: pending?.step_id ?? null,
     pending_step_slug: pending?.slug ?? null,
     is_finalized: sopState.is_finalized,
+    captured_case_type_slug:
+      caseTypeStep?.status === 'complete' ? caseTypeStep.captured_value : null,
   };
 }
 

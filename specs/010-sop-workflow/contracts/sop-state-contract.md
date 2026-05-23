@@ -40,6 +40,14 @@ const sopStateHeaderSchema = z.object({
   pending_step_id: z.string().nullable(),
   pending_step_slug: z.string().nullable(),
   is_finalized: z.boolean(),
+  /**
+   * Captured value of the `case_type` SOP step, or null if not yet
+   * captured. Exposed (and only this slug) so the widget can compute
+   * `sub_type` chips locally without needing the full SOPState.
+   * Non-PII — case_type slugs are controlled vocabulary defined by the
+   * lawyer in the dashboard.
+   */
+  captured_case_type_slug: z.string().nullable().optional(),
 });
 ```
 

@@ -1,6 +1,13 @@
 import { useChat } from '@ai-sdk/react';
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { QuickReplies } from './QuickReplies';
+import { Chips } from './Chips';
+import { useSOPState } from '../hooks/useSOPState';
+import {
+  computeActiveChips,
+  type WidgetSOP,
+  type WidgetCaseType,
+} from '../hooks/computeActiveChips';
 
 interface ChatPanelProps {
   apiKey: string;
@@ -47,6 +54,10 @@ interface WidgetConfig {
   greeting_message: string;
   practice_areas: string[];
   phone: string;
+  /** SOP structure when the account has a published SOP, else null. */
+  sop?: WidgetSOP | null;
+  /** Case-type catalog with sub-types (010-sop-workflow T033). */
+  case_types?: WidgetCaseType[];
 }
 
 export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
@@ -74,6 +85,8 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
       });
   }, [apiUrl, apiKey]);
 
+  const { sopState, onResponse: onSOPResponse } = useSOPState();
+
   const { messages, input, handleInputChange, handleSubmit, isLoading, error, append } = useChat({
     api: apiUrl,
     headers: {
@@ -85,8 +98,26 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
       if (newSessionId) {
         saveSessionId(newSessionId);
       }
+      // 010-sop-workflow T037: forward the same Response to the SOP
+      // hook so it can read x-sop-state and update progress + chips.
+      onSOPResponse(response);
     },
   });
+
+  // 010-sop-workflow T037: compute the chip row for the current pending
+  // SOP step. Empty array when SOP isn't active or pending step is
+  // free-text only — Chips returns null in that case so no row renders.
+  const activeChips = useMemo(
+    () =>
+      computeActiveChips({
+        sop: widgetConfig?.sop ?? null,
+        caseTypes: widgetConfig?.case_types ?? [],
+        capturedCaseTypeSlug: sopState?.captured_case_type_slug ?? null,
+        pendingStepSlug: sopState?.pending_step_slug ?? null,
+        isFinalized: sopState?.is_finalized ?? false,
+      }),
+    [widgetConfig, sopState],
+  );
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -270,6 +301,21 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
             Something went wrong. Please try again or call {widgetConfig?.phone ?? '(555) 123-4567'}.
           </div>
         )}
+
+        {/* 010-sop-workflow T037: SOP chip row, rendered after the
+            latest assistant message when the pending SOP step has chips
+            and we're not mid-stream. Sending a chip-derived user message
+            triggers the existing useChat flow. */}
+        {!isLoading
+          && messages.length > 0
+          && messages[messages.length - 1]?.role === 'assistant'
+          && (
+            <Chips
+              chips={activeChips}
+              onSelect={(label) => append({ role: 'user', content: label })}
+              ariaLabel="Choose an option"
+            />
+          )}
 
         <div ref={messagesEndRef} />
       </div>

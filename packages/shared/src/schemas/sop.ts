@@ -187,5 +187,13 @@ export const sopStateHeaderPayloadSchema = z.object({
   pending_step_id: z.string().nullable(),
   pending_step_slug: slugSchema.nullable(),
   is_finalized: z.boolean(),
+  /**
+   * Slug captured at the `case_type` SOP step, or null if not yet
+   * captured. Exposed in the wire payload (and only this slug) so the
+   * widget can compute `sub_type` chips locally without needing the
+   * full SOPState. Non-PII by design — case_type slugs are controlled
+   * vocabulary defined by the lawyer in the dashboard.
+   */
+  captured_case_type_slug: slugSchema.nullable().optional(),
 });
 export type SOPStateHeaderPayload = z.infer<typeof sopStateHeaderPayloadSchema>;
