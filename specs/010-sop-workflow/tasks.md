@@ -240,7 +240,7 @@ description: "Tasks for SOP Workflow"
 
 ### 9B — Observability (R12, FR-058 to FR-060)
 
-- [ ] T074 [P] Extend Foundation logger redaction list at `packages/api/src/lib/logger.ts` (or shared logger) to redact email/phone/name patterns from any payload field named `captured_value_summary`, `captured_value`, or `case_summary`; existing redaction tests extended to verify
+- [ ] T074 [P] Extend Foundation logger redaction list at `packages/api/src/lib/logger.ts` (or shared logger) to redact email/phone/name patterns from any payload field named `captured_value_summary`, `captured_value`, or `brief_description` (the real Phase 5 field name); existing redaction tests extended to verify
 - [ ] T075 [P] Add structured-log emissions at the appropriate code-path call sites in `packages/api/src/app/api/chat/route.ts` for the 9 events documented in `data-model.md` "Logging" / `contracts/sop-state-contract.md`: `sop_step_completed`, `sop_step_skipped`, `sop_step_inferred`, `sop_off_topic_detour`, `sop_finalized`, `sop_follow_up_generated`, `sop_qualified`, `sop_out_of_scope_termination`, `legacy_sop_migration` (the migration event is in T071)
 - [ ] T076 [P] Add Vitest assertion in `packages/api/src/lib/logger.test.ts` that captured-value summaries emitted via the SOP log events (the 9 events in T075) are stripped of email/phone/name patterns; provides a sanity check that complements the redaction in T074
 

@@ -12,4 +12,4 @@ dist/
 .opencode/
 .specify/feature.json
 packages/crawler/test-site/crawl-output/
-packages/api/tsconfig.tsbuildinfo
+packages/*/tsconfig.tsbuildinfo
