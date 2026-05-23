@@ -1,5 +1,6 @@
 import { verifyApiKey } from '../../../lib/auth';
 import { getPublishedConfig } from '../../../lib/config';
+import { getPublishedSOP, getCaseTypes } from '../../../lib/sop-config';
 import { corsHeaders } from '../chat/cors';
 
 const configCorsHeaders = {
@@ -36,12 +37,53 @@ export async function GET(req: Request) {
     );
   }
 
+  // 010-sop-workflow T033: include SOP + chip catalogs so the widget
+  // can render chips for whichever SOP step is currently pending. The
+  // widget computes the active chip list locally from these payloads
+  // plus the per-turn `x-sop-state` header. Both fields are null when
+  // an account has no published SOP (legacy / pre-migration state).
+  const [sop, caseTypes] = await Promise.all([
+    getPublishedSOP(auth.accountId),
+    getCaseTypes(auth.accountId),
+  ]);
+
   return Response.json(
     {
       chatbot_name: config.persona.chatbot_name,
       greeting_message: config.persona.greeting_message,
       practice_areas: [...config.practice_areas.active, ...config.practice_areas.custom.filter(Boolean)],
       phone: config.contact.phone,
+      // SOP fields — null when an account has no published SOP.
+      sop: sop
+        ? {
+            id: sop.id,
+            version: sop.version,
+            qualified_lead_threshold: sop.qualified_lead_threshold,
+            steps: sop.steps.map((s) => ({
+              id: s.id,
+              position: s.position,
+              slug: s.slug,
+              question_text: s.question_text,
+              chip_source: s.chip_source,
+              inline_chips_json: s.inline_chips_json,
+              accepts_free_text: s.accepts_free_text,
+              is_required: s.is_required,
+            })),
+          }
+        : null,
+      case_types: caseTypes.map((ct) => ({
+        id: ct.id,
+        slug: ct.slug,
+        label: ct.label,
+        position: ct.position,
+        is_in_scope: ct.is_in_scope,
+        sub_types: ct.sub_types.map((st) => ({
+          id: st.id,
+          slug: st.slug,
+          label: st.label,
+          position: st.position,
+        })),
+      })),
     },
     { headers: configCorsHeaders }
   );
