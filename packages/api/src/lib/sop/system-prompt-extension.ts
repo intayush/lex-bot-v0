@@ -46,6 +46,18 @@ export function composeSopBlock(
     'and direct the conversation toward the next pending step.',
   );
   lines.push('');
+  lines.push(
+    'IMPORTANT: The SOP step list below is the SOURCE OF TRUTH for what ' +
+    'the visitor has told you. When you paraphrase the matter back to the ' +
+    'visitor (e.g., "What kind of DUI matter is this?") use ONLY values ' +
+    'marked complete in the step list. Do NOT substitute a different ' +
+    'case_type or sub_type that the visitor mentioned in passing — only ' +
+    'the captured values are confirmed answers. If the visitor wants to ' +
+    'correct an earlier answer they will use explicit correction language ' +
+    '("actually", "I meant", "wait, no") and the SOP runtime will update ' +
+    'the step list accordingly.',
+  );
+  lines.push('');
 
   if (sopState.is_finalized) {
     lines.push(...composeFinalizedSection(sopState));

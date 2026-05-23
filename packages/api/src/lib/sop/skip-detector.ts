@@ -28,6 +28,15 @@ import { inferDate } from './date-inferer';
 const WHEN_STEP_SLUG = 'when';
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * Words/phrases that signal the visitor is correcting an earlier answer.
+ * Word-boundary matched, case-insensitive. Conservative list: matches
+ * are explicit-intent only ("actually it's...", "wait, no...", "i meant
+ * personal injury"), avoiding false positives on incidental case_type
+ * mentions ("my friend had a DUI too").
+ */
+const CORRECTION_SIGNAL_REGEX = /\b(actually|wait|never\s*mind|nevermind|instead|i\s*meant|i\s*mean|sorry\s+(?:no|i)|change\s+(?:that|to)|correct\s+(?:that|me)|let\s*me\s*correct|scratch\s+that|no\s*,)/i;
+
 export interface SkipDetectorMatch {
   step_id: string;
   slug: string;
@@ -36,7 +45,7 @@ export interface SkipDetectorMatch {
   /** True iff this is a case_type chip whose case-type is_in_scope=false. */
   out_of_scope: boolean;
   /** Source of the match (informational; useful for logging). */
-  source: 'chip' | 'date_inference' | 'free_text';
+  source: 'chip' | 'date_inference' | 'free_text' | 'correction';
 }
 
 export interface DetectSkippedStepsInput {
@@ -60,10 +69,16 @@ export async function detectSkippedSteps(
   if (trimmed.length === 0) return [];
 
   const lower = trimmed.toLowerCase();
+  const hasCorrectionSignal = CORRECTION_SIGNAL_REGEX.test(lower);
+
   const pendingSteps = sopConfig.steps
     .filter((s) => isStepPending(state, s.id))
     .sort((a, b) => a.position - b.position);
-  if (pendingSteps.length === 0) return [];
+
+  // No pending steps AND no correction signal → nothing to do. With a
+  // correction signal we still scan completed case_type/sub_type steps
+  // for a possible re-capture.
+  if (pendingSteps.length === 0 && !hasCorrectionSignal) return [];
 
   const matches: SkipDetectorMatch[] = [];
   const matchedStepIds = new Set<string>();
@@ -128,6 +143,47 @@ export async function detectSkippedSteps(
       if (m) {
         matches.push(m);
         matchedStepIds.add(step.id);
+        continue;
+      }
+    }
+  }
+
+  // --- correction-signal pass: re-capture COMPLETE case_type / sub_type
+  //     steps when the visitor explicitly says they want to change. ---
+  //
+  // Only fires if hasCorrectionSignal === true. Without an explicit
+  // correction phrase ("actually...", "I meant...", etc.) we never
+  // overwrite an existing capture.
+
+  if (hasCorrectionSignal) {
+    for (const step of sopConfig.steps) {
+      if (matchedStepIds.has(step.id)) continue; // already matched in pending pass
+      const stateStep = state.steps.find((s) => s.step_id === step.id);
+      if (stateStep?.status !== 'complete') continue;
+
+      if (step.chip_source === 'case_types') {
+        const m = matchCaseTypeChip(lower, step, caseTypes);
+        if (m && m.captured_value !== stateStep.captured_value) {
+          matches.push({ ...m, source: 'correction' });
+          matchedStepIds.add(step.id);
+        }
+        continue;
+      }
+
+      if (step.chip_source === 'sub_types') {
+        // Resolve parent case_type from current state (may have been
+        // corrected above in this same pass).
+        const newCaseTypeMatch = matches.find((m) => m.slug === 'case_type');
+        const capturedCaseType =
+          newCaseTypeMatch?.captured_value
+          ?? state.steps.find((s) => s.slug === 'case_type')?.captured_value
+          ?? null;
+        if (!capturedCaseType) continue;
+        const m = matchSubTypeChip(lower, step, caseTypes, capturedCaseType);
+        if (m && m.captured_value !== stateStep.captured_value) {
+          matches.push({ ...m, source: 'correction' });
+          matchedStepIds.add(step.id);
+        }
         continue;
       }
     }

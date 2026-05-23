@@ -384,3 +384,129 @@ describe('detectSkippedSteps — defensive', () => {
     expect(matches.some((m) => m.slug === 'when')).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Change-of-mind: explicit correction signal re-captures complete steps
+// ---------------------------------------------------------------------------
+
+describe('detectSkippedSteps — correction signal (change-of-mind)', () => {
+  function captureCaseType(state: ReturnType<typeof initSOPState>, sopConfig: SOPConfiguration, slug: string) {
+    return advanceSOP(
+      state,
+      { type: 'capture_step', step_id: 'step_1', value: slug, capturedAt: T1 },
+      sopConfig,
+    );
+  }
+
+  it('"actually personal injury" overrides previously-captured case_type=dui', async () => {
+    const sopConfig = buildSOPConfig();
+    let state = initSOPState(sopConfig, ANCHOR);
+    state = captureCaseType(state, sopConfig, 'dui');
+
+    const matches = await detectSkippedSteps({
+      message: 'actually personal injury',
+      state, sopConfig, caseTypes: CASE_TYPES,
+      inferDateImpl: ALWAYS_NULL,
+    });
+    const ct = matches.find((m) => m.slug === 'case_type');
+    expect(ct).toBeDefined();
+    expect(ct!.captured_value).toBe('personal_injury');
+    expect(ct!.source).toBe('correction');
+  });
+
+  it('"i meant DUI" overrides personal_injury \u2192 dui', async () => {
+    const sopConfig = buildSOPConfig();
+    let state = initSOPState(sopConfig, ANCHOR);
+    state = captureCaseType(state, sopConfig, 'personal_injury');
+
+    const matches = await detectSkippedSteps({
+      message: 'i meant DUI',
+      state, sopConfig, caseTypes: CASE_TYPES,
+      inferDateImpl: ALWAYS_NULL,
+    });
+    expect(matches.find((m) => m.slug === 'case_type')?.captured_value).toBe('dui');
+    expect(matches.find((m) => m.slug === 'case_type')?.source).toBe('correction');
+  });
+
+  it('"wait no, scratch that, drug crime" recognizes scratch-that signal', async () => {
+    // CASE_TYPES fixture has personal_injury but not drug_crime; use the
+    // personal_injury slug to test the signal independently of fixture.
+    const sopConfig = buildSOPConfig();
+    let state = initSOPState(sopConfig, ANCHOR);
+    state = captureCaseType(state, sopConfig, 'dui');
+
+    const matches = await detectSkippedSteps({
+      message: 'wait no, scratch that, personal injury',
+      state, sopConfig, caseTypes: CASE_TYPES,
+      inferDateImpl: ALWAYS_NULL,
+    });
+    expect(matches.find((m) => m.slug === 'case_type')?.captured_value).toBe('personal_injury');
+  });
+
+  it('does NOT re-capture without an explicit correction signal', async () => {
+    // "personal injury" alone (no signal) should NOT overwrite an
+    // existing dui capture. This is the conservative safety check.
+    const sopConfig = buildSOPConfig();
+    let state = initSOPState(sopConfig, ANCHOR);
+    state = captureCaseType(state, sopConfig, 'dui');
+
+    const matches = await detectSkippedSteps({
+      message: 'personal injury',
+      state, sopConfig, caseTypes: CASE_TYPES,
+      inferDateImpl: ALWAYS_NULL,
+    });
+    // case_type already complete; no correction signal; no match emitted.
+    expect(matches.find((m) => m.slug === 'case_type')).toBeUndefined();
+  });
+
+  it('"actually" with the same case_type value does NOT emit a redundant match', async () => {
+    const sopConfig = buildSOPConfig();
+    let state = initSOPState(sopConfig, ANCHOR);
+    state = captureCaseType(state, sopConfig, 'dui');
+
+    const matches = await detectSkippedSteps({
+      message: 'actually DUI',
+      state, sopConfig, caseTypes: CASE_TYPES,
+      inferDateImpl: ALWAYS_NULL,
+    });
+    // Same value as already captured → no-op (avoid spurious updates).
+    expect(matches.find((m) => m.slug === 'case_type')).toBeUndefined();
+  });
+
+  it('correction signal can change sub_type within the same case_type', async () => {
+    const sopConfig = buildSOPConfig();
+    let state = initSOPState(sopConfig, ANCHOR);
+    state = advanceSOP(state, { type: 'capture_step', step_id: 'step_1', value: 'dui', capturedAt: T1 }, sopConfig);
+    state = advanceSOP(state, { type: 'capture_step', step_id: 'step_2', value: 'first_offense', capturedAt: T1 }, sopConfig);
+
+    const matches = await detectSkippedSteps({
+      message: 'actually it was a repeat offense',
+      state, sopConfig, caseTypes: CASE_TYPES,
+      inferDateImpl: ALWAYS_NULL,
+    });
+    expect(matches.find((m) => m.slug === 'sub_type')?.captured_value).toBe('repeat_offense');
+    expect(matches.find((m) => m.slug === 'sub_type')?.source).toBe('correction');
+  });
+
+  it('correction "actually personal injury" emits case_type but NOT a sub_type match by itself', async () => {
+    // After capturing case_type=dui + sub_type=first_offense, "actually
+    // personal injury" changes the case_type. The sub_type (first_offense)
+    // is now stale (it was a DUI sub-type). Skip-detector emits the
+    // case_type match; the advancer is responsible for resetting the
+    // stale sub_type to pending afterwards.
+    const sopConfig = buildSOPConfig();
+    let state = initSOPState(sopConfig, ANCHOR);
+    state = advanceSOP(state, { type: 'capture_step', step_id: 'step_1', value: 'dui', capturedAt: T1 }, sopConfig);
+    state = advanceSOP(state, { type: 'capture_step', step_id: 'step_2', value: 'first_offense', capturedAt: T1 }, sopConfig);
+
+    const matches = await detectSkippedSteps({
+      message: 'actually personal injury',
+      state, sopConfig, caseTypes: CASE_TYPES,
+      inferDateImpl: ALWAYS_NULL,
+    });
+    expect(matches.find((m) => m.slug === 'case_type')?.captured_value).toBe('personal_injury');
+    // No sub_type match in THIS pass — the message didn't mention a
+    // personal-injury sub_type. Advancer's job to reset the stale one.
+    expect(matches.find((m) => m.slug === 'sub_type')).toBeUndefined();
+  });
+});

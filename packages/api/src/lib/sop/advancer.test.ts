@@ -112,9 +112,21 @@ const CASE_TYPES: CaseType[] = [
   {
     id: 'ct_2',
     account_id: 'acct_test',
+    slug: 'personal_injury',
+    label: 'Personal Injury',
+    position: 2,
+    is_in_scope: true,
+    created_at: ANCHOR,
+    sub_types: [
+      { id: 'st_3', case_type_id: 'ct_2', slug: 'car_accident', label: 'Car Accident', position: 1, created_at: ANCHOR },
+    ],
+  },
+  {
+    id: 'ct_3',
+    account_id: 'acct_test',
     slug: 'estate_planning',
     label: 'Estate Planning',
-    position: 2,
+    position: 3,
     is_in_scope: false,
     created_at: ANCHOR,
     sub_types: [],
@@ -360,5 +372,104 @@ describe('advanceForVisitorMessage — multi-step capture (US2)', () => {
     });
     expect(after.is_finalized).toBe(true);
     expect(after.out_of_scope_termination).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Change-of-mind via correction signal (Phase 6 follow-up after live testing)
+// ---------------------------------------------------------------------------
+
+describe('advanceForVisitorMessage — change-of-mind correction', () => {
+  it('"actually personal injury" overrides previously-captured case_type=dui', async () => {
+    const sopConfig = buildSOPConfig();
+    let s = initSOPState(sopConfig, ANCHOR);
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: 'DUI', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+    expect(s.steps[0]!.captured_value).toBe('dui');
+
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: 'actually personal injury', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+    expect(s.steps[0]!.captured_value).toBe('personal_injury');
+    expect(s.steps[0]!.status).toBe('complete');
+    // current_progress unchanged at 1 (re-capture, not new step).
+    expect(s.current_progress).toBe(1);
+  });
+
+  it('case_type correction resets a stale sub_type back to pending', async () => {
+    // Walk: DUI \u2192 first_offense (DUI sub-type). Then "actually personal
+    // injury". The sub_type 'first_offense' is now stale (not a valid
+    // sub_type of personal_injury). Advancer must reset sub_type to
+    // pending so the agent re-asks.
+    const sopConfig = buildSOPConfig();
+    let s = initSOPState(sopConfig, ANCHOR);
+    // Use the smaller fixture's step layout: case_type, sub_type, where, when
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: 'DUI', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: 'first offense', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+    // Both case_type and sub_type complete now.
+    expect(s.steps[0]!.status).toBe('complete');
+    expect(s.steps[1]!.status).toBe('complete');
+    expect(s.current_progress).toBe(2);
+
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: 'actually personal injury', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+
+    expect(s.steps[0]!.captured_value).toBe('personal_injury');
+    expect(s.steps[0]!.status).toBe('complete');
+    // sub_type was reset to pending — stale value cleared.
+    expect(s.steps[1]!.status).toBe('pending');
+    expect(s.steps[1]!.captured_value).toBeNull();
+    // current_progress decremented from 2 to 1 (case_type still counted,
+    // sub_type reset).
+    expect(s.current_progress).toBe(1);
+  });
+
+  it('does NOT re-capture without an explicit correction signal', async () => {
+    // Visitor mentions "personal injury" without a correction phrase.
+    // The conservative rule: case_type stays as DUI.
+    const sopConfig = buildSOPConfig();
+    let s = initSOPState(sopConfig, ANCHOR);
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: 'DUI', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: 'personal injury', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+    expect(s.steps[0]!.captured_value).toBe('dui'); // unchanged
+  });
+
+  it('correction within same case_type changes only the sub_type', async () => {
+    const sopConfig = buildSOPConfig();
+    let s = initSOPState(sopConfig, ANCHOR);
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: 'DUI', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: 'first offense', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: 'actually it was a repeat offense', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+    expect(s.steps[0]!.captured_value).toBe('dui'); // unchanged
+    expect(s.steps[1]!.captured_value).toBe('repeat_offense');
+    expect(s.current_progress).toBe(2); // both still complete
   });
 });

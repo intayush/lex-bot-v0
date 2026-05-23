@@ -62,6 +62,18 @@ export async function advanceForVisitorMessage(
     return { state: input.state, matches, pendingStepBefore };
   }
 
+  // Detect change-of-mind on case_type. If the visitor corrected the
+  // case_type (matches contains a 'correction' match for case_type)
+  // AND a sub_type was previously captured, that sub_type is scoped
+  // to the OLD case_type and is now stale — reset it to pending so
+  // the agent re-asks on the next turn.
+  const caseTypeCorrection = matches.find(
+    (m) => m.slug === 'case_type' && m.source === 'correction',
+  );
+  const subTypeAlsoCorrected = matches.some(
+    (m) => m.slug === 'sub_type' && m.source === 'correction',
+  );
+
   // Apply each match as a capture_step action. Skip-detector already
   // de-duplicates per step; applying in match order is safe.
   let next = input.state;
@@ -83,6 +95,19 @@ export async function advanceForVisitorMessage(
       sopConfig,
     );
     if (m.out_of_scope) anyOutOfScope = true;
+  }
+
+  // After captures land: if case_type was just corrected AND no new
+  // sub_type was captured in the same turn, reset the (now-stale)
+  // sub_type step so the agent re-asks it.
+  if (caseTypeCorrection && !subTypeAlsoCorrected) {
+    const subTypeStep = sopConfig.steps.find((s) => s.slug === 'sub_type');
+    if (subTypeStep) {
+      const subTypeState = next.steps.find((s) => s.step_id === subTypeStep.id);
+      if (subTypeState?.status === 'complete') {
+        next = advanceSOP(next, { type: 'reset_step', step_id: subTypeStep.id }, sopConfig);
+      }
+    }
   }
 
   if (anyOutOfScope) {
