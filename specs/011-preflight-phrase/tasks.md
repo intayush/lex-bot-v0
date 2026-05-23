@@ -29,9 +29,9 @@ description: "Tasks for Preflight Phrase"
 
 **Purpose**: Verify the environment is ready for the feature. No new dependencies are needed (`@ai-sdk/google` and `ai` are already in `packages/api/package.json` from 010-sop-workflow). No new directories are needed (`lib/` and `app/api/chat/` already exist). The "setup" phase is therefore minimal but explicit so that the foundational phase can start cleanly.
 
-- [ ] T001 Verify `@ai-sdk/google` and `ai` are present at the required versions in `packages/api/package.json` (both ≥ versions installed for 010-sop-workflow); if absent or older, run `pnpm --filter @legal-chatbot/api install` to refresh
-- [ ] T002 [P] Verify the dev `GOOGLE_GENERATIVE_AI_API_KEY` in `packages/api/.env.local` is set and valid by running a 1-line probe: `pnpm --filter @legal-chatbot/api exec tsx -e "import {google} from '@ai-sdk/google';console.log('ok')"` — exit 0 means the env is live
-- [ ] T003 [P] Confirm the existing `packages/api/src/app/api/chat/preflight/` directory does NOT exist yet; if a stale empty directory is present from a prior aborted attempt, remove it so the route-handler scaffolding lands cleanly
+- [X] T001 Verify `@ai-sdk/google` and `ai` are present at the required versions in `packages/api/package.json` (both ≥ versions installed for 010-sop-workflow); if absent or older, run `pnpm --filter @legal-chatbot/api install` to refresh
+- [X] T002 [P] Verify the dev `GOOGLE_GENERATIVE_AI_API_KEY` in `packages/api/.env.local` is set and valid by running a 1-line probe: `pnpm --filter @legal-chatbot/api exec tsx -e "import {google} from '@ai-sdk/google';console.log('ok')"` — exit 0 means the env is live
+- [X] T003 [P] Confirm the existing `packages/api/src/app/api/chat/preflight/` directory does NOT exist yet; if a stale empty directory is present from a prior aborted attempt, remove it so the route-handler scaffolding lands cleanly
 
 **Checkpoint**: After Phase 1 the local toolchain is verified and the target paths are clear. No runtime changes yet.
 
@@ -43,9 +43,9 @@ description: "Tasks for Preflight Phrase"
 
 **⚠️ CRITICAL**: No US1/US2/US3 implementation work can begin until this phase is complete.
 
-- [ ] T004 Create `packages/shared/src/schemas/preflight.ts` containing `preflightRequestSchema` (`{ message: z.string().min(1).max(2000), pendingStepSlug: z.string().regex(/^[a-z][a-z0-9_]*$/).nullable() }`) and `preflightResponseSchema` (`{ phrase: z.string().min(3).max(60) }`); export `PreflightRequest` and `PreflightResponse` types via `z.infer`. Reuse the existing `slugSchema` import from `./sop` if present, otherwise inline the regex per `data-model.md`
-- [ ] T005 Update `packages/shared/src/schemas/index.ts` to re-export everything from `./preflight`
-- [ ] T006 Run `pnpm --filter @legal-chatbot/shared build` and confirm the new types appear in `packages/shared/dist/schemas/preflight.d.ts`; commit if green
+- [X] T004 Create `packages/shared/src/schemas/preflight.ts` containing `preflightRequestSchema` (`{ message: z.string().min(1).max(2000), pendingStepSlug: z.string().regex(/^[a-z][a-z0-9_]*$/).nullable() }`) and `preflightResponseSchema` (`{ phrase: z.string().min(3).max(60) }`); export `PreflightRequest` and `PreflightResponse` types via `z.infer`. Reuse the existing `slugSchema` import from `./sop` if present, otherwise inline the regex per `data-model.md`
+- [X] T005 Update `packages/shared/src/schemas/index.ts` to re-export everything from `./preflight`
+- [X] T006 Run `pnpm --filter @legal-chatbot/shared build` and confirm the new types appear in `packages/shared/dist/schemas/preflight.d.ts`; commit if green
 
 **Checkpoint**: After Phase 2 the shared schemas are committed and consumable from `packages/api` + `packages/widget` via `@legal-chatbot/shared`. The MVP phase can now proceed.
 
