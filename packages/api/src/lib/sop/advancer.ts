@@ -66,7 +66,7 @@ export async function advanceForVisitorMessage(
   if (pendingStepBefore?.chip_source === 'contact_form') {
     const payload = extractContactPayload(message);
     if (payload) {
-      const next = advanceSOP(
+      let next = advanceSOP(
         input.state,
         {
           type: 'capture_step',
@@ -77,6 +77,7 @@ export async function advanceForVisitorMessage(
         },
         sopConfig,
       );
+      next = autoFinalizeIfReady(next, sopConfig);
       return {
         state: next,
         matches: [{
@@ -158,9 +159,37 @@ export async function advanceForVisitorMessage(
 
   if (anyOutOfScope) {
     next = advanceSOP(next, { type: 'finalize_out_of_scope' }, sopConfig);
+  } else {
+    next = autoFinalizeIfReady(next, sopConfig);
   }
 
   return { state: next, matches, pendingStepBefore };
+}
+
+/**
+ * Auto-finalize the SOP state when:
+ *   (a) `current_progress` has reached `qualified_lead_threshold`, AND
+ *   (b) no required step is still pending.
+ *
+ * This is the missing link from the spec's "set is_finalized=true on
+ * Step 6 finalize" rule (data-model.md). Without it, the runtime would
+ * stay forever at `current=N, total=N, is_finalized=false`, which
+ * confuses the widget (contact form keeps showing) and breaks the
+ * captureLead flow.
+ *
+ * No-op when already finalized OR when conditions aren't met.
+ */
+function autoFinalizeIfReady(state: SOPState, sopConfig: SOPConfiguration): SOPState {
+  if (state.is_finalized) return state;
+  if (state.current_progress < state.qualified_lead_threshold) return state;
+  // Confirm no required step is still pending.
+  const requiredPending = state.steps.some((s) => {
+    if (s.status !== 'pending') return false;
+    const cfgStep = sopConfig.steps.find((cs) => cs.id === s.step_id);
+    return cfgStep?.is_required ?? true;
+  });
+  if (requiredPending) return state;
+  return advanceSOP(state, { type: 'finalize' }, sopConfig);
 }
 
 /**

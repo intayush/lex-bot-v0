@@ -614,4 +614,37 @@ describe('advanceForVisitorMessage — contact-form step', () => {
     });
     expect(s.current_progress).toBe(6);
   });
+
+  it('auto-finalizes when contact step capture meets threshold (caught by US1 E2E spec)', async () => {
+    // Regression test for the bug surfaced by widget-us1-happy-path.walk.spec.ts:
+    // when a visitor walked all 6 default-SOP steps including the contact form,
+    // the runtime ended at current=6, total=6, is_finalized=FALSE — which
+    // breaks the widget's contact-form rendering (it stayed visible after
+    // submission) and the captureLead finalization signal.
+    const sopConfig = buildSOPConfig();
+    sopConfig.qualified_lead_threshold = 6;
+    let s = await walkToContactPending(sopConfig);
+    expect(s.is_finalized).toBe(false); // Pre-condition.
+
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: "My name is Jane, my email is jane@x.com",
+      capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+    expect(s.current_progress).toBe(6);
+    expect(s.is_finalized).toBe(true);
+    expect(s.out_of_scope_termination).toBe(false);
+  });
+
+  it('does NOT auto-finalize when threshold is met but a required step is still pending', async () => {
+    // Regression: auto-finalize must respect `is_required` — if a required
+    // step is still pending, the runtime stays open (and the agent keeps
+    // asking the question).
+    const sopConfig = buildSOPConfig();
+    sopConfig.qualified_lead_threshold = 5;
+    const s = await walkToContactPending(sopConfig);
+    // Threshold reached (5/5), but step_6 (contact, is_required=true) pending.
+    expect(s.current_progress).toBe(5);
+    expect(s.is_finalized).toBe(false);
+  });
 });
