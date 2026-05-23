@@ -389,3 +389,154 @@ describe('captureLead — SOP state snapshot (010-sop-workflow)', () => {
     expect(parsed.out_of_scope_termination).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 010-sop-workflow: per-session dedup (multi-call captureLead bug fix)
+// ---------------------------------------------------------------------------
+//
+// Surfaced during live verification on 2026-05-23: the LLM ignored the
+// system-prompt instruction "Call captureLead exactly ONCE per
+// conversation" and invoked the tool 3 times in one session. Each call
+// inserted a separate leads row. The dashboard would see 3 leads for
+// what's actually one visitor.
+//
+// Server-side dedup: if a lead already exists for the session, UPDATE
+// the existing row rather than insert a new one. The latest call's
+// fields win (the LLM's later judgment generally has more context).
+// Notification fires when classification transitions normal/unqualified
+// → urgent on the same row.
+
+describe('captureLead — per-session dedup (multi-call fix)', () => {
+  it('second call for the same session UPDATES the existing row instead of inserting', async () => {
+    const r1 = await captureLead(makeLeadInput({
+      caseType: 'DUI', incidentDate: null, briefDescription: 'Initial brief',
+    }));
+    const r2 = await captureLead(makeLeadInput({
+      caseType: 'DUI', incidentDate: '2026-05-22',
+      briefDescription: 'Refined brief with more context',
+    }));
+
+    expect(r2.leadId).toBe(r1.leadId);
+
+    const all = (db as any)
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+      .all();
+    expect(all).toHaveLength(1);
+
+    const row = all[0];
+    expect(row.case_type).toBe('DUI');
+    expect(row.incident_date).toBe('2026-05-22');
+    expect(row.brief_description).toBe('Refined brief with more context');
+  });
+
+  it('different sessions still each get their own lead row', async () => {
+    // Need a second session in the FK chain.
+    (db as any).insert(schema.sessions).values({
+      id: 'sess_test_002',
+      account_id: TEST_ACCOUNT_ID,
+      messages_json: '[]',
+      is_preview: false,
+      sop_state_json: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).run();
+
+    const r1 = await captureLead(makeLeadInput({ sessionId: TEST_SESSION_ID }));
+    const r2 = await captureLead(makeLeadInput({ sessionId: 'sess_test_002' }));
+
+    expect(r2.leadId).not.toBe(r1.leadId);
+
+    const all = (db as any).select().from(schema.leads).all();
+    expect(all).toHaveLength(2);
+  });
+
+  it('classification escalation normal→urgent on update fires a new notification', async () => {
+    // First call: normal. No notification.
+    await captureLead(makeLeadInput({ classification: 'normal' }));
+    let notifs = (db as any)
+      .select().from(schema.notifications)
+      .where(eq(schema.notifications.account_id, TEST_ACCOUNT_ID))
+      .all();
+    expect(notifs).toHaveLength(0);
+
+    // Second call: urgent. Notification fires for the (now-updated) lead.
+    const r2 = await captureLead(makeLeadInput({
+      classification: 'urgent',
+      caseType: 'DUI',
+      urgencyFactors: ['recent_arrest'],
+    }));
+    notifs = (db as any)
+      .select().from(schema.notifications)
+      .where(eq(schema.notifications.account_id, TEST_ACCOUNT_ID))
+      .all();
+    expect(notifs).toHaveLength(1);
+    expect(notifs[0].lead_id).toBe(r2.leadId);
+    expect(notifs[0].title).toContain('DUI');
+  });
+
+  it('repeated urgent calls do NOT fire duplicate notifications', async () => {
+    await captureLead(makeLeadInput({ classification: 'urgent' }));
+    await captureLead(makeLeadInput({ classification: 'urgent', caseType: 'DUI Updated' }));
+
+    const notifs = (db as any)
+      .select().from(schema.notifications)
+      .where(eq(schema.notifications.account_id, TEST_ACCOUNT_ID))
+      .all();
+    expect(notifs).toHaveLength(1);
+  });
+
+  it('downgrade urgent→normal on update does NOT fire a notification', async () => {
+    // Edge case: LLM initially classified urgent, then downgraded.
+    await captureLead(makeLeadInput({ classification: 'urgent' }));
+    let notifs = (db as any)
+      .select().from(schema.notifications)
+      .where(eq(schema.notifications.account_id, TEST_ACCOUNT_ID))
+      .all();
+    expect(notifs).toHaveLength(1); // from first call
+
+    await captureLead(makeLeadInput({ classification: 'normal' }));
+    notifs = (db as any)
+      .select().from(schema.notifications)
+      .where(eq(schema.notifications.account_id, TEST_ACCOUNT_ID))
+      .all();
+    // No new notification on downgrade — one total still.
+    expect(notifs).toHaveLength(1);
+
+    // The lead row's classification reflects the latest value.
+    const lead = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+      .get();
+    expect(lead.classification).toBe('normal');
+  });
+
+  it('updates sop_state_snapshot when the second call provides a richer SOP state', async () => {
+    const partialState = {
+      sop_configuration_id: 'cfg_test',
+      sop_version: 1,
+      conversation_anchor_iso: '2026-05-23T10:00:00.000Z',
+      steps: [
+        { step_id: 'step_1', slug: 'case_type', status: 'complete' as const,
+          captured_value: 'dui', captured_at: '2026-05-23T10:01:00.000Z', inferred: false },
+      ],
+      qualified_lead_threshold: 5,
+      current_progress: 1,
+      is_finalized: false,
+      out_of_scope_termination: false,
+    };
+    const fullState = { ...partialState, current_progress: 5, is_finalized: true };
+
+    await captureLead(makeLeadInput({ sopState: partialState }));
+    await captureLead(makeLeadInput({ sopState: fullState }));
+
+    const lead = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+      .get();
+    const parsed = JSON.parse(lead.sop_state_snapshot);
+    expect(parsed.current_progress).toBe(5);
+    expect(parsed.is_finalized).toBe(true);
+  });
+});
