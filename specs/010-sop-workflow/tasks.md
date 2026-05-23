@@ -60,13 +60,13 @@ description: "Tasks for SOP Workflow"
 - [X] T013 Extend `packages/api/src/db/schema.ts`: add `sopStateSnapshot: text('sop_state_snapshot')` column to `leads` table (nullable)
 - [X] T014 [P] Mirror schema changes in `packages/api/src/db/test-schema.ts` (SQLite mirror used by Vitest)
 - [X] T015 Generate migration with `pnpm --filter @legal-chatbot/api db:generate`; commit the generated SQL file under `packages/api/drizzle/` (filename auto-numbered by drizzle-kit)
-- [~] T016 Run `pnpm --filter @legal-chatbot/api db:migrate` against local PG to verify migration applies without errors **— DEFERRED.** Local Docker not running and no compose file exists in this repo (Foundation quickstart claim was aspirational). Migration was statically validated at generation time by drizzle-kit (12 tables resolved, FKs + indexes recorded, no diff conflicts). Re-attempt when Foundation's Docker compose lands OR run against staging Neon during deploy. Tracked here so we don't ship to prod without verification.
+- [X] T016 Run `pnpm --filter @legal-chatbot/api db:migrate` against local PG to verify migration applies without errors **— APPLIED to Neon dev DB on 2026-05-24.** All 5 new tables created, 2 column adds applied (sessions.sop_state_json, leads.sop_state_snapshot), drizzle migration `2782323b` recorded. Working state confirmed via inspector script.
 
 ### Foundation 2C — Default SOP Seed (R1)
 
 - [X] T017 [P] Create `packages/api/src/db/seed-defaults/sop.ts` exporting the `DEFAULT_SOP_STEPS`, `DEFAULT_CASE_TYPES`, `DEFAULT_GOODBYE_PHRASES` constants per `data-model.md` "Default Seed (TS Constants)"; constants MUST be Zod-validated at module-load time via `sopStepSchema.array().parse(...)` etc. (Constitution II)
 - [X] T018 Extend `packages/api/src/db/seed.ts` to invoke a new `seedSopForAccount(accountId)` helper for the dev account; helper inserts one `sop_configurations` row (`version=1, is_published=true, qualified_lead_threshold=5`), 5 `sop_steps` rows from `DEFAULT_SOP_STEPS`, 6 `case_types` rows + nested sub_types from `DEFAULT_CASE_TYPES`, 7 `goodbye_phrases` rows from `DEFAULT_GOODBYE_PHRASES`. Idempotent: if account already has an `sop_configurations` row, skip.
-- [~] T019 Run `pnpm --filter @legal-chatbot/api db:seed` and confirm via `db:query` that the dev account has 1 SOP, 5 steps, 6 case types, ≥18 sub-types, 7 goodbye phrases **— DEFERRED.** Same constraint as T016 (Docker not running locally; seed depends on T016 migration which itself is deferred). The seed code is statically typed against the same shared schemas and runs Zod validation on module-load (T017's `Object.freeze(...parse(...))` pattern). Re-run after T016 lands.
+- [X] T019 Run `pnpm --filter @legal-chatbot/api db:seed` and confirm via `db:query` that the dev account has 1 SOP, 5 steps, 6 case types, ≥18 sub-types, 7 goodbye phrases **— APPLIED to Neon dev DB on 2026-05-24.** Confirmed: 1 SOP config (v1, published, threshold=5), 5 default SOP steps, 6 case types (all is_in_scope=true), 21 sub-types, 7 goodbye phrases.
 
 ### Foundation 2D — CORS Header Exposure (Constitution IV)
 
