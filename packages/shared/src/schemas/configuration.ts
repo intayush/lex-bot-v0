@@ -16,6 +16,14 @@ export const practiceAreasSchema = z.object({
   out_of_scope_response: z.string(),
 });
 
+/**
+ * @deprecated Use SOP via 010-sop-workflow. Lawyer-defined intake questions
+ * are now expressed as `sop_steps` rows under an `sop_configurations` row;
+ * see `packages/shared/src/schemas/sop.ts`. The legacy
+ * `qualifying_questions` field on `Configuration` remains readable so the
+ * one-shot lazy migration (R11) can convert each entry into a custom SOP
+ * step on first dashboard load. Do NOT add new code that reads this shape.
+ */
 export const qualifyingQuestionSchema = z.object({
   question: z.string(),
   required: z.boolean().default(true),

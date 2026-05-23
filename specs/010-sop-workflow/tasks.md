@@ -49,9 +49,9 @@ description: "Tasks for SOP Workflow"
 
 ### Foundation 2A — Shared Schemas (Constitution II)
 
-- [ ] T008 Create `packages/shared/src/schemas/sop.ts` containing `sopStepSchema`, `sopConfigurationSchema`, `caseTypeSchema`, `subTypeSchema`, `goodbyePhraseSchema`, `sopStateSchema`, `sopStateHeaderSchema` per `contracts/sop-state-contract.md`; export all types from the file
-- [ ] T009 Update `packages/shared/src/schemas/index.ts` to re-export everything from `./sop`
-- [ ] T010 [P] Update `packages/shared/src/schemas/configuration.ts` to mark `qualifying_questions` as deprecated via JSDoc (`@deprecated Use SOP via 010-sop-workflow`); do NOT remove the field — R11 lazy migration depends on it remaining readable
+- [X] T008 Create `packages/shared/src/schemas/sop.ts` containing `sopStepSchema`, `sopConfigurationSchema`, `caseTypeSchema`, `subTypeSchema`, `goodbyePhraseSchema`, `sopStateSchema`, `sopStateHeaderSchema` per `contracts/sop-state-contract.md`; export all types from the file
+- [X] T009 Update `packages/shared/src/schemas/index.ts` to re-export everything from `./sop`
+- [X] T010 [P] Update `packages/shared/src/schemas/configuration.ts` to mark `qualifying_questions` as deprecated via JSDoc (`@deprecated Use SOP via 010-sop-workflow`); do NOT remove the field — R11 lazy migration depends on it remaining readable
 
 ### Foundation 2B — Drizzle Schema Migration (Constitution VII)
 
