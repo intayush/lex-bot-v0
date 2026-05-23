@@ -70,7 +70,7 @@ description: "Tasks for SOP Workflow"
 
 ### Foundation 2D — CORS Header Exposure (Constitution IV)
 
-- [ ] T020 Update CORS middleware `packages/api/src/lib/cors.ts` to add `x-sop-state` to the `Access-Control-Expose-Headers` response header (per `contracts/sop-state-contract.md` "Wire Shape"); add a Vitest assertion that the header value contains `x-sop-state`
+- [X] T020 Update CORS module `packages/api/src/app/api/chat/cors.ts` (plan.md said `lib/cors.ts` — path correction noted) to add `x-sop-state` to the `Access-Control-Expose-Headers` response header (per `contracts/sop-state-contract.md` "Wire Shape"); add a Vitest assertion in `cors.test.ts` that the header value contains `x-sop-state`
 
 ### Foundation 2E — System-Prompt Composer Hook (Block 4 stub)
 
