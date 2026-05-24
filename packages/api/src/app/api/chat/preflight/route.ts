@@ -37,8 +37,14 @@ import { corsHeaders } from '../cors';
 // Configuration
 // ---------------------------------------------------------------------------
 
-/** Server-side hard budget for the LLM call. See research.md R3. */
-const PREFLIGHT_TIMEOUT_MS = 800;
+/** Server-side hard budget for the LLM call. See research.md R3.
+ *
+ * Updated 2026-05-24: bumped from 800ms to 1500ms after live measurement
+ * showed gemini-2.5-flash-lite warm-up calls landing at ~1000-1100ms
+ * even for short prompts. The original 800ms came from research-time
+ * estimates; production observation moves the budget out. The widget's
+ * client-side timeout is 2000ms (sits just above this server budget). */
+const PREFLIGHT_TIMEOUT_MS = 1500;
 
 // ---------------------------------------------------------------------------
 // Dependency injection seam (for tests)

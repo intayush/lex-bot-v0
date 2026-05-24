@@ -6,6 +6,7 @@ import { ContactForm } from './ContactForm';
 import { ProgressBar } from './ProgressBar';
 import { useSOPState } from '../hooks/useSOPState';
 import { useReducedMotion } from '../hooks/useReducedMotion';
+import { usePreflightPhrase } from '../hooks/usePreflightPhrase';
 import {
   computeActiveChips,
   type WidgetSOP,
@@ -89,6 +90,19 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
   const { sopState, onResponse: onSOPResponse } = useSOPState();
   const reducedMotion = useReducedMotion();
 
+  // 011-preflight-phrase T013/T014: query-tailored loading status phrase
+  // that swaps the typing-indicator content from `● ● ●` to e.g.
+  // "✨ Looking into your DUI matter…" within ~500ms of Send. Fires in
+  // parallel with /api/chat; failure is silent (dots remain).
+  //
+  // The widget's `apiUrl` prop points at `.../api/chat`. The preflight
+  // route lives at `.../api/chat/preflight`, so we pass `apiUrl` to the
+  // hook unchanged — the hook appends `/preflight` to whatever it gets.
+  const { phrase: preflightPhrase, start: startPreflight, clear: clearPreflight } = usePreflightPhrase({
+    apiUrl,
+    apiKey,
+  });
+
   // Custom fetch that reads the session id from sessionStorage at REQUEST
   // time rather than at component-mount time. Critical for multi-turn
   // conversations: the first fetch returns a new session id (which we
@@ -152,6 +166,17 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // 011-preflight-phrase T014: clear the preflight phrase as soon as the
+  // assistant's first token has streamed. The streaming bubble takes over
+  // the visual real estate; keeping the phrase up after the agent starts
+  // talking would feel broken.
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (last?.role === 'assistant' && typeof last.content === 'string' && last.content.length > 0) {
+      clearPreflight();
+    }
+  }, [messages, clearPreflight]);
 
   const panelStyle = useMemo((): React.CSSProperties => {
     const base: React.CSSProperties = {
@@ -273,7 +298,11 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
               {widgetConfig?.greeting_message ?? "Hi! I'm Sarah, a virtual assistant for Smith & Associates. How can I help you today?"}
             </div>
             <QuickReplies
-              onSelect={(text) => append({ role: 'user', content: `I need help with ${text}` })}
+              onSelect={(text) => {
+                const message = `I need help with ${text}`;
+                startPreflight(message, sopState?.pending_step_slug ?? null);
+                append({ role: 'user', content: message });
+              }}
               options={widgetConfig?.practice_areas}
             />
           </>
@@ -313,6 +342,8 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
 
         {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
           <div
+            role="status"
+            aria-live="polite"
             style={{
               padding: '12px 16px',
               borderRadius: '12px 12px 12px 4px',
@@ -322,7 +353,14 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
               color: '#718096',
             }}
           >
-            <span className="lc-typing">● ● ●</span>
+            {preflightPhrase ? (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <span aria-hidden="true">✨</span>
+                <span>{preflightPhrase}…</span>
+              </span>
+            ) : (
+              <span className="lc-typing">● ● ●</span>
+            )}
           </div>
         )}
 
@@ -351,7 +389,10 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
           && (
             <Chips
               chips={activeChips}
-              onSelect={(label) => append({ role: 'user', content: label })}
+              onSelect={(label) => {
+                startPreflight(label, sopState?.pending_step_slug ?? null);
+                append({ role: 'user', content: label });
+              }}
               ariaLabel="Choose an option"
             />
           )}
@@ -367,7 +408,10 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
           && pendingStepIsContactForm
           && (
             <ContactForm
-              onSubmit={(message) => append({ role: 'user', content: message })}
+              onSubmit={(message) => {
+                startPreflight(message, sopState?.pending_step_slug ?? null);
+                append({ role: 'user', content: message });
+              }}
             />
           )}
 
@@ -376,7 +420,15 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
 
       {/* Input */}
       <form
-        onSubmit={handleSubmit}
+        onSubmit={(e) => {
+          // 011-preflight-phrase T014: fire preflight in parallel with the
+          // useChat submit so a tailored phrase can replace the typing
+          // dots before the agent's first token streams.
+          if (input.trim()) {
+            startPreflight(input, sopState?.pending_step_slug ?? null);
+          }
+          handleSubmit(e);
+        }}
         style={{
           padding: '12px 16px',
           borderTop: '1px solid #e2e8f0',

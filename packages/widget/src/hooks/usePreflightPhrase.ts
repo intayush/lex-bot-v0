@@ -22,10 +22,10 @@ import { useCallback, useRef, useState } from 'react';
 
 export interface UsePreflightPhraseOptions {
   /**
-   * Base URL of the API. The hook calls `${apiUrl}/preflight`. The widget's
-   * existing `apiUrl` prop points at `.../api/chat`; pass that with `/chat`
-   * stripped (the hook does NOT do the stripping itself — keep the input
-   * unambiguous).
+   * Base URL of the chat API. The hook calls `${apiUrl}/preflight`. The
+   * widget's existing `apiUrl` prop already points at `.../api/chat`, so
+   * passing it directly resolves to `.../api/chat/preflight` — exactly
+   * where the route handler lives.
    */
   apiUrl: string;
   /** API key forwarded as the `x-api-key` header. */
@@ -43,8 +43,13 @@ export interface UsePreflightPhraseReturn {
   clear: () => void;
 }
 
-/** Client-side hard ceiling for the preflight fetch. */
-const CLIENT_TIMEOUT_MS = 1000;
+/** Client-side hard ceiling for the preflight fetch.
+ *
+ * Sits just above the server's 1500ms budget so the server's structured
+ * 503 wins in normal failure cases; this exists for stuck connections.
+ * Updated 2026-05-24 alongside the server bump from 800ms→1500ms after
+ * live latency measurement of gemini-2.5-flash-lite warm-up calls. */
+const CLIENT_TIMEOUT_MS = 2000;
 
 export function usePreflightPhrase(opts: UsePreflightPhraseOptions): UsePreflightPhraseReturn {
   const [phrase, setPhrase] = useState<string | null>(null);
