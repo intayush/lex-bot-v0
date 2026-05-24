@@ -29,8 +29,8 @@ description: "Tasks for Lead Action Tracking"
 
 **Purpose**: Verify the environment is ready. No new dependencies are required (`drizzle-orm`, `zod`, `iron-session`, `@neondatabase/serverless` all already installed for prior features). No new directories needed (`packages/api/src/app/api/dashboard/leads/[id]/` exists from 007; we add the `action/` sub-route under it). The setup phase is minimal but explicit so the foundational phase starts cleanly.
 
-- [ ] T001 Verify the existing dev DB has at least one captured lead (needed for US1 + US2 walk-through to be exercise-able). Run `pnpm --filter @legal-chatbot/api exec tsx -e "import {db, schema} from './src/db'; const r = await db.select().from(schema.leads).limit(1); console.log('leads in dev DB:', r.length)"` — exit 0 with `leads in dev DB: 1` (or higher) means good. If 0, either run a SOP-completion via the widget OR seed via the existing `db:seed` flow.
-- [ ] T002 [P] Confirm `packages/api/src/app/api/dashboard/leads/[id]/action/` directory does NOT exist yet. If it does (stale from a prior aborted attempt), remove it.
+- [X] T001 Verify the existing dev DB has at least one captured lead (needed for US1 + US2 walk-through to be exercise-able). Run `pnpm --filter @legal-chatbot/api exec tsx -e "import {db, schema} from './src/db'; const r = await db.select().from(schema.leads).limit(1); console.log('leads in dev DB:', r.length)"` — exit 0 with `leads in dev DB: 1` (or higher) means good. If 0, either run a SOP-completion via the widget OR seed via the existing `db:seed` flow.
+- [X] T002 [P] Confirm `packages/api/src/app/api/dashboard/leads/[id]/action/` directory does NOT exist yet. If it does (stale from a prior aborted attempt), remove it.
 
 **Checkpoint**: After Phase 1 the local toolchain is verified and the target paths are clear. No runtime changes yet.
 
@@ -44,17 +44,17 @@ description: "Tasks for Lead Action Tracking"
 
 ### Foundation 2A — Shared schema (Constitution II)
 
-- [ ] T003 Create `packages/shared/src/schemas/lead-action.ts` containing `leadActionEnum` (`z.enum(['contacted', 'call_no_answer', 'meeting_fixed'])`), `leadActionUpdateSchema` (`z.object({ action: leadActionEnum.nullable() })`), and `LEAD_ACTION_LABELS` constant map per data-model.md. Export `LeadAction` and `LeadActionUpdate` types via `z.infer`. Include a JSDoc comment explaining the slug → label convention.
-- [ ] T004 Update `packages/shared/src/schemas/index.ts` to re-export everything from `./lead-action`.
-- [ ] T005 [P] Write Vitest tests for `packages/shared/src/schemas/lead-action.test.ts` covering: each of the 3 enum slugs accepted; `null` accepted; invalid slug rejected (e.g., `'foo'`); missing `action` field rejected; non-object body rejected; extra fields don't reject (Zod default is to strip, not error). **NOTE**: this requires standing up Vitest in `packages/shared` (which has none today). Use the same minimal config as `packages/widget/vitest.config.ts` from 011-preflight-phrase rev2 (node environment, `include: ['src/**/*.test.ts']`).
-- [ ] T006 Run `pnpm --filter @legal-chatbot/shared build` and confirm the new types appear in `packages/shared/dist/schemas/lead-action.d.ts`.
+- [X] T003 Create `packages/shared/src/schemas/lead-action.ts` containing `leadActionEnum` (`z.enum(['contacted', 'call_no_answer', 'meeting_fixed'])`), `leadActionUpdateSchema` (`z.object({ action: leadActionEnum.nullable() })`), and `LEAD_ACTION_LABELS` constant map per data-model.md. Export `LeadAction` and `LeadActionUpdate` types via `z.infer`. Include a JSDoc comment explaining the slug → label convention.
+- [X] T004 Update `packages/shared/src/schemas/index.ts` to re-export everything from `./lead-action`.
+- [X] T005 [P] Write Vitest tests for `packages/shared/src/schemas/lead-action.test.ts` covering: each of the 3 enum slugs accepted; `null` accepted; invalid slug rejected (e.g., `'foo'`); missing `action` field rejected; non-object body rejected; extra fields don't reject (Zod default is to strip, not error). **NOTE**: this requires standing up Vitest in `packages/shared` (which has none today). Use the same minimal config as `packages/widget/vitest.config.ts` from 011-preflight-phrase rev2 (node environment, `include: ['src/**/*.test.ts']`).
+- [X] T006 Run `pnpm --filter @legal-chatbot/shared build` and confirm the new types appear in `packages/shared/dist/schemas/lead-action.d.ts`.
 
 ### Foundation 2B — Drizzle schema migration (Constitution VII)
 
-- [ ] T007 Extend `packages/api/src/db/schema.ts` to add two new nullable columns to the `leads` table per data-model.md: `follow_up_action: text('follow_up_action')` and `follow_up_action_changed_at: text('follow_up_action_changed_at')`. Both nullable, no default.
-- [ ] T008 [P] Mirror the schema changes in `packages/api/src/db/test-schema.ts` (SQLite mirror used by Vitest).
-- [ ] T009 Generate the migration with `pnpm --filter @legal-chatbot/api db:generate`. Commit the auto-generated SQL file under `packages/api/drizzle/` (filename auto-numbered by drizzle-kit).
-- [ ] T010 Run `pnpm --filter @legal-chatbot/api db:migrate` against the local Neon dev DB to verify the migration applies cleanly. Verify via `pnpm --filter @legal-chatbot/api exec tsx -e "import {sql} from 'drizzle-orm'; import {db} from './src/db'; const r = await db.execute(sql\`SELECT column_name FROM information_schema.columns WHERE table_name='leads' AND column_name LIKE 'follow_up_%'\`); console.log(r.rows)"` — output should list both new columns.
+- [X] T007 Extend `packages/api/src/db/schema.ts` to add two new nullable columns to the `leads` table per data-model.md: `follow_up_action: text('follow_up_action')` and `follow_up_action_changed_at: text('follow_up_action_changed_at')`. Both nullable, no default.
+- [X] T008 [P] Mirror the schema changes in `packages/api/src/db/test-schema.ts` (SQLite mirror used by Vitest).
+- [X] T009 Generate the migration with `pnpm --filter @legal-chatbot/api db:generate`. Commit the auto-generated SQL file under `packages/api/drizzle/` (filename auto-numbered by drizzle-kit). **Generated**: `drizzle/0002_vengeful_inertia.sql` with two `ALTER TABLE leads ADD COLUMN` statements.
+- [X] T010 Run `pnpm --filter @legal-chatbot/api db:migrate` against the local Neon dev DB to verify the migration applies cleanly. Verify via `pnpm --filter @legal-chatbot/api exec tsx -e "import {sql} from 'drizzle-orm'; import {db} from './src/db'; const r = await db.execute(sql\`SELECT column_name FROM information_schema.columns WHERE table_name='leads' AND column_name LIKE 'follow_up_%'\`); console.log(r.rows)"` — output should list both new columns. **APPLIED to Neon dev DB on 2026-05-24**: both `follow_up_action` and `follow_up_action_changed_at` columns confirmed nullable=YES.
 
 **Checkpoint**: After Phase 2 the shared types are committed and consumable from `packages/api`, the schema migration is applied to the dev DB, and existing leads have `NULL` for both new columns. US1 + US2 implementation can now proceed.
 

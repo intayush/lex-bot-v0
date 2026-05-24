@@ -65,6 +65,21 @@ export const leads = pgTable('leads', {
    */
   sop_state_snapshot: text('sop_state_snapshot'),
   status: text('status').notNull().default('new'),
+  /**
+   * Lawyer-recorded follow-up action (013-lead-action-tracking). One of
+   * `'contacted'`, `'call_no_answer'`, `'meeting_fixed'`, or null
+   * (default — no action yet). Independent of `classification` (LLM-set,
+   * immutable) and `status` (system state). Validated app-side via
+   * `leadActionEnum` from `@legal-chatbot/shared`.
+   */
+  follow_up_action: text('follow_up_action'),
+  /**
+   * ISO 8601 timestamp of the most recent follow_up_action change.
+   * Set to the current time on every action change; cleared to null
+   * when the action is cleared. Most-recent only — no history log
+   * (out of scope for v1 per spec.md).
+   */
+  follow_up_action_changed_at: text('follow_up_action_changed_at'),
   created_at: text('created_at').notNull(),
 });
 

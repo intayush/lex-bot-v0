@@ -15,6 +15,13 @@
       "when": 1779556115898,
       "tag": "0001_heavy_excalibur",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1779654300719,
+      "tag": "0002_vengeful_inertia",
+      "breakpoints": true
     }
   ]
 }

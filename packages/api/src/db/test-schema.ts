@@ -59,6 +59,10 @@ export const leads = sqliteTable('leads', {
   /** SOP snapshot (010-sop-workflow). JSON-serialized SOPState. */
   sop_state_snapshot: text('sop_state_snapshot'),
   status: text('status').notNull().default('new'),
+  /** Lawyer-recorded follow-up action (013-lead-action-tracking). */
+  follow_up_action: text('follow_up_action'),
+  /** ISO 8601 timestamp of the most recent follow_up_action change. */
+  follow_up_action_changed_at: text('follow_up_action_changed_at'),
   created_at: text('created_at').notNull(),
 });
 
