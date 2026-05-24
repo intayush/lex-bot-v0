@@ -224,15 +224,6 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
 
   return (
     <div style={panelStyle}>
-      {/* SOP progress bar — pinned at the very top across all breakpoints
-          per contracts/progress-bar-contract.md. Returns null when
-          total === 0 (no SOP active for the account). */}
-      <ProgressBar
-        current={sopState?.current ?? 0}
-        total={sopState?.total ?? 0}
-        reducedMotion={reducedMotion}
-      />
-
       {/* Header */}
       <div
         style={{
@@ -268,6 +259,23 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
         >
           ✕
         </button>
+      </div>
+
+      {/* SOP progress bar — 012-progressbar-refinement positions this
+          INSIDE the chat content area: below the header bar, above the
+          messages list. Returns null when total === 0 (no SOP active for
+          the account). See specs/012-progressbar-refinement/. */}
+      <div
+        style={{
+          padding: '8px 16px 0',
+          flexShrink: 0,
+        }}
+      >
+        <ProgressBar
+          current={sopState?.current ?? 0}
+          total={sopState?.total ?? 0}
+          reducedMotion={reducedMotion}
+        />
       </div>
 
       {/* Messages */}
