@@ -18,7 +18,8 @@
  *     because it lives in this same describe block)
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { handlePreflight, OPTIONS, type PreflightDeps } from './route';
+import { handlePreflight, type PreflightDeps } from './handler';
+import { OPTIONS } from './route';
 import {
   PreflightLLMError,
   PreflightValidationError,
