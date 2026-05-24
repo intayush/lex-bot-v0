@@ -142,15 +142,15 @@ DATABASE_URL=... pnpm --filter @legal-chatbot/api exec tsx -e "
 
 ## Done-When (Spec SC) Verification Map
 
-| Spec SC | Quickstart step | How verified |
+| Spec SC | Verifying task | How verified |
 |---|---|---|
-| SC-001 | curl smoke test | 200 + valid phrase |
-| SC-002 | US1 walk-through | typing-bubble timing |
-| SC-003 | US6 unit test | turnId race fix |
-| SC-004 | US4 walk-through | DevTools blocked URL |
-| SC-005 | `pnpm verify-invariants` (when 009 lands the script) | invariants script |
-| SC-006 | `pnpm e2e` headless | walk spec passes |
-| SC-007 | redaction unit test in `route.test.ts` | log payload assertions |
+| SC-001 | T012 (route impl) + curl smoke test | `curl -X POST .../api/chat/preflight` returns 200 with `{phrase: "..."}` |
+| SC-002 | T015 (walk spec) | typing-bubble shows non-dots content within 1.5s of Send |
+| SC-003 | T020 (race-fix unit test) | `[~]` deferred until widget Vitest infra; `usePreflightPhrase` source-code review confirms turnId + clearedTurnIds guard |
+| SC-004 | T018 (silent-failure walk spec) | network-blocked preflight → main agent still streams; no error UI |
+| SC-005 | T024 (constitution + invariants verification) | `pnpm typecheck && pnpm test && pnpm e2e` all green; `pnpm verify-invariants` (when 009 R3 lands) |
+| SC-006 | T015 + T018 + T021 (e2e suite run) | `pnpm e2e` runs all 13 specs green (10 from 010 + 3 from 011) |
+| SC-007 | T009 (logging redaction unit test) | route.test.ts assertions confirm logs contain only metadata; no message/phrase content |
 
 ## Troubleshooting
 
