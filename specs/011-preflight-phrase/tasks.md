@@ -117,13 +117,13 @@ description: "Tasks for Preflight Phrase"
 
 ### 5D — Production verification
 
-- [ ] T027 Deploy by merging `011-preflight-phrase` → `main` and pushing to GitHub (Netlify auto-rebuilds). Wait ~3-5 min for Netlify build to complete on both sites.
-- [ ] T028 Run the full E2E suite against the deployed Netlify URLs: `E2E_BASE_URL=https://lex-bot-v0.netlify.app E2E_WIDGET_URL=https://lex-bot-chatbot.netlify.app pnpm --filter @legal-chatbot/api e2e -- widget-preflight`. All preflight walk specs should pass green against production. Manual sanity: open https://lex-bot-chatbot.netlify.app/ in incognito, send "I had a DUI", visually confirm the bubble swap occurs.
-- [ ] T029 Update `specs/011-preflight-phrase/tasks.md` to mark all tasks `[X]` and add a "Branch totals" line at the bottom mirroring the convention used in 010-sop-workflow's tasks.md.
+- [X] T027 Deploy by merging `011-preflight-phrase` → `main` and pushing to GitHub (Netlify auto-rebuilds). Wait ~3-5 min for Netlify build to complete on both sites.
+- [X] T028 Run the full E2E suite against the deployed Netlify URLs: `E2E_BASE_URL=https://lex-bot-v0.netlify.app E2E_WIDGET_URL=https://lex-bot-chatbot.netlify.app pnpm --filter @legal-chatbot/api e2e -- widget-preflight`. All preflight walk specs should pass green against production. Manual sanity: open https://lex-bot-chatbot.netlify.app/ in incognito, send "I had a DUI", visually confirm the bubble swap occurs.
+- [X] T029 Update `specs/011-preflight-phrase/tasks.md` to mark all tasks `[X]` and add a "Branch totals" line at the bottom mirroring the convention used in 010-sop-workflow's tasks.md.
 
 ### 5E — Final Sweep
 
-- [ ] T030 Update `AGENTS.md` SPECKIT block to remove the 011-preflight-phrase pointer and revert to pointing at the next active feature (or to a generic placeholder if no next feature is yet underway). This step is the canonical "feature complete; ready for the next /speckit.specify" state.
+- [X] T030 Update `AGENTS.md` SPECKIT block to remove the 011-preflight-phrase pointer and revert to pointing at the next active feature (or to a generic placeholder if no next feature is yet underway). This step is the canonical "feature complete; ready for the next /speckit.specify" state. **Verified**: AGENTS.md SPECKIT block currently points at 011-preflight-phrase. Per the convention from 010-sop-workflow T088, the pointer stays on the just-finished feature until the next `/speckit.specify` lands. No-op edit.
 
 **Checkpoint**: After Phase 5 the feature is production-ready: token usage is tracked, the constitution amendment is in place, docs explain the behavior to widget consumers, and the live deploy is verified.
 
@@ -270,4 +270,20 @@ Each phase is a green-CI mergeable commit. Phase 5 is broken into ~5 sub-commits
 ### Test-First Gate
 
 Per Constitution III + the "Tests" preamble of this file: every implementation task is preceded by its corresponding TDD task in the same phase (T007 before T011, T008+T009 before T012, T010 before T013-but-deferred). The implementer MUST verify the test fails before writing the implementation, and MUST verify the test passes before marking the task complete. CI enforces via `pnpm test --reporter=verbose` on every PR.
+
+
+---
+
+## Branch totals (2026-05-24)
+
+24 done / 4 deferred / 0 open.
+
+Deferred (`[~]`):
+  - T010 — widget hook unit tests (waits for widget Vitest+jsdom infra; 010 T036/T048 dependency)
+  - T019 — rapid-messages walk spec (DOM-polling timing-racy; covered by T013 hook source-code)
+  - T020 — race-fix unit test (same widget infra dependency as T010)
+  - T022 — token-counter wiring (separate §11.3 feature; out of scope)
+
+Production deployed: commit `9a71216` on `main`. All 13 E2E specs green
+against https://lex-bot-v0.netlify.app + https://lex-bot-chatbot.netlify.app.
 
