@@ -62,8 +62,6 @@ export function ActionPicker({
   const [persistedChangedAt, setPersistedChangedAt] = useState<string | null>(initialChangedAt);
   const [saveState, setSaveState] = useState<SaveState>({ status: 'idle' });
 
-  const isDirty = selectedValue !== (persistedAction ?? '');
-
   async function handleSave() {
     setSaveState({ status: 'saving' });
     const action: LeadAction | null = selectedValue === '' ? null : (selectedValue as LeadAction);
@@ -134,7 +132,7 @@ export function ActionPicker({
 
         <button
           onClick={handleSave}
-          disabled={!isDirty || saveState.status === 'saving'}
+          disabled={saveState.status === 'saving'}
           className="bg-[#171717] hover:bg-[#262626] text-white rounded-lg px-4 py-2 text-sm font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saveState.status === 'saving' ? 'Saving…' : 'Save'}
