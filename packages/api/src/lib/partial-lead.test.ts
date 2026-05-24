@@ -69,6 +69,8 @@ CREATE TABLE \`leads\` (
   \`urgency_factors_json\` text,
   \`sop_state_snapshot\` text,
   \`status\` text DEFAULT 'new' NOT NULL,
+  \`follow_up_action\` text,
+  \`follow_up_action_changed_at\` text,
   \`created_at\` text NOT NULL,
   FOREIGN KEY (\`account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE no action,
   FOREIGN KEY (\`session_id\`) REFERENCES \`sessions\`(\`id\`) ON UPDATE no action ON DELETE no action

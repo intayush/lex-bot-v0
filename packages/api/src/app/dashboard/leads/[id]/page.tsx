@@ -3,6 +3,8 @@ import { redirect, notFound } from 'next/navigation';
 import { db } from '../../../../db';
 import { leads, sessions } from '../../../../db/schema';
 import { getAuthSession } from '../../../../lib/dashboard-session';
+import { ActionPicker } from './action-picker';
+import type { LeadAction } from '@legal-chatbot/shared';
 
 const classificationStyles: Record<string, { dot: string; bg: string; text: string }> = {
   urgent: { dot: 'bg-[#DC2626]', bg: 'bg-[#FEF2F2]', text: 'text-[#991B1B]' },
@@ -128,6 +130,13 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               <dd className="text-sm text-[#171717] tabular-nums">{lead.created_at ? new Date(lead.created_at).toLocaleString() : <span className="text-[#D4D4D4]">&mdash;</span>}</dd>
             </dl>
           </div>
+
+          {/* 013-lead-action-tracking T015: lawyer's follow-up action picker. */}
+          <ActionPicker
+            leadId={lead.id}
+            initialAction={(lead.follow_up_action as LeadAction | null) ?? null}
+            initialChangedAt={lead.follow_up_action_changed_at ?? null}
+          />
 
           {lead.brief_description && (
             <div className="bg-white rounded-xl border border-[#E5E5E5] p-6">
