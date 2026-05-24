@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { LEAD_ACTION_LABELS, type LeadAction } from '@legal-chatbot/shared';
 
 interface Lead {
   id: string;
@@ -10,6 +11,8 @@ interface Lead {
   case_type: string | null;
   classification: string | null;
   status: string | null;
+  /** 013-lead-action-tracking: lawyer-recorded follow-up action slug or null. */
+  follow_up_action: string | null;
   created_at: string | null;
 }
 
@@ -23,6 +26,16 @@ const statusStyles: Record<string, { dot: string; text: string }> = {
   new: { dot: 'bg-[#059669]', text: 'text-[#059669]' },
   contacted: { dot: 'bg-[#2563EB]', text: 'text-[#2563EB]' },
   dismissed: { dot: 'bg-[#A3A3A3]', text: 'text-[#737373]' },
+};
+
+/**
+ * 013-lead-action-tracking: per-action visual style for the new "Action"
+ * column. Slug → {dot, bg, text} colors per research.md R7.
+ */
+const actionStyles: Record<LeadAction, { dot: string; bg: string; text: string }> = {
+  contacted: { dot: 'bg-[#059669]', bg: 'bg-[#ECFDF5]', text: 'text-[#047857]' },
+  call_no_answer: { dot: 'bg-[#D97706]', bg: 'bg-[#FFFBEB]', text: 'text-[#92400E]' },
+  meeting_fixed: { dot: 'bg-[#2563EB]', bg: 'bg-[#EFF6FF]', text: 'text-[#1E40AF]' },
 };
 
 function formatRelativeTime(dateStr: string): string {
@@ -108,6 +121,7 @@ export function LeadTable({ leads }: { leads: Lead[] }) {
                   <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#A3A3A3]">Case Type</th>
                   <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#A3A3A3]">Classification</th>
                   <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#A3A3A3]">Status</th>
+                  <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#A3A3A3]">Action</th>
                   <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#A3A3A3]">Contact</th>
                   <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#A3A3A3]">Date</th>
                 </tr>
@@ -116,6 +130,8 @@ export function LeadTable({ leads }: { leads: Lead[] }) {
                 {filtered.map((lead) => {
                   const cls = classificationStyles[lead.classification || 'normal'] ?? classificationStyles.normal;
                   const sts = statusStyles[lead.status || 'new'] ?? statusStyles.new;
+                  const actionSlug = (lead.follow_up_action ?? null) as LeadAction | null;
+                  const actionStyle = actionSlug ? actionStyles[actionSlug] : null;
                   return (
                     <tr key={lead.id} className="border-b border-[#F5F5F5] hover:bg-[#FAFAFA] transition">
                       <td className="px-5 py-4">
@@ -138,6 +154,16 @@ export function LeadTable({ leads }: { leads: Lead[] }) {
                           <span className={`w-1.5 h-1.5 rounded-full ${sts.dot}`} />
                           {lead.status || 'new'}
                         </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        {actionSlug && actionStyle ? (
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${actionStyle.bg} ${actionStyle.text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${actionStyle.dot}`} />
+                            {LEAD_ACTION_LABELS[actionSlug]}
+                          </span>
+                        ) : (
+                          <span className="text-[#D4D4D4]">&mdash;</span>
+                        )}
                       </td>
                       <td className="px-5 py-4">
                         {lead.contact_email ? (
