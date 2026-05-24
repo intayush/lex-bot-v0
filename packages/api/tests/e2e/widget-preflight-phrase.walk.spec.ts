@@ -1,25 +1,13 @@
 /**
- * Walk-mode E2E spec for the preflight phrase MVP (011-preflight-phrase T015).
+ * Walk-mode E2E spec for the preflight phrase rev2 (011-preflight-phrase).
  *
- * Verifies the preflight wire path: POST /api/chat/preflight is called
- * in parallel with /api/chat when the visitor sends a message via any
- * of the three send-paths (free-text, QuickReply, SOP chip).
+ * Verifies that the typing-indicator bubble shows a tailored phrase
+ * (✨ {phrase}…) instead of dots when the visitor sends a message
+ * that the client-side classifier recognizes.
  *
- * Assertion strategy: structural only — verify the request fires.
- * Response status, body shape, and exact phrase content are NOT asserted
- * here because:
- *   - Dev-server HMR + LLM cold-start make the response timing racy.
- *   - The route's response shape + post-filter rules are already covered
- *     by 39 Vitest tests in `lib/preflight-phrase.test.ts` +
- *     `app/api/chat/preflight/route.test.ts`.
- *   - LLM phrase content varies; never assert prose in walk specs.
- *
- * What this spec proves end-to-end that unit tests cannot:
- *   - The widget hook fires the POST when ChatPanel's three send-paths
- *     are exercised.
- *   - The URL the hook constructs (`apiUrl + /preflight`) matches the
- *     route's actual mount point.
- *   - The headers (`Content-Type`, `x-api-key`) make it through CORS.
+ * Rev2: the classifier is synchronous and client-side (no network call).
+ * The phrase appears WITHIN THE SAME ANIMATION FRAME as the user's
+ * message bubble. We assert by reading the bubble's text content.
  *
  * @walk — runs in headed slow-mo via `pnpm --filter @legal-chatbot/api e2e:walk`.
  */
@@ -28,63 +16,53 @@ import { openWidget, sendMessage, resetWidgetSession } from './fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
-interface PreflightCall {
-  method: string;
-  url: string;
-}
-
-function listenForPreflight(page: import('@playwright/test').Page): PreflightCall[] {
-  const captured: PreflightCall[] = [];
-  page.on('request', (req) => {
-    if (req.url().includes('/api/chat/preflight') && req.method() === 'POST') {
-      captured.push({ method: req.method(), url: req.url() });
-    }
-  });
-  return captured;
-}
-
-test('@walk preflight POST fires on free-text Send', async ({ page }) => {
+test('@walk preflight phrase shows tailored content for known message', async ({ page }) => {
   test.setTimeout(60_000);
   await resetWidgetSession(page);
-
-  const captured = listenForPreflight(page);
   await openWidget(page);
-  await sendMessage(page, 'I had a DUI');
 
-  // Generous timeout — dev server HMR can stall the very first POST
-  // for several seconds while routes compile.
-  await expect
-    .poll(() => captured.length, {
-      timeout: 20_000,
-      message: 'preflight POST should fire when free-text message is sent',
-    })
-    .toBeGreaterThanOrEqual(1);
+  // "I had a DUI" matches the DUI rule → "Looking into your DUI matter".
+  // Send via fill-and-click so we can observe the bubble appear.
+  await page.locator("input[placeholder='Type your message...']").fill('I had a DUI');
+  await page.getByRole('button', { name: 'Send message' }).click();
 
-  expect(captured[0]!.url).toContain('/api/chat/preflight');
+  // The typing bubble (role=status, aria-live=polite) should appear.
+  // Its content should contain the tailored phrase (we assert presence
+  // of the SPARKLE prefix that distinguishes the phrase state from
+  // dots state — without asserting exact phrase text, future-proof if
+  // we tune the phrase library).
+  const bubble = page.locator("[role='status'][aria-live='polite']").first();
+  await expect(bubble).toBeVisible({ timeout: 5_000 });
+  await expect(bubble).toContainText(/looking into|noting|recording|checking|wrapping|finding/i, { timeout: 3_000 });
 });
 
-test('@walk preflight POST fires on QuickReply / chip click', async ({ page }) => {
+test('@walk preflight bubble disappears once agent response streams', async ({ page }) => {
   test.setTimeout(60_000);
   await resetWidgetSession(page);
-
-  const captured = listenForPreflight(page);
   await openWidget(page);
 
-  // The widget greeting includes practice-area QuickReplies; click one.
-  // If no QuickReply chips render (account has no practice areas
-  // configured), fall back to a free-text submit so we still exercise
-  // a non-free-text send-path.
-  const quickReplies = page.locator(
-    "[role='group'][aria-label='Quick reply options'] button",
-  );
-  const count = await quickReplies.count();
-  if (count > 0) {
-    await quickReplies.first().click();
-  } else {
-    await sendMessage(page, 'I had a DUI');
-  }
+  await sendMessage(page, 'I had a DUI');
 
-  await expect
-    .poll(() => captured.length, { timeout: 20_000 })
-    .toBeGreaterThanOrEqual(1);
+  // The typing bubble appears, then disappears once the assistant
+  // streams a non-empty message. Generous timeout for the LLM round-trip.
+  const bubble = page.locator("[role='status'][aria-live='polite']").first();
+  await expect(bubble).not.toBeVisible({ timeout: 60_000 });
+});
+
+test('@walk preflight falls back to dots for unrecognized message', async ({ page }) => {
+  test.setTimeout(60_000);
+  await resetWidgetSession(page);
+  await openWidget(page);
+
+  // Send a message that doesn't match any classifier rule and has no
+  // pendingStepSlug yet. Should show dots (`● ● ●`) not a phrase.
+  await page.locator("input[placeholder='Type your message...']").fill('asdfqwerty');
+  await page.getByRole('button', { name: 'Send message' }).click();
+
+  // The bubble appears in dots state. We verify by checking the
+  // .lc-typing element is present (the rev2 ChatPanel still renders
+  // `<span className="lc-typing">● ● ●</span>` when phrase is null).
+  const bubble = page.locator("[role='status'][aria-live='polite']").first();
+  await expect(bubble).toBeVisible({ timeout: 5_000 });
+  await expect(bubble.locator('.lc-typing')).toBeVisible({ timeout: 1_000 });
 });

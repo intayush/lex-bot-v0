@@ -1,30 +1,19 @@
 <!--
 SYNC IMPACT REPORT (most recent)
 ================================
-Version change: 1.0.0 → 1.0.1 (PATCH)
+Version change: 1.0.1 → 1.0.0 (REVERT)
 Date: 2026-05-24
-Bump rationale: Clarify the §IV Required Stack "LLM provider" row to
-permit gemini-2.5-flash-lite as a secondary model alongside the
-default gemini-2.5-flash. The lite model is used ONLY for the
-preflight-phrase pre-call (see specs/011-preflight-phrase/) — a
-fire-and-forget structured-output call producing a 3-7 word loading
-status phrase that runs in parallel with the main agent stream.
-
-Why PATCH (not MINOR or MAJOR):
-  - Adds an option, not an obligation. Existing code that uses only
-    gemini-2.5-flash remains compliant.
-  - No principle added, removed, or redefined.
-  - No backward-incompatible governance change.
-  Per the Versioning Policy below: "PATCH: Clarifications, wording
-  fixes, typo corrections, or non-semantic refinements that do not
-  change what compliance requires."
+Bump rationale: Reverts the 1.0.0 → 1.0.1 PATCH that added
+gemini-2.5-flash-lite to §IV. The preflight feature (011-preflight-phrase)
+that motivated the addition was rolled to a client-side keyword
+classifier after production showed 5-10x the design latency for the
+LLM-driven approach. With no LLM call in the preflight path, the
+constitution returns to single-model-only.
 
 Modified sections:
-  ~ §IV Required Stack — "LLM provider" row notes column updated.
+  ~ §IV Required Stack — "LLM provider" row reverted to gemini-2.5-flash only.
 
 Templates requiring updates: none.
-
-Follow-up TODOs: none.
 -->
 
 <!--
@@ -333,7 +322,7 @@ require a constitution amendment.
 | Language | TypeScript (strict) | Node.js 20+ runtime |
 | Frontend framework | React (NPM widget, Dashboard); Preact (CDN widget bundle) | Per §6.2 |
 | Framework | Next.js (Dashboard + API) | Route Handlers only — no Server Actions |
-| LLM provider | Gemini via `@ai-sdk/google` | `gemini-2.5-flash` for the main agent + tools; `gemini-2.5-flash-lite` for the preflight-phrase pre-call only (per `011-preflight-phrase`) |
+| LLM provider | Gemini via `@ai-sdk/google` | `gemini-2.5-flash` is the default model |
 | AI SDK | Vercel AI SDK (`ai`, `@ai-sdk/google`) | `streamText` + `tool()` + `useChat` |
 | Styling | Tailwind CSS (Dashboard); CSS custom properties (Widget) | §6.7, §8.11 |
 | Database (prod) | Neon serverless PostgreSQL via `@neondatabase/serverless` | §2.6, §9.3 |
@@ -507,4 +496,4 @@ that are not policy) lives in `README.md`, `AGENTS.md`, and the active
 plan under `specs/[###-feature]/plan.md`. Those documents implement this
 constitution; they MUST NOT contradict it.
 
-**Version**: 1.0.1 | **Ratified**: 2026-05-23 | **Last Amended**: 2026-05-24
+**Version**: 1.0.0 | **Ratified**: 2026-05-23 | **Last Amended**: 2026-05-23

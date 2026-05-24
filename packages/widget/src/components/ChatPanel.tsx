@@ -90,18 +90,17 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
   const { sopState, onResponse: onSOPResponse } = useSOPState();
   const reducedMotion = useReducedMotion();
 
-  // 011-preflight-phrase T013/T014: query-tailored loading status phrase
+  // 011-preflight-phrase rev2: query-tailored loading status phrase
   // that swaps the typing-indicator content from `● ● ●` to e.g.
-  // "✨ Looking into your DUI matter…" within ~500ms of Send. Fires in
-  // parallel with /api/chat; failure is silent (dots remain).
+  // "✨ Looking into your DUI matter…" within ~1ms of Send.
   //
-  // The widget's `apiUrl` prop points at `.../api/chat`. The preflight
-  // route lives at `.../api/chat/preflight`, so we pass `apiUrl` to the
-  // hook unchanged — the hook appends `/preflight` to whatever it gets.
-  const { phrase: preflightPhrase, start: startPreflight, clear: clearPreflight } = usePreflightPhrase({
-    apiUrl,
-    apiKey,
-  });
+  // Rev2 history: the original LLM-driven preflight (POST /api/chat/preflight
+  // → gemini-2.5-flash-lite) hit production latencies of 1300-3500ms,
+  // 5-10x the design target. Rolled to a synchronous client-side
+  // keyword + SOP-step classifier — instant, deterministic, free.
+  // Messages that don't match any rule AND have no pending step return
+  // null; the widget falls back to dots (honest "we don't know" state).
+  const { phrase: preflightPhrase, start: startPreflight, clear: clearPreflight } = usePreflightPhrase();
 
   // Custom fetch that reads the session id from sessionStorage at REQUEST
   // time rather than at component-mount time. Critical for multi-turn

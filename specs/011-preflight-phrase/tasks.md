@@ -287,3 +287,56 @@ Deferred (`[~]`):
 Production deployed: commit `9a71216` on `main`. All 13 E2E specs green
 against https://lex-bot-v0.netlify.app + https://lex-bot-chatbot.netlify.app.
 
+
+---
+
+## Rev2 — Pivot from LLM-driven to client-side keyword classifier (2026-05-24)
+
+**Problem:** production rollout of the LLM-driven preflight (T011-T015,
+T027-T028) showed real latency of 1300-3500ms — 5-10x the design
+target. Most calls hit the 1500ms server-side timeout and returned
+`preflight_timeout`, leaving the visitor on the dots indicator. The
+feature was effectively non-functional in production.
+
+**Pivot:** rolled the LLM-driven server-side preflight for a
+synchronous client-side classifier. Same wire shape on the widget
+(`usePreflightPhrase` hook surface unchanged). Server-side route +
+helper deleted entirely.
+
+**Changes:**
+- DELETED `packages/api/src/app/api/chat/preflight/{route,handler,route.test}.ts`
+- DELETED `packages/api/src/lib/preflight-phrase.{ts,test.ts}`
+- DELETED `packages/shared/src/schemas/preflight.ts`
+- REVERTED `.specify/memory/constitution.md` to 1.0.0 (the `flash-lite`
+  PATCH amendment is no longer needed; we're not using a second model).
+- DELETED `packages/api/tests/e2e/widget-preflight-silent-failure.walk.spec.ts`
+  (no network call to fail).
+- REPLACED `packages/widget/src/hooks/usePreflightPhrase.ts` — now
+  calls `classifyMessage()` synchronously, no fetch, no AbortController,
+  no race-fix turnId/clearedTurnIds (no race possible).
+- ADDED `packages/widget/src/hooks/classifyMessage.{ts,test.ts}` —
+  pure function with 9 keyword rules (DUI, family, injury, criminal,
+  estate, office hours, contact info, goodbye, generic help) +
+  6 SOP-step phrases + null fallback.
+- ADDED `packages/widget/vitest.config.ts` + `test` npm script.
+  Vitest stood up in widget for non-DOM tests; jsdom + @testing-library/react
+  still deferred ([~] T010/T036/T048).
+- REPLACED `packages/api/tests/e2e/widget-preflight-phrase.walk.spec.ts`
+  with structural assertions (bubble shows tailored phrase for known
+  message; dots for unrecognized; bubble disappears once agent streams).
+
+**Verification (post-rev2):**
+- `pnpm --filter @legal-chatbot/widget test` → 21 classifier tests passing.
+- `pnpm --filter @legal-chatbot/api test` → 297 passing (was 336; -39 from
+  deleted server-side preflight tests).
+- `pnpm -r typecheck` → clean.
+- `pnpm --filter @legal-chatbot/api build` → clean; `/api/chat/preflight`
+  correctly absent from the route list.
+- `pnpm --filter @legal-chatbot/api e2e -- widget-preflight` → 3/3 in 11.4s.
+  First spec passes in 382ms (synchronous classifier vs. previous 2-7s wait).
+
+**Trade-offs accepted:**
+- Phrase library is fixed in the widget bundle. No dashboard-customizable
+  phrases (would need to re-add the server route). YAGNI for MVP.
+- Long-tail messages without keyword matches see dots. Acceptable —
+  dots are more honest than a generic "One moment" pretending to tailor.

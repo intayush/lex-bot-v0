@@ -1,158 +1,63 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { classifyMessage } from './classifyMessage';
 
 /**
- * Widget-side preflight phrase tracking (011-preflight-phrase T013).
+ * Widget-side preflight phrase tracking (011-preflight-phrase rev2).
  *
- * Wires the widget to the POST /api/chat/preflight route. Fires a
- * cancellable fetch when the visitor sends a message; exposes the
- * resolved phrase via `phrase` so ChatPanel can swap the typing
- * indicator's content. Closes the rare race where the main agent
- * starts streaming BEFORE the preflight resolves via a `clear()`
- * function paired with a per-turn `clearedTurnIds` set.
+ * Synchronously classifies the visitor's message into a tailored
+ * loading-status phrase ("Looking into your DUI matter", "Checking
+ * office hours") that swaps the typing-indicator content from the
+ * default `● ● ●` dots within ~1ms of Send.
  *
- * Failure modes (every one falls back silently to dots):
- *   - Server returns 4xx / 5xx → silent no-op
- *   - Network error → silent no-op
- *   - Client 1000ms timeout → abort + silent no-op
- *   - Body parse fails → silent no-op
- *   - Resolved phrase but `clear()` was already called → discarded (race fix)
+ * Rev2 history: replaces a previous LLM-driven preflight (gemini-
+ * 2.5-flash-lite via POST /api/chat/preflight) that hit production
+ * latencies of 1300-3500ms — 5-10x the design target. The synchronous
+ * classifier is instant, deterministic, free, and never times out.
  *
- * Source of truth: contracts/preflight-hook-contract.md.
+ * Trade-off: the classifier handles only common message patterns
+ * (DUI / family / injury / criminal / estate / office-hours / etc.)
+ * plus pending-SOP-step context. Messages that don't match any rule
+ * AND have no pending step return null — the widget falls back to
+ * dots, which is honest behavior: pretending to tailor when we can't
+ * would feel worse.
+ *
+ * Surface (unchanged from rev1 to keep ChatPanel.tsx wiring stable):
+ *   - phrase: string | null   — the current tailored phrase, or null
+ *   - start(message, slug)    — call when the visitor sends a message
+ *   - clear()                 — call when agent's first token streams
+ *
+ * Source of truth: contracts/preflight-hook-contract.md (rev2 notes).
  */
 
 export interface UsePreflightPhraseOptions {
   /**
-   * Base URL of the chat API. The hook calls `${apiUrl}/preflight`. The
-   * widget's existing `apiUrl` prop already points at `.../api/chat`, so
-   * passing it directly resolves to `.../api/chat/preflight` — exactly
-   * where the route handler lives.
+   * Reserved for backward compatibility with rev1's API. The rev2
+   * classifier is purely client-side and ignores apiUrl/apiKey.
+   * Keeping the option in the type lets ChatPanel.tsx pass them
+   * unchanged; future LLM fallback could re-enable.
    */
-  apiUrl: string;
-  /** API key forwarded as the `x-api-key` header. */
-  apiKey: string;
-  /** Optional session id forwarded as the `x-session-id` header. */
+  apiUrl?: string;
+  apiKey?: string;
   sessionId?: string;
 }
 
 export interface UsePreflightPhraseReturn {
-  /** Latest preflight phrase, or null. Reset on every `start()` and `clear()`. */
   phrase: string | null;
-  /** Call when the visitor sends a message — fires the preflight in the background. */
   start: (message: string, pendingStepSlug: string | null) => void;
-  /** Call when the agent's first response token has streamed (cancels in-flight, clears phrase). */
   clear: () => void;
 }
 
-/** Client-side hard ceiling for the preflight fetch.
- *
- * Sits just above the server's 1500ms budget so the server's structured
- * 503 wins in normal failure cases; this exists for stuck connections.
- * Updated 2026-05-24 alongside the server bump from 800ms→1500ms after
- * live latency measurement of gemini-2.5-flash-lite warm-up calls. */
-const CLIENT_TIMEOUT_MS = 2000;
-
-export function usePreflightPhrase(opts: UsePreflightPhraseOptions): UsePreflightPhraseReturn {
+export function usePreflightPhrase(_opts: UsePreflightPhraseOptions = {}): UsePreflightPhraseReturn {
   const [phrase, setPhrase] = useState<string | null>(null);
 
-  // Refs so they survive renders without retriggering effects.
-  const turnIdRef = useRef<number>(0);
-  const clearedTurnIdsRef = useRef<Set<number>>(new Set());
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const cancelInFlight = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    if (timeoutRef.current !== null) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
+  const start = useCallback((message: string, pendingStepSlug: string | null) => {
+    const result = classifyMessage(message, pendingStepSlug);
+    setPhrase(result);
   }, []);
 
-  const start = useCallback(
-    (message: string, pendingStepSlug: string | null) => {
-      // Cancel anything still in flight from a prior turn.
-      cancelInFlight();
-
-      // Bump turnId; capture it for the closure so the resolve callback
-      // can check whether it's still current.
-      turnIdRef.current += 1;
-      const myTurnId = turnIdRef.current;
-
-      // Clear any stale phrase from the prior turn.
-      setPhrase(null);
-
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
-
-      // Client-side hard timeout — server has its own 800ms budget; this is
-      // a belt-and-suspenders fallback for stuck connections.
-      timeoutRef.current = setTimeout(() => {
-        controller.abort();
-      }, CLIENT_TIMEOUT_MS);
-
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'x-api-key': opts.apiKey,
-      };
-      if (opts.sessionId) {
-        headers['x-session-id'] = opts.sessionId;
-      }
-
-      // Build the URL: `${apiUrl}/preflight` — caller is responsible for
-      // passing the right base.
-      const url = `${opts.apiUrl.replace(/\/$/, '')}/preflight`;
-
-      // Fire-and-forget. We deliberately do NOT await; the caller's render
-      // pipeline continues and the main /api/chat call proceeds in parallel.
-      fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ message, pendingStepSlug }),
-        signal: controller.signal,
-      })
-        .then(async (res) => {
-          if (timeoutRef.current !== null) {
-            clearTimeout(timeoutRef.current);
-            timeoutRef.current = null;
-          }
-          if (!res.ok) return; // silent no-op on 4xx/5xx
-          let body: unknown;
-          try {
-            body = await res.json();
-          } catch {
-            return; // silent no-op on malformed JSON
-          }
-          if (
-            typeof body !== 'object'
-            || body === null
-            || typeof (body as { phrase?: unknown }).phrase !== 'string'
-          ) {
-            return; // shape mismatch — silent no-op
-          }
-          // Race fix R5: only setPhrase if our turn is still current AND
-          // it hasn't been cleared.
-          if (
-            turnIdRef.current === myTurnId
-            && !clearedTurnIdsRef.current.has(myTurnId)
-          ) {
-            setPhrase((body as { phrase: string }).phrase);
-          }
-        })
-        .catch(() => {
-          // AbortError + network errors land here — silent no-op.
-        });
-    },
-    [cancelInFlight, opts.apiKey, opts.apiUrl, opts.sessionId],
-  );
-
   const clear = useCallback(() => {
-    clearedTurnIdsRef.current.add(turnIdRef.current);
-    cancelInFlight();
     setPhrase(null);
-  }, [cancelInFlight]);
+  }, []);
 
   return { phrase, start, clear };
 }
