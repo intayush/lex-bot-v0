@@ -2,9 +2,10 @@
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
 
-- Active plan: `specs/012-progressbar-refinement/plan.md`
-- Research: `specs/012-progressbar-refinement/research.md`
-- Contracts: `specs/012-progressbar-refinement/contracts/`
-- Quickstart: `specs/012-progressbar-refinement/quickstart.md`
+- Active plan: `specs/013-lead-action-tracking/plan.md`
+- Research: `specs/013-lead-action-tracking/research.md`
+- Data model: `specs/013-lead-action-tracking/data-model.md`
+- Contracts: `specs/013-lead-action-tracking/contracts/`
+- Quickstart: `specs/013-lead-action-tracking/quickstart.md`
 - Constitution: `.specify/memory/constitution.md`
 <!-- SPECKIT END -->
