@@ -113,18 +113,18 @@ description: "Tasks for Lead Action Tracking"
 
 ### 5B — Full pre-deploy verification
 
-- [ ] T022 Stop dev servers; run the full pre-deploy sweep: `pnpm -r typecheck` (all 5 packages), `pnpm --filter @legal-chatbot/api test` (full unit suite — should be 297 + new tests passing), `pnpm --filter @legal-chatbot/api e2e` (full e2e suite — should be 17 + 1 new = 18 passing). Production builds: `pnpm --filter @legal-chatbot/shared build` + `pnpm --filter @legal-chatbot/widget build` + `pnpm --filter @legal-chatbot/api build`. All clean.
+- [X] T022 Stop dev servers; run the full pre-deploy sweep: `pnpm -r typecheck` (all 5 packages), `pnpm --filter @legal-chatbot/api test` (full unit suite — should be 297 + new tests passing), `pnpm --filter @legal-chatbot/api e2e` (full e2e suite — should be 17 + 1 new = 18 passing). Production builds: `pnpm --filter @legal-chatbot/shared build` + `pnpm --filter @legal-chatbot/widget build` + `pnpm --filter @legal-chatbot/api build`. All clean.
 
 ### 5C — Production deploy
 
-- [ ] T023 Apply the migration to the production Neon DB. The dev account uses the same Neon DB as production for this MVP setup, so `pnpm --filter @legal-chatbot/api db:migrate` against the dev `DATABASE_URL` (which IS production for this project) is what's needed. Running this from the local shell is the same operation that would run during a Netlify build's `db:migrate` if that were wired in (it's not today; manual apply is the convention).
-- [ ] T024 Merge `013-lead-action-tracking` → `main` (fast-forward) and push to GitHub. Netlify auto-rebuilds the dashboard site within ~3-5 min.
-- [ ] T025 Run the full E2E suite against the deployed Netlify URLs: `E2E_BASE_URL=https://lex-bot-v0.netlify.app E2E_WIDGET_URL=https://lex-bot-chatbot.netlify.app pnpm --filter @legal-chatbot/api e2e`. Should be 18/18 green. Sanity check: open https://lex-bot-v0.netlify.app/dashboard in incognito, sign in, navigate to a lead, set the action, observe the persistence.
+- [X] T023 Apply the migration to the production Neon DB. The dev account uses the same Neon DB as production for this MVP setup, so `pnpm --filter @legal-chatbot/api db:migrate` against the dev `DATABASE_URL` (which IS production for this project) is what's needed. Running this from the local shell is the same operation that would run during a Netlify build's `db:migrate` if that were wired in (it's not today; manual apply is the convention). **APPLIED 2026-05-24** during T010 (the dev DB IS production per the established pattern).
+- [X] T024 Merge `013-lead-action-tracking` → `main` (fast-forward) and push to GitHub. Netlify auto-rebuilds the dashboard site within ~3-5 min. **MERGED + PUSHED**: commit `d26a060` on main. Netlify rebuild completed.
+- [X] T025 Run the full E2E suite against the deployed Netlify URLs: `E2E_BASE_URL=https://lex-bot-v0.netlify.app E2E_WIDGET_URL=https://lex-bot-chatbot.netlify.app pnpm --filter @legal-chatbot/api e2e`. Should be 18/18 green. Sanity check: open https://lex-bot-v0.netlify.app/dashboard in incognito, sign in, navigate to a lead, set the action, observe the persistence. **VERIFIED 2026-05-24**: 18/18 e2e specs green against production in 2.7 min, including the new dashboard-lead-action walk spec at 5.0s.
 
 ### 5D — Final sweep
 
-- [ ] T026 Update `specs/013-lead-action-tracking/tasks.md` to mark all tasks `[X]` and append a "Branch totals" line at the bottom mirroring the convention used in 010/011/012 tasks.md.
-- [ ] T027 Update `AGENTS.md` SPECKIT block per the established convention: stays on 013 until the next `/speckit.specify` lands. (No-op edit; verify the pointer is correct.)
+- [X] T026 Update `specs/013-lead-action-tracking/tasks.md` to mark all tasks `[X]` and append a "Branch totals" line at the bottom mirroring the convention used in 010/011/012 tasks.md.
+- [X] T027 Update `AGENTS.md` SPECKIT block per the established convention: stays on 013 until the next `/speckit.specify` lands. (No-op edit; verify the pointer is correct.) **VERIFIED**: AGENTS.md SPECKIT block points at `specs/013-lead-action-tracking/plan.md`. No edit needed.
 
 **Checkpoint**: After Phase 5, the feature is production-ready and verified end-to-end against the live Netlify deploy.
 
@@ -289,3 +289,15 @@ Per Constitution III + the "Tests" preamble of this file: every implementation t
 For US1: T011 (route tests) MUST be authored AND failing before T012 (route handler impl) is started. T011's cross-account-404 test in particular is the privacy-critical assertion.
 
 For US2: there's no Vitest test pair (the change is presentational on top of an existing component). The walk spec at T020 covers it.
+
+---
+
+## Branch totals (2026-05-24)
+
+27 done / 0 deferred / 0 open. Feature complete and shipped to production.
+
+Production deployed: commit `d26a060` on `main`. All 18 E2E specs
+green against https://lex-bot-v0.netlify.app + https://lex-bot-chatbot.netlify.app
+(was 17 specs pre-013; +1 new for dashboard-lead-action.walk.spec.ts).
+
+Zero deferrals — all tasks completed without `[~]` markers.
