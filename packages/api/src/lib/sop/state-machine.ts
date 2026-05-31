@@ -34,6 +34,15 @@ export type SOPAction =
       capturedAt: string;
       /** True if captured via the skip-detector (R4). */
       inferred?: boolean;
+      /**
+       * Human-readable label snapshot at capture time (e.g. "DUI").
+       * Forwarded from `SkipDetectorMatch.captured_label`. Persisted on
+       * the resulting state step so leads remain meaningful even if
+       * the firm later renames or removes the chip
+       * (014-fix-sop-case-subtypes FR-022). Optional/null for
+       * non-chip captures.
+       */
+      capturedLabel?: string | null;
     }
   | {
       type: 'skip_step';
@@ -149,6 +158,11 @@ function applyCapture(
     captured_value: action.value,
     captured_at: action.capturedAt,
     inferred: action.inferred ?? false,
+    // 014-fix-sop-case-subtypes T018 / FR-022: snapshot the chip's
+    // human-readable label at capture time so leads remain meaningful
+    // after later edits. `null` when the action didn't supply one
+    // (free-text captures, date inference results, contact form).
+    captured_label: action.capturedLabel ?? null,
   };
 
   const newSteps = [

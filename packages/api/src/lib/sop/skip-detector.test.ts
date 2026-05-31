@@ -510,3 +510,102 @@ describe('detectSkippedSteps — correction signal (change-of-mind)', () => {
     expect(matches.find((m) => m.slug === 'sub_type')).toBeUndefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// 014-fix-sop-case-subtypes T008/T009/T010 — captured_label snapshot.
+// Every chip match emitted by the skip-detector must include the chip's
+// human-readable label so leads carry a stable display value even after
+// the firm renames or removes the chip (FR-022).
+// ---------------------------------------------------------------------------
+
+describe('detectSkippedSteps — captured_label snapshot (014)', () => {
+  it('matchCaseTypeChip exact-slug emits ct.label as captured_label', async () => {
+    const sopConfig = buildSOPConfig();
+    const state = initSOPState(sopConfig, ANCHOR);
+    const matches = await detectSkippedSteps({
+      message: 'dui', state, sopConfig, caseTypes: CASE_TYPES,
+      inferDateImpl: ALWAYS_NULL,
+    });
+    const m = matches.find((x) => x.slug === 'case_type');
+    expect(m).toBeDefined();
+    expect(m!.captured_label).toBe('DUI');
+  });
+
+  it('matchCaseTypeChip exact-label emits ct.label as captured_label', async () => {
+    const sopConfig = buildSOPConfig();
+    const state = initSOPState(sopConfig, ANCHOR);
+    const matches = await detectSkippedSteps({
+      message: 'Personal Injury', state, sopConfig, caseTypes: CASE_TYPES,
+      inferDateImpl: ALWAYS_NULL,
+    });
+    const m = matches.find((x) => x.slug === 'case_type');
+    expect(m).toBeDefined();
+    expect(m!.captured_label).toBe('Personal Injury');
+  });
+
+  it('matchCaseTypeChip substring match emits ct.label as captured_label', async () => {
+    const sopConfig = buildSOPConfig();
+    const state = initSOPState(sopConfig, ANCHOR);
+    const matches = await detectSkippedSteps({
+      message: 'I have a DUI matter to discuss', state, sopConfig, caseTypes: CASE_TYPES,
+      inferDateImpl: ALWAYS_NULL,
+    });
+    const m = matches.find((x) => x.slug === 'case_type');
+    expect(m).toBeDefined();
+    expect(m!.captured_label).toBe('DUI');
+  });
+
+  it('matchSubTypeChip exact-slug emits st.label as captured_label', async () => {
+    const sopConfig = buildSOPConfig();
+    let state = initSOPState(sopConfig, ANCHOR);
+    state = advanceSOP(
+      state,
+      { type: 'capture_step', step_id: 'step_1', value: 'dui', capturedAt: T1 },
+      sopConfig,
+    );
+    const matches = await detectSkippedSteps({
+      message: 'first_offense', state, sopConfig, caseTypes: CASE_TYPES,
+      inferDateImpl: ALWAYS_NULL,
+    });
+    const m = matches.find((x) => x.slug === 'sub_type');
+    expect(m).toBeDefined();
+    expect(m!.captured_label).toBe('First Offense');
+  });
+
+  it('matchSubTypeChip exact-label emits st.label as captured_label', async () => {
+    const sopConfig = buildSOPConfig();
+    let state = initSOPState(sopConfig, ANCHOR);
+    state = advanceSOP(
+      state,
+      { type: 'capture_step', step_id: 'step_1', value: 'personal_injury', capturedAt: T1 },
+      sopConfig,
+    );
+    const matches = await detectSkippedSteps({
+      message: 'Slip and Fall', state, sopConfig, caseTypes: CASE_TYPES,
+      inferDateImpl: ALWAYS_NULL,
+    });
+    const m = matches.find((x) => x.slug === 'sub_type');
+    expect(m).toBeDefined();
+    expect(m!.captured_label).toBe('Slip and Fall');
+  });
+
+  it('inferCaseTypeFromSubType emits the parent case_type.label as captured_label', async () => {
+    // "first offense" mentions a sub_type label that's unique to DUI.
+    // Skip-detector emits BOTH a case_type=dui match (with label "DUI")
+    // and a sub_type=first_offense match (with label "First Offense").
+    const sopConfig = buildSOPConfig();
+    const state = initSOPState(sopConfig, ANCHOR);
+    const matches = await detectSkippedSteps({
+      message: 'first offense', state, sopConfig, caseTypes: CASE_TYPES,
+      inferDateImpl: ALWAYS_NULL,
+    });
+    const caseTypeMatch = matches.find((x) => x.slug === 'case_type');
+    expect(caseTypeMatch).toBeDefined();
+    expect(caseTypeMatch!.captured_value).toBe('dui');
+    expect(caseTypeMatch!.captured_label).toBe('DUI');
+
+    const subTypeMatch = matches.find((x) => x.slug === 'sub_type');
+    expect(subTypeMatch).toBeDefined();
+    expect(subTypeMatch!.captured_label).toBe('First Offense');
+  });
+});

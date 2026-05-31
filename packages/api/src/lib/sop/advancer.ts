@@ -84,6 +84,7 @@ export async function advanceForVisitorMessage(
           step_id: pendingStepBefore.id,
           slug: pendingStepBefore.slug,
           captured_value: JSON.stringify(payload),
+          captured_label: null,
           out_of_scope: false,
           source: 'free_text',
         }],
@@ -138,6 +139,10 @@ export async function advanceForVisitorMessage(
         // marked inferred=true here for simplicity; consumers (logging,
         // dashboard) treat all skip-detector captures uniformly.
         inferred: m.source !== 'free_text',
+        // 014-fix-sop-case-subtypes T018 / FR-022: forward the chip's
+        // label snapshot from skip-detector to the state-machine so the
+        // capture preserves a stable display value.
+        capturedLabel: m.captured_label,
       },
       sopConfig,
     );

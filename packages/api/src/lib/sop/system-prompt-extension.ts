@@ -23,6 +23,28 @@ import { redactPII } from './pii-redactor';
 /** Hard ceiling on captured-value length displayed in the system prompt. */
 const CAPTURED_VALUE_MAX_LEN = 30;
 
+/**
+ * Interpolate `{case_type}` (and future placeholders) in a step's
+ * question text using snapshots from the SOP state. The caller is
+ * responsible for finding the captured_label off the case_type step;
+ * we accept it as a parameter so this helper stays pure.
+ *
+ * Behavior (014-fix-sop-case-subtypes T019 / FR-006):
+ *   - When the captured case-type label is non-null, replace every
+ *     occurrence of `{case_type}` with the label.
+ *   - When the label is null (Step 1 not yet captured OR snapshot was
+ *     never set), leave the placeholder intact. The legacy behavior
+ *     was for the LLM to substitute the captured slug; preserving the
+ *     placeholder keeps that fallback path working unchanged.
+ */
+function interpolateQuestionText(
+  questionText: string,
+  capturedCaseTypeLabel: string | null,
+): string {
+  if (capturedCaseTypeLabel === null) return questionText;
+  return questionText.replace(/\{case_type\}/g, capturedCaseTypeLabel);
+}
+
 export function composeSopBlock(
   sopState: SOPState,
   sopConfig: SOPConfiguration,
@@ -69,6 +91,13 @@ export function composeSopBlock(
   // Steps in display order.
   const orderedConfigSteps = [...sopConfig.steps].sort((a, b) => a.position - b.position);
 
+  // 014-fix-sop-case-subtypes T019: read the captured case-type label
+  // off the SOP state once so we can interpolate `{case_type}` into
+  // any step's question text. Null when Step 1 is not yet complete or
+  // when the snapshot was never set (legacy state).
+  const capturedCaseTypeLabel =
+    sopState.steps.find((s) => s.slug === 'case_type')?.captured_label ?? null;
+
   // ---- Step list ----
   lines.push('### Steps (in order)');
   lines.push('');
@@ -99,7 +128,7 @@ export function composeSopBlock(
   } else {
     lines.push('### Current pending step');
     lines.push('');
-    lines.push(`Ask the visitor: "${earliestPending.question_text}"`);
+    lines.push(`Ask the visitor: "${interpolateQuestionText(earliestPending.question_text, capturedCaseTypeLabel)}"`);
     if (earliestPending.chip_source) {
       lines.push('Chips will be rendered by the widget; the visitor may also free-text.');
     } else if (!earliestPending.accepts_free_text) {
@@ -126,7 +155,7 @@ export function composeSopBlock(
         'SOP step. Do this:\n' +
         '  1. Answer their question briefly within your guardrail boundaries.\n' +
         '  2. End your response by asking the pending step\'s question ' +
-        `verbatim: "${earliestPending.question_text}"\n` +
+        `verbatim: "${interpolateQuestionText(earliestPending.question_text, capturedCaseTypeLabel)}"\n` +
         'Do NOT skip step 2.',
       );
       lines.push('');

@@ -19,8 +19,9 @@ import { initSOPState } from '../../../lib/sop/state-machine';
 import { advanceForVisitorMessage } from '../../../lib/sop/advancer';
 import { isOffTopic } from '../../../lib/sop/off-sop-detour';
 import { analyzeAndFollowUpTool } from '../../../lib/sop/follow-up-tool';
+import { buildSOPStateHeader } from '../../../lib/sop/build-sop-state-header';
 import { corsHeaders } from './cors';
-import type { Manifest, SOPState, SOPStateHeaderPayload } from '@legal-chatbot/shared';
+import type { Manifest, SOPState } from '@legal-chatbot/shared';
 
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: corsHeaders });
@@ -39,31 +40,10 @@ async function getCachedManifest(contextStoreUrl: string): Promise<Manifest> {
   return manifest;
 }
 
-/**
- * Compact SOP state payload sent to the widget via the x-sop-state
- * response header (per contracts/sop-state-contract.md "Wire Shape").
- * Returns null when the account has no published SOP.
- */
-function buildSOPStateHeader(sopState: SOPState | null): SOPStateHeaderPayload | null {
-  if (!sopState) return null;
-  const pending = sopState.steps.find((s) => s.status === 'pending');
-  const caseTypeStep = sopState.steps.find((s) => s.slug === 'case_type');
-  return {
-    current: sopState.current_progress,
-    total: sopState.qualified_lead_threshold,
-    pending_step_id: pending?.step_id ?? null,
-    pending_step_slug: pending?.slug ?? null,
-    is_finalized: sopState.is_finalized,
-    captured_case_type_slug:
-      caseTypeStep?.status === 'complete' ? caseTypeStep.captured_value : null,
-    // 014-fix-sop-case-subtypes: captured_case_type_label is populated
-    // by T020 (which has the caseTypes catalog in scope). For now this
-    // helper has only the SOP state to work with so it can't resolve
-    // the label by itself; T020 replaces this field with a proper
-    // caseTypes lookup at the call site.
-    captured_case_type_label: null,
-  };
-}
+/* buildSOPStateHeader was inlined here; 014-fix-sop-case-subtypes T020
+   extracted it into ../../../lib/sop/build-sop-state-header.ts so it
+   can be unit-tested with a caseTypes catalog and so the
+   captured_case_type_label field is populated correctly per FR-006. */
 
 export async function POST(req: Request) {
   const apiKey = req.headers.get('x-api-key');
@@ -278,7 +258,7 @@ export async function POST(req: Request) {
 
   const headers = new Headers(response.headers);
   headers.set('x-session-id', sessionId);
-  const sopHeaderPayload = buildSOPStateHeader(sopState);
+  const sopHeaderPayload = buildSOPStateHeader(sopState, sopBundle.caseTypes);
   if (sopHeaderPayload) {
     headers.set('x-sop-state', JSON.stringify(sopHeaderPayload));
   }

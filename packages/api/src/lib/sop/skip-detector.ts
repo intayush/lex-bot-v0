@@ -42,6 +42,15 @@ export interface SkipDetectorMatch {
   slug: string;
   /** Captured value: chip slug for chip steps, ISO date for when, free text for free-text steps. */
   captured_value: string;
+  /**
+   * Human-readable label snapshot at the moment of capture (e.g. "DUI"
+   * for `case_type=dui`, "First Offense" for `sub_type=first_offense`).
+   * `null` for non-chip captures (free_text, date_inference) where no
+   * label exists. Persisted via `SOPStateStep.captured_label` so leads
+   * remain meaningful after the firm renames or removes the chip
+   * (014-fix-sop-case-subtypes FR-022).
+   */
+  captured_label: string | null;
   /** True iff this is a case_type chip whose case-type is_in_scope=false. */
   out_of_scope: boolean;
   /** Source of the match (informational; useful for logging). */
@@ -121,6 +130,7 @@ export async function detectSkippedSteps(
               step_id: caseTypeStep.id,
               slug: caseTypeStep.slug,
               captured_value: inferred.case_type_slug,
+              captured_label: inferred.case_type_label,
               out_of_scope: !inferred.is_in_scope,
               source: 'chip',
             });
@@ -206,6 +216,7 @@ export async function detectSkippedSteps(
           step_id: whenStep.id,
           slug: whenStep.slug,
           captured_value: result.iso_date,
+          captured_label: null,
           out_of_scope: false,
           source: 'date_inference',
         });
@@ -255,6 +266,7 @@ export async function detectSkippedSteps(
         step_id: earliestPending.id,
         slug: earliestPending.slug,
         captured_value: trimmed,
+        captured_label: null,
         out_of_scope: false,
         source: 'free_text',
       });
@@ -285,6 +297,7 @@ function matchCaseTypeChip(
         step_id: step.id,
         slug: step.slug,
         captured_value: ct.slug,
+        captured_label: ct.label,
         out_of_scope: !ct.is_in_scope,
         source: 'chip',
       };
@@ -298,6 +311,7 @@ function matchCaseTypeChip(
         step_id: step.id,
         slug: step.slug,
         captured_value: ct.slug,
+        captured_label: ct.label,
         out_of_scope: !ct.is_in_scope,
         source: 'chip',
       };
@@ -321,6 +335,7 @@ function matchSubTypeChip(
         step_id: step.id,
         slug: step.slug,
         captured_value: st.slug,
+        captured_label: st.label,
         out_of_scope: false,
         source: 'chip',
       };
@@ -334,6 +349,7 @@ function matchSubTypeChip(
         step_id: step.id,
         slug: step.slug,
         captured_value: st.slug,
+        captured_label: st.label,
         out_of_scope: false,
         source: 'chip',
       };
@@ -360,6 +376,7 @@ function matchInlineChip(
         step_id: step.id,
         slug: step.slug,
         captured_value: chip.slug,
+        captured_label: chip.label,
         out_of_scope: false,
         source: 'chip',
       };
@@ -373,6 +390,7 @@ function matchInlineChip(
         step_id: step.id,
         slug: step.slug,
         captured_value: chip.slug,
+        captured_label: chip.label,
         out_of_scope: false,
         source: 'chip',
       };
@@ -404,13 +422,13 @@ function computeInferenceText(
 function inferCaseTypeFromSubType(
   lowerMessage: string,
   caseTypes: CaseType[],
-): { case_type_slug: string; is_in_scope: boolean } | null {
-  const candidates: Array<{ case_type_slug: string; is_in_scope: boolean }> = [];
+): { case_type_slug: string; case_type_label: string; is_in_scope: boolean } | null {
+  const candidates: Array<{ case_type_slug: string; case_type_label: string; is_in_scope: boolean }> = [];
   for (const ct of caseTypes) {
     for (const st of ct.sub_types) {
       if (containsWord(lowerMessage, st.slug.replace(/_/g, ' '))
         || containsWord(lowerMessage, st.label.toLowerCase())) {
-        candidates.push({ case_type_slug: ct.slug, is_in_scope: ct.is_in_scope });
+        candidates.push({ case_type_slug: ct.slug, case_type_label: ct.label, is_in_scope: ct.is_in_scope });
         break; // one sub_type match per case_type is enough
       }
     }

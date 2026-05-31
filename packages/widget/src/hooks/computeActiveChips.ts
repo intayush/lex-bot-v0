@@ -11,6 +11,20 @@
  *   - SOP is finalized (no more chips to offer)
  *   - The pending step has chip_source=null (it's a free-text step)
  *   - The chip source resolves to an empty list
+ *
+ * 014-fix-sop-case-subtypes cross-reference (FR-001 / FR-002 / FR-003):
+ *   - When `pendingStepSlug === 'sub_type'` and the pending step's
+ *     `chip_source === 'sub_types'`, the hook returns ONLY the
+ *     captured case-type's sub-types — never the full case-type list.
+ *     This prevents the user-reported bug of case-type chips
+ *     re-rendering at Step 2.
+ *   - When the captured case type has zero sub_types, the hook returns
+ *     `[]` so the chip row collapses cleanly while the runtime
+ *     auto-skips the sub_type step (FR-003 — handled in the advancer
+ *     under task T049 of this feature).
+ *   - When the captured case-type slug refers to a deleted case type
+ *     (admin removed it between turns), the hook also returns `[]`
+ *     rather than falling back to case-type chips.
  */
 import type { Chip } from '@legal-chatbot/shared';
 

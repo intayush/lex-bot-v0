@@ -299,3 +299,79 @@ describe('composeSopBlock — off-topic-now directive (US3)', () => {
     expect(block).not.toContain('### Detour required NOW');
   });
 });
+
+// ---------------------------------------------------------------------------
+// 014-fix-sop-case-subtypes T011 — {case_type} interpolation in
+// the rendered SOP block. When the case_type step has a captured_label,
+// the sub_type's question text "What kind of {case_type} matter is this?"
+// is interpolated to "What kind of DUI matter is this?" so the visitor
+// never sees the raw template token (FR-006).
+// ---------------------------------------------------------------------------
+
+describe('composeSopBlock — {case_type} interpolation (014)', () => {
+  it('interpolates {case_type} when case_type step has captured_label', () => {
+    const sopConfig = buildSOPConfig();
+    let state = initSOPState(sopConfig, ANCHOR);
+    // Capture case_type with the label snapshot.
+    state = advanceSOP(
+      state,
+      { type: 'capture_step', step_id: 'step_1', value: 'dui', capturedAt: T1 },
+      sopConfig,
+    );
+    // Manually set the captured_label as T015 will. Mutate the state
+    // directly because the helper that wires this end-to-end (T018) is
+    // not yet implemented; we're testing interpolation in isolation.
+    const caseTypeStep = state.steps.find((s) => s.slug === 'case_type')!;
+    state = {
+      ...state,
+      steps: state.steps.map((s) =>
+        s === caseTypeStep ? { ...s, captured_label: 'DUI' } : s,
+      ),
+    };
+
+    const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES);
+
+    // The rendered question must contain the interpolated label.
+    expect(block).toContain('What kind of DUI matter is this?');
+    // And must NOT contain the raw placeholder.
+    expect(block).not.toContain('{case_type}');
+  });
+
+  it('does not interpolate or corrupt question text when there is no {case_type} placeholder', () => {
+    // Sanity: questions that don't reference {case_type} pass through
+    // unchanged regardless of whether a label is present. Use the case_type
+    // step itself as a current-pending example since its question text
+    // ("What kind of legal matter can we help you with?") contains no
+    // placeholder.
+    const sopConfig = buildSOPConfig();
+    const state = initSOPState(sopConfig, ANCHOR);
+    const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES);
+    expect(block).toContain('What kind of legal matter can we help you with?');
+    // No literal placeholder appears in the output of a fresh state
+    // (the sub_type step's text isn't rendered yet — only the current
+    // pending step's question is).
+    expect(block).not.toContain('{case_type}');
+  });
+
+  it('uses the captured_label even when the case_type step is not the most recently captured', () => {
+    // After multiple captures, the case_type label still drives sub_type interpolation.
+    const sopConfig = buildSOPConfig();
+    let state = initSOPState(sopConfig, ANCHOR);
+    state = advanceSOP(
+      state,
+      { type: 'capture_step', step_id: 'step_1', value: 'personal_injury', capturedAt: T1 },
+      sopConfig,
+    );
+    // Inject the captured_label for case_type.
+    state = {
+      ...state,
+      steps: state.steps.map((s) =>
+        s.slug === 'case_type' ? { ...s, captured_label: 'Personal Injury' } : s,
+      ),
+    };
+
+    const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES);
+    expect(block).toContain('What kind of Personal Injury matter is this?');
+    expect(block).not.toContain('{case_type}');
+  });
+});
