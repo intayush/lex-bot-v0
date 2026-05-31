@@ -56,6 +56,12 @@ function buildSOPStateHeader(sopState: SOPState | null): SOPStateHeaderPayload |
     is_finalized: sopState.is_finalized,
     captured_case_type_slug:
       caseTypeStep?.status === 'complete' ? caseTypeStep.captured_value : null,
+    // 014-fix-sop-case-subtypes: captured_case_type_label is populated
+    // by T020 (which has the caseTypes catalog in scope). For now this
+    // helper has only the SOP state to work with so it can't resolve
+    // the label by itself; T020 replaces this field with a proper
+    // caseTypes lookup at the call site.
+    captured_case_type_label: null,
   };
 }
 

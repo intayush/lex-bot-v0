@@ -186,6 +186,16 @@ export const sopStateStepSchema = z.object({
   captured_value: z.string().nullable(),
   captured_at: z.string().nullable(),
   inferred: z.boolean(),
+  /**
+   * Human-readable snapshot of the captured chip's label at the moment
+   * of capture (e.g. "DUI" for case_type=dui, "First Offense" for
+   * sub_type=first_offense). Stays stable even if the firm later
+   * renames or removes the chip — historical leads remain meaningful
+   * (014-fix-sop-case-subtypes FR-022). Optional + nullable for
+   * backward compatibility with sessions persisted before this field
+   * existed; older states deserialize cleanly with `captured_label = null`.
+   */
+  captured_label: z.string().nullable().optional().default(null),
 });
 export type SOPStateStep = z.infer<typeof sopStateStepSchema>;
 
@@ -224,5 +234,16 @@ export const sopStateHeaderPayloadSchema = z.object({
    * vocabulary defined by the lawyer in the dashboard.
    */
   captured_case_type_slug: slugSchema.nullable().optional(),
+  /**
+   * Human-readable label of the captured case type (e.g. "DUI",
+   * "Personal Injury"). Optional companion to `captured_case_type_slug`
+   * so the system prompt and the widget can interpolate the case-type
+   * into questions like "What kind of {case_type} matter is this?"
+   * without re-fetching the case_types catalog
+   * (014-fix-sop-case-subtypes FR-006). Null when the case_type step
+   * is not yet complete OR when the captured slug refers to a deleted
+   * case type that can no longer be resolved.
+   */
+  captured_case_type_label: z.string().nullable().optional().default(null),
 });
 export type SOPStateHeaderPayload = z.infer<typeof sopStateHeaderPayloadSchema>;

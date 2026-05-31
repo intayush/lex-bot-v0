@@ -77,6 +77,7 @@ export function initSOPState(
     captured_value: null,
     captured_at: null,
     inferred: false,
+    captured_label: null,
   }));
 
   return {

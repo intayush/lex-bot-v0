@@ -30,7 +30,7 @@ No new workspace packages, no SQL migration, no new top-level directories.
 
 **Purpose**: No project initialization needed (existing monorepo). Confirm environment is healthy before starting.
 
-- [ ] T001 Verify `pnpm install` completes cleanly on branch `014-fix-sop-case` and all existing tests pass (`pnpm test` and `pnpm -w turbo run typecheck`). Establishes a green baseline before introducing any code change.
+- [X] T001 Verify `pnpm install` completes cleanly on branch `014-fix-sop-case` and all existing tests pass (`pnpm test` and `pnpm -w turbo run typecheck`). Establishes a green baseline before introducing any code change.
 
 ---
 
@@ -40,12 +40,12 @@ No new workspace packages, no SQL migration, no new top-level directories.
 
 **⚠️ CRITICAL**: User stories MUST NOT begin until Phase 2 completes — every story consumes at least one of these shared types or helpers.
 
-- [ ] T002 [P] Write failing unit test in `packages/shared/src/schemas/sop.test.ts` (extend if exists, otherwise create) asserting that `SOPStateStep` parses payloads with and without the new optional `captured_label` field, defaulting to `null` when absent, and rejects non-string non-null values.
-- [ ] T003 Extend `packages/shared/src/schemas/sop.ts` to add `captured_label: z.string().nullable().optional().default(null)` to `SOPStateStep`. Make T002 pass. Re-export the inferred type unchanged externally.
-- [ ] T004 [P] Write failing unit test in `packages/shared/src/schemas/sop.test.ts` asserting `sopStateHeaderPayloadSchema` accepts payloads with and without `captured_case_type_label` and rejects non-string non-null values.
-- [ ] T005 Extend `packages/shared/src/schemas/sop.ts` to add `captured_case_type_label: z.string().nullable().optional().default(null)` to `sopStateHeaderPayloadSchema`. Make T004 pass.
-- [ ] T006 [P] Create new helper file `packages/api/src/lib/sop/case-type-label.ts` exporting a pure function `resolveCaseTypeLabel(slug: string | null, caseTypes: CaseType[]): string | null` that returns the matching case-type label, or `null` if slug is `null` or not found. Co-locate `case-type-label.test.ts` with three failing tests (null slug, found, not found); make them pass in the same task.
-- [ ] T007 [P] Create new helper file `packages/api/src/lib/sop/derive-slug.ts` exporting `deriveSlugFromLabel(label: string): string` implementing the rule from data-model.md (lowercase ASCII-fold, non-`[a-z0-9]` runs → `_`, strip leading digits, assert against `^[a-z][a-z0-9_]*$` and throw `SlugDerivationError` on failure). Co-locate `derive-slug.test.ts` with failing tests covering: typical label "First Offense" → `first_offense`, label with punctuation/accents → folded slug, all-non-alpha label → throws, leading digit → stripped or throws per the rule, empty/whitespace label → throws. Make all tests pass.
+- [X] T002 [P] Write failing unit test in `packages/shared/src/schemas/sop.test.ts` (extend if exists, otherwise create) asserting that `SOPStateStep` parses payloads with and without the new optional `captured_label` field, defaulting to `null` when absent, and rejects non-string non-null values.
+- [X] T003 Extend `packages/shared/src/schemas/sop.ts` to add `captured_label: z.string().nullable().optional().default(null)` to `SOPStateStep`. Make T002 pass. Re-export the inferred type unchanged externally.
+- [X] T004 [P] Write failing unit test in `packages/shared/src/schemas/sop.test.ts` asserting `sopStateHeaderPayloadSchema` accepts payloads with and without `captured_case_type_label` and rejects non-string non-null values.
+- [X] T005 Extend `packages/shared/src/schemas/sop.ts` to add `captured_case_type_label: z.string().nullable().optional().default(null)` to `sopStateHeaderPayloadSchema`. Make T004 pass.
+- [X] T006 [P] Create new helper file `packages/api/src/lib/sop/case-type-label.ts` exporting a pure function `resolveCaseTypeLabel(slug: string | null, caseTypes: CaseType[]): string | null` that returns the matching case-type label, or `null` if slug is `null` or not found. Co-locate `case-type-label.test.ts` with three failing tests (null slug, found, not found); make them pass in the same task.
+- [X] T007 [P] Create new helper file `packages/api/src/lib/sop/derive-slug.ts` exporting `deriveSlugFromLabel(label: string): string` implementing the rule from data-model.md (lowercase ASCII-fold, non-`[a-z0-9]` runs → `_`, strip leading digits, assert against `^[a-z][a-z0-9_]*$` and throw `SlugDerivationError` on failure). Co-locate `derive-slug.test.ts` with failing tests covering: typical label "First Offense" → `first_offense`, label with punctuation/accents → folded slug, all-non-alpha label → throws, leading digit → stripped or throws per the rule, empty/whitespace label → throws. Make all tests pass.
 
 **Checkpoint**: Shared schemas extended, helper functions in place. Story phases can now proceed in parallel.
 
