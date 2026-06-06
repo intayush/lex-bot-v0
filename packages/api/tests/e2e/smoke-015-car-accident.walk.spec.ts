@@ -19,12 +19,15 @@
 import { test, expect } from '@playwright/test';
 import { neon } from '@neondatabase/serverless';
 import { config as loadDotenv } from 'dotenv';
-import { resolve } from 'node:path';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // Load .env.local so DATABASE_URL is available for the post-walk
 // dev-DB query. Playwright does not auto-load .env.local the way
 // Next.js / Vitest do, so we load it explicitly here. Mirrors the
-// pattern in vitest.setup.ts.
+// pattern in vitest.setup.ts but uses ESM-compatible __dirname
+// derivation.
+const __dirname = dirname(fileURLToPath(import.meta.url));
 loadDotenv({ path: resolve(__dirname, '../../.env.local') });
 
 import {
@@ -154,22 +157,18 @@ test('@walk SMOKE 015 — Personal Injury / Car Accident HOT walk produces rule-
   // chip from the original `when` chip set.
   await chipOrFreeText(page, 'Today', 'Today');
 
-  // Turn 15: contact form. The widget renders a form for this step
-  // rather than a free-text input. Fill it in.
-  // The form fields are typically labeled name / email / phone with
-  // a submit button. We try the form interaction; if the widget's
-  // form selector differs we'll iterate.
-  const nameInput = page.getByPlaceholder(/name/i).first();
-  const emailInput = page.getByPlaceholder(/email/i).first();
-  const phoneInput = page.getByPlaceholder(/phone/i).first();
+  // Turn 15: contact form. The widget renders a <form aria-label="Contact information">
+  // with three textboxes labeled "Name *", "Email", "Phone" plus a
+  // "Submit" button (see packages/widget/src/components/ContactForm.tsx).
+  // Use role-based locators to be robust to placeholder text changes.
+  const contactForm = page.locator('form[aria-label="Contact information"]');
+  await expect(contactForm).toBeVisible({ timeout: 60_000 });
 
-  await expect(nameInput).toBeVisible({ timeout: 30_000 });
-  await nameInput.fill('Smoke Test 015');
-  await emailInput.fill('smoke-015@example.org');
-  await phoneInput.fill('+1 617 555 0101');
+  await contactForm.getByRole('textbox', { name: /name/i }).fill('Smoke Test 015');
+  await contactForm.getByRole('textbox', { name: /email/i }).fill('smoke-015@example.org');
+  await contactForm.getByRole('textbox', { name: /phone/i }).fill('+1 617 555 0101');
 
-  const submitButton = page.getByRole('button', { name: /submit|send|finish/i });
-  await submitButton.first().click();
+  await contactForm.getByRole('button', { name: /submit/i }).click();
 
   // Wait for is_finalized=true on the SOP state header.
   await expect
