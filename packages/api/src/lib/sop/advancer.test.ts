@@ -569,16 +569,38 @@ describe('advanceForVisitorMessage — contact-form step', () => {
     expect(payload.contact_phone).toBeNull();
   });
 
-  it('does NOT capture when extraction fails (incomplete form-submit)', async () => {
-    // Visitor's message lacks a name pattern. Form should re-render.
+  it('does NOT capture when extraction fails (no email AND no phone)', async () => {
+    // Spec 016 FR-002 (partial-gate): contact extraction succeeds
+    // when the message contains AT LEAST ONE of email/phone (name is
+    // optional). Extraction fails only when both are missing — this
+    // test asserts the failure path (form re-renders).
     const sopConfig = buildSOPConfig();
     const before = await walkToContactPending(sopConfig);
     const after = await advanceForVisitorMessage({
       state: before, sopConfig, caseTypes: CASE_TYPES,
-      message: "jane@example.com",
+      message: "I'd rather not say",
       capturedAt: T1, inferDateImpl: ALWAYS_NULL,
     });
     expect(after).toBe(before); // same reference; no-op
+  });
+
+  it('captures email-only payloads (spec 016 partial-gate)', async () => {
+    // Spec 016 FR-002: email alone satisfies the contact step. Name
+    // and phone may be null. The captureLead path then writes the
+    // lead row with at least one reachable channel populated.
+    const sopConfig = buildSOPConfig();
+    let s = await walkToContactPending(sopConfig);
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: 'jane@example.com',
+      capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+    const contactStep = s.steps.find((step) => step.slug === 'contact');
+    expect(contactStep?.status).toBe('complete');
+    const payload = JSON.parse(contactStep!.captured_value!);
+    expect(payload.contact_email).toBe('jane@example.com');
+    expect(payload.contact_phone).toBeNull();
+    expect(payload.name).toBeNull();
   });
 
   it('does NOT advance other steps when pending is contact_form (short-circuit)', async () => {

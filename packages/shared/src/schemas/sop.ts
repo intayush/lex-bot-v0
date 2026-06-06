@@ -74,12 +74,15 @@ export type ChipSource = z.infer<typeof chipSourceSchema>;
  * inside the chat widget. Validated when the advancer captures it; the
  * stringified JSON form is stored as the step's captured_value.
  *
- * Required: name AND at least one of (contact_email, contact_phone).
- * Validation enforced via the schema's `.refine` clause below.
+ * Spec 016 Q1 — partial-gate rule (FR-002):
+ *   - At least one of (contact_email, contact_phone) is REQUIRED.
+ *   - `name` is OPTIONAL (may be null).
+ *   - Refusal of BOTH email AND phone terminates the SOP without
+ *     creating a lead row (FR-002a).
  */
 export const contactFormPayloadSchema = z
   .object({
-    name: z.string().min(1).max(120),
+    name: z.string().min(1).max(120).nullable(),
     contact_email: z.string().email().nullable(),
     contact_phone: z.string().min(3).max(40).nullable(),
   })
@@ -246,6 +249,29 @@ export const sopStateSchema = z.object({
   current_progress: z.number().int().nonnegative(),
   is_finalized: z.boolean(),
   out_of_scope_termination: z.boolean(),
+  /**
+   * Spec 016 US3 — sequence-safe contact stash (FR-005a, R5).
+   * Volunteered contact fields scanned from earlier-than-Step-6
+   * visitor messages. Null when no contact info has been seen
+   * yet, OR after Step 6 has consumed the stash. The progress bar
+   * MUST NOT advance on stash; it advances only when the runtime
+   * reaches Step 6 in sequence per spec 010 FR-019.
+   */
+  pending_contact: z
+    .object({
+      name: z.string().nullable(),
+      contact_email: z.string().nullable(),
+      contact_phone: z.string().nullable(),
+    })
+    .nullable()
+    .optional(),
+  /**
+   * Spec 016 US3 — Step 6 retry counter (FR-002a). Increments on
+   * every Step 6 turn that yields no email AND no phone. On the
+   * third refusal (counter >= 2 → still no contact) the SOP state
+   * machine transitions to terminated_no_contact.
+   */
+  contact_retry_count: z.number().int().min(0).max(3).optional(),
   /**
    * Spec 016 US2 — runtime state for an in-flight Branch (FR-008).
    * Null when:

@@ -18,6 +18,7 @@ import { checkRateLimit } from '../../../lib/rate-limit';
 import { initSOPState } from '../../../lib/sop/state-machine';
 import { advanceForVisitorMessage } from '../../../lib/sop/advancer';
 import { isOffTopic } from '../../../lib/sop/off-sop-detour';
+import { detectPendingContact } from '../../../lib/sop/pending-contact-detector';
 import {
   runBranchOrchestrator,
   type BranchOrchestratorDeps,
@@ -152,6 +153,30 @@ export async function POST(req: Request) {
         pendingStep: advanced.pendingStepBefore,
         skipDetectorMatches: advanced.matches,
       });
+
+      // Spec 016 US3 — sequence-safe contact stash (FR-005a).
+      // Scan every visitor message for volunteered email/phone/name
+      // and stash into sopState.pending_contact. The progress bar
+      // does NOT advance on stash; the contact step is satisfied
+      // ONLY when the runtime reaches it in sequence (the
+      // contact-form short-circuit in advancer.ts handles the
+      // hand-off — when Step 6 is the pending step AND
+      // pending_contact has a usable payload, the form submit can
+      // pre-fill from the stash).
+      const pendingContact = detectPendingContact(userText);
+      if (pendingContact) {
+        // Merge with any existing stash (later messages can fill in
+        // a missing field).
+        const existing = sopState.pending_contact ?? null;
+        sopState = {
+          ...sopState,
+          pending_contact: {
+            name: pendingContact.name ?? existing?.name ?? null,
+            contact_email: pendingContact.contact_email ?? existing?.contact_email ?? null,
+            contact_phone: pendingContact.contact_phone ?? existing?.contact_phone ?? null,
+          },
+        };
+      }
     }
   }
 

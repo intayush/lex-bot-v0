@@ -270,7 +270,13 @@ describe('captureLead', () => {
     expect(row!.status).toBe('new');
   });
 
-  it('with null optional fields works correctly', async () => {
+  it('throws when both contact_email and contact_phone are null (FR-002b partial-gate)', async () => {
+    // Spec 016 FR-002b / SC-003: every captured lead must carry at
+    // least one reachable channel. captureLead refuses to insert a
+    // row that violates this invariant. The chat route's contact-
+    // form short-circuit + retry flow guarantee contact is on file
+    // before captureLead fires; this guard catches buggy upstream
+    // paths that would otherwise create invalid leads.
     const input = makeLeadInput({
       name: null,
       contactEmail: null,
@@ -279,21 +285,45 @@ describe('captureLead', () => {
       incidentDate: null,
       briefDescription: null,
     });
-    const result = await captureLead(input);
+    await expect(captureLead(input)).rejects.toThrow(/at least one of contactEmail or contactPhone/);
+  });
 
+  it('accepts email-only payload (partial-gate satisfied with phone null)', async () => {
+    const input = makeLeadInput({
+      name: null,
+      contactEmail: 'visitor@example.com',
+      contactPhone: null,
+      caseType: null,
+      incidentDate: null,
+      briefDescription: null,
+    });
+    const result = await captureLead(input);
     const row = (db as any)
       .select()
       .from(schema.leads)
       .where(eq(schema.leads.id, result.leadId))
       .get();
-
-    expect(row).toBeDefined();
-    expect(row!.name).toBeNull();
-    expect(row!.contact_email).toBeNull();
+    expect(row!.contact_email).toBe('visitor@example.com');
     expect(row!.contact_phone).toBeNull();
-    expect(row!.case_type).toBeNull();
-    expect(row!.incident_date).toBeNull();
-    expect(row!.brief_description).toBeNull();
+  });
+
+  it('accepts phone-only payload (partial-gate satisfied with email null)', async () => {
+    const input = makeLeadInput({
+      name: null,
+      contactEmail: null,
+      contactPhone: '+15555555555',
+      caseType: null,
+      incidentDate: null,
+      briefDescription: null,
+    });
+    const result = await captureLead(input);
+    const row = (db as any)
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.id, result.leadId))
+      .get();
+    expect(row!.contact_email).toBeNull();
+    expect(row!.contact_phone).toBe('+15555555555');
   });
 
   it('stores urgency_factors_json as JSON string', async () => {
@@ -911,10 +941,13 @@ describe('updateLeadSOPState — contact step backfill', () => {
     };
   }
 
-  it('populates null name/email/phone columns from contact step payload', async () => {
-    // captureLead fired with all contact fields null (visitor hadn't given them yet)
+  it('populates null name/phone columns from contact step payload (spec 016: email-only initial captureLead)', async () => {
+    // Spec 016 FR-002b: captureLead must be called with at least one
+    // contact channel. The chat route's tool call resolves
+    // contactEmail from the SOP contact step before invoking
+    // captureLead. The backfill path then fills in name + phone.
     await captureLead(makeLeadInput({
-      name: null, contactEmail: null, contactPhone: null,
+      name: null, contactEmail: 'placeholder@example.com', contactPhone: null,
     }));
 
     // SOP advances; contact step captured. Backfill runs.
@@ -928,7 +961,8 @@ describe('updateLeadSOPState — contact step backfill', () => {
       .where(eq(schema.leads.session_id, TEST_SESSION_ID))
       .get();
     expect(row.name).toBe('Jane Doe');
-    expect(row.contact_email).toBe('jane@example.com');
+    // Existing email preserved (LLM had it first); phone backfilled.
+    expect(row.contact_email).toBe('placeholder@example.com');
     expect(row.contact_phone).toBe('555-867-5309');
   });
 
@@ -958,7 +992,13 @@ describe('updateLeadSOPState — contact step backfill', () => {
   });
 
   it('skips backfill when contact step is still pending', async () => {
-    await captureLead(makeLeadInput({ name: null, contactEmail: null, contactPhone: null }));
+    // Spec 016: captureLead requires at least one contact channel,
+    // so we satisfy the partial-gate with a placeholder email.
+    await captureLead(makeLeadInput({
+      name: null,
+      contactEmail: 'placeholder@example.com',
+      contactPhone: null,
+    }));
     await updateLeadSOPState(TEST_SESSION_ID, buildSOPStateWithContact(null));
 
     const row = (db as any)
@@ -966,12 +1006,16 @@ describe('updateLeadSOPState — contact step backfill', () => {
       .where(eq(schema.leads.session_id, TEST_SESSION_ID))
       .get();
     expect(row.name).toBeNull();
-    expect(row.contact_email).toBeNull();
+    expect(row.contact_email).toBe('placeholder@example.com');
     expect(row.contact_phone).toBeNull();
   });
 
   it('handles malformed contact payload gracefully (skips backfill, no throw)', async () => {
-    await captureLead(makeLeadInput({ name: null, contactEmail: null, contactPhone: null }));
+    await captureLead(makeLeadInput({
+      name: null,
+      contactEmail: 'placeholder@example.com',
+      contactPhone: null,
+    }));
 
     const sopState: any = {
       sop_configuration_id: 'cfg_test',

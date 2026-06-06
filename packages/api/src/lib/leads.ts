@@ -437,6 +437,20 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
     return { leadId: existingRow.id, classification: finalClassification };
   }
 
+  // Spec 016 FR-002b / SC-003 — partial-gate guard: every captured
+  // lead row MUST carry at least one reachable contact channel.
+  // Without this guard, a buggy upstream path could insert a lead
+  // with both contact_email and contact_phone NULL, breaking the
+  // FR-002b invariant. Throwing here is preferred to silent rejection
+  // because the chat route's tool-call path should never reach this
+  // state (the contact-form short-circuit + retry flow guarantee
+  // contact is on file before captureLead fires).
+  if (input.contactEmail === null && input.contactPhone === null) {
+    throw new Error(
+      'captureLead refused: at least one of contactEmail or contactPhone is required (FR-002b).',
+    );
+  }
+
   // First-time insert.
   const leadId = nanoid();
 
