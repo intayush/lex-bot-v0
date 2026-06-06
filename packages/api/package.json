@@ -15,7 +15,8 @@
     "e2e:ui": "playwright test --ui",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
-    "db:seed": "tsx src/db/seed.ts"
+    "db:seed": "tsx src/db/seed.ts",
+    "db:ensure-car-accident-scoring": "tsx src/db/ensure-car-accident-scoring.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^1.2.0",
