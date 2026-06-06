@@ -16,7 +16,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
-    "db:ensure-car-accident-branch": "tsx src/db/ensure-car-accident-branch.ts"
+    "db:ensure-car-accident-branch": "tsx src/db/ensure-car-accident-branch.ts",
+    "db:bootstrap-prod": "tsx src/db/bootstrap-prod.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^1.2.0",

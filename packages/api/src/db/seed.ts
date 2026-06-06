@@ -275,4 +275,11 @@ async function seed() {
   console.log(`  Context Store: ${process.env.CONTEXT_STORE_URL || 'http://localhost:5173/chatbot-context/'}`);
 }
 
-seed();
+// CLI invocation guard. Only runs `seed()` when this file is the
+// process entry point (`tsx src/db/seed.ts`). Importing
+// `seedSopForAccount` from another module MUST NOT destructively
+// reseed the DB — earlier versions had no guard and any consumer
+// that re-exported a sibling module triggered a full wipe.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  seed();
+}
