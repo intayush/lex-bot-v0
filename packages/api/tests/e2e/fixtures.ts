@@ -276,9 +276,22 @@ export async function clickChip(
   page: import('@playwright/test').Page,
   label: string,
 ): Promise<PlaywrightResponse> {
-  const chip = page.locator(`[role='group'][aria-label='Quick reply options'] button`, {
-    hasText: label,
-  }).first();
+  // The widget renders inline chips with aria-label="Choose an option"
+  // (see packages/widget/src/components/ChatPanel.tsx). Older specs used
+  // the "Quick reply options" default — left as a fallback in case any
+  // other surface still uses it.
+  const chipPrimary = page.locator(
+    `[role='group'][aria-label='Choose an option'] button`,
+    { hasText: label },
+  ).first();
+  const chipFallback = page.locator(
+    `[role='group'][aria-label='Quick reply options'] button`,
+    { hasText: label },
+  ).first();
+
+  // Prefer the primary; race the fallback as a defensive layer for old
+  // spec compatibility.
+  const chip = chipPrimary.or(chipFallback).first();
   await expect(chip, `chip "${label}" should be visible`).toBeVisible({ timeout: 10_000 });
 
   const responsePromise = page.waitForResponse(
