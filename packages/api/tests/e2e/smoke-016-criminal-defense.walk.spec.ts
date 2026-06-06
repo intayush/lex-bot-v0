@@ -49,7 +49,10 @@ async function waitForSopProgress(
   message: string,
 ) {
   await expect
-    .poll(() => lastSopState(log).current_progress, { timeout: 90_000, message })
+    .poll(
+      () => (log.length === 0 ? -1 : log[log.length - 1].current),
+      { timeout: 90_000, message },
+    )
     .toBeGreaterThanOrEqual(minCurrent);
 }
 
@@ -91,7 +94,7 @@ async function assertNoForbiddenChips(
 test('@walk SMOKE 016 — Criminal Defense / Assault Charges takes default-only path; no car-accident chips', async ({
   page,
 }) => {
-  test.setTimeout(180_000); // 3 minutes — 6-step SOP with real LLM
+  test.setTimeout(300_000); // 5 minutes — 6-step SOP with real LLM
 
   await resetWidgetSession(page);
 
@@ -135,12 +138,15 @@ test('@walk SMOKE 016 — Criminal Defense / Assault Charges takes default-only 
   await waitForSopProgress(sopLog, 5, 'when should be captured (current ≥ 5)');
   await assertNoForbiddenChips(page, 'after when');
 
-  // Turn 6: contact form. Spec 016 has the contact form rendered as
-  // an embedded widget per spec 010. Fill with valid email + phone.
-  const contactForm = page.getByRole('region', { name: /contact/i });
-  await contactForm.getByLabel(/name/i).fill('Jane Defendant');
-  await contactForm.getByLabel(/email/i).fill('jane.defendant@example.com');
-  await contactForm.getByLabel(/phone/i).fill('+15551234567');
+  // Turn 6: contact form. Per spec 010 the widget renders a structured
+  // form with three labelled inputs + a Submit button. Spec 016
+  // tightens the validation to "≥ 1 of email/phone"; name remains
+  // optional in the visible form (the Submit button enables when at
+  // least one of email/phone is filled).
+  const contactForm = page.getByRole('form', { name: /contact/i });
+  await contactForm.getByRole('textbox', { name: /name/i }).fill('Jane Defendant');
+  await contactForm.getByRole('textbox', { name: /email/i }).fill('jane.defendant@example.com');
+  await contactForm.getByRole('textbox', { name: /phone/i }).fill('+15551234567');
   await contactForm.getByRole('button', { name: /submit/i }).click();
 
   // Wait for finalization.
