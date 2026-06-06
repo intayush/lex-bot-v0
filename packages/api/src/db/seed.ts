@@ -191,9 +191,28 @@ async function seed() {
       language: 'English',
     },
     practice_areas: {
-      active: ['Criminal Defense', 'DUI Defense', 'Drug Crimes', 'Assault Charges', 'Sex Crimes', 'Theft Charges', 'Gun Crimes', 'Federal Crimes', 'Fraud', 'Arson & Burglary'],
+      // Spec 016 alignment: the widget's initial greeting chips render
+      // from this list. It MUST overlap with the seeded `case_types`
+      // labels (DUI, Criminal Defense, Personal Injury, Family Law,
+      // Drug Crime, Estate Planning) so visitors can land on the
+      // configured Car Accident branch directly from the chip
+      // selection.
+      active: [
+        'DUI',
+        'Criminal Defense',
+        'Personal Injury',
+        'Family Law',
+        'Drug Crime',
+        'Estate Planning',
+        'Assault Charges',
+        'Sex Crimes',
+        'Theft Charges',
+        'Gun Crimes',
+        'Federal Crimes',
+        'Fraud',
+      ],
       custom: [],
-      out_of_scope_response: "Our firm focuses exclusively on criminal defense and DUI law. I'm not able to help with that area, but I'd recommend reaching out to another attorney who specializes in that practice area. If you have a criminal matter, I'm happy to help — call Attorney David Shrager directly at 412-969-2540.",
+      out_of_scope_response: "I'm not able to help with that area, but I'd recommend reaching out to another attorney who specializes in that practice area. If you have a criminal-defense, DUI, personal-injury, or family-law matter, I'm happy to help — call Attorney David Shrager directly at 412-969-2540.",
     },
     qualifying_questions: [
       { question: 'What type of criminal charges are you facing, or what happened?', required: true, order: 1 },
