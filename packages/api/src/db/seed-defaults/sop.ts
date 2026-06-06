@@ -14,9 +14,44 @@
 import {
   sopStepInputSchema,
   caseTypeInputSchema,
+  scoringConfigSchema,
   type SOPStepInput,
   type CaseTypeInput,
+  type ScoringConfig,
 } from '@legal-chatbot/shared';
+
+// ---------------------------------------------------------------------------
+// Spec 015 — default scoring configuration for Personal Injury / Car Accident.
+// Per contracts/scoring-config.md §"Default values shipped" and the xlsx Self
+// + Family/Friend tables. Validated against scoringConfigSchema at module-load
+// time so any drift fails loudly during pnpm db:seed.
+// ---------------------------------------------------------------------------
+
+const _CAR_ACCIDENT_SCORING_CONFIG: ScoringConfig = scoringConfigSchema.parse({
+  schema_version: 1,
+  thresholds_self: {
+    hot: [76, 100],
+    warm: [51, 75],
+    cold: [26, 50],
+    spam: [0, 25],
+  },
+  thresholds_family_friend: {
+    hot: [76, 100],
+    warm: [26, 75],
+    spam: [0, 25],
+  },
+  hard_overrides_enabled: {
+    missing_contact: true,
+    out_of_scope: true,
+    no_injury_no_treatment: true,
+    fake_info: true,
+  },
+});
+
+/** Pre-serialised JSON ready for `sub_types.scoring_config_json` writes. */
+export const CAR_ACCIDENT_SCORING_CONFIG_JSON: string = JSON.stringify(
+  _CAR_ACCIDENT_SCORING_CONFIG,
+);
 
 // ---------------------------------------------------------------------------
 // 5 default SOP steps (FR-001)
@@ -75,9 +110,194 @@ const _RAW_DEFAULT_SOP_STEPS: SOPStepInput[] = [
     skip_condition_json: null,
     applies_when_sub_type_slug: null,
   },
+  // -------------------------------------------------------------------------
+  // 9 sub_type-scoped steps for spec 015 (Lead Classification Revamp).
+  // Positions 5–13. Activate ONLY when captured sub_type matches
+  // `applies_when_sub_type_slug` (per research.md §R2). All have
+  // `counts_toward_threshold: false` so they don't gate finalization
+  // (FR-013); the existing 6-step threshold continues to apply.
+  // Chip weights match `lex-chat.xlsx` per `contracts/scoring-config.md`.
+  // -------------------------------------------------------------------------
+  {
+    // Metadata — selects classification-threshold table (FR-014).
+    slug: 'request_type',
+    position: 5,
+    question_text: 'Are you asking for yourself or a friend/family member?',
+    chip_source: 'inline',
+    inline_chips_json: JSON.stringify([
+      { label: 'Myself', slug: 'myself', score_weight: 0 },
+      { label: 'Friend / Family Member', slug: 'friend_family', score_weight: 0 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
+  {
+    // Metadata — service-area gate (FR-015).
+    slug: 'geographic_qualification',
+    position: 6,
+    question_text: 'Did the accident happen in or near our service area?',
+    chip_source: 'inline',
+    inline_chips_json: JSON.stringify([
+      { label: 'Yes', slug: 'yes_in_area', score_weight: 0 },
+      { label: 'No', slug: 'no_outside_area', score_weight: 0 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
+  {
+    // xlsx Q1 — Accident Timing (0..+20)
+    slug: 'accident_timing',
+    position: 7,
+    question_text: 'When did the accident happen?',
+    chip_source: 'inline',
+    inline_chips_json: JSON.stringify([
+      { label: 'Today', slug: 'today', score_weight: 20 },
+      { label: 'Within Last 7 Days', slug: 'within_last_7_days', score_weight: 15 },
+      { label: 'Within Last 30 Days', slug: 'within_last_30_days', score_weight: 10 },
+      { label: 'Within Last 6 Months', slug: 'within_last_6_months', score_weight: 5 },
+      { label: 'More Than 6 Months Ago', slug: 'more_than_6_months_ago', score_weight: 0 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
+  {
+    // xlsx Q2 — Injury (-20..+15)
+    slug: 'injury',
+    position: 8,
+    question_text: 'Were you (or they) injured?',
+    chip_source: 'inline',
+    inline_chips_json: JSON.stringify([
+      { label: 'Yes', slug: 'injury_yes', score_weight: 15 },
+      { label: 'Still Being Evaluated', slug: 'injury_evaluating', score_weight: 10 },
+      { label: 'Not Sure Yet', slug: 'injury_not_sure', score_weight: 5 },
+      { label: 'No', slug: 'injury_no', score_weight: -20 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
+  {
+    // xlsx Q3 — Medical Treatment (-10..+25)
+    slug: 'medical_treatment',
+    position: 9,
+    question_text: 'What medical treatment was received?',
+    chip_source: 'inline',
+    inline_chips_json: JSON.stringify([
+      { label: 'Surgery', slug: 'surgery', score_weight: 25 },
+      { label: 'Hospitalization', slug: 'hospitalization', score_weight: 20 },
+      { label: 'Emergency Room Visit', slug: 'er_visit', score_weight: 15 },
+      { label: 'Doctor Visit', slug: 'doctor_visit', score_weight: 10 },
+      { label: 'Physical Therapy / Chiropractor', slug: 'pt_chiro', score_weight: 8 },
+      { label: 'No Treatment Yet', slug: 'no_treatment_yet', score_weight: 5 },
+      { label: 'No Treatment', slug: 'no_treatment', score_weight: -10 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
+  {
+    // xlsx Q4 — Accident Role (0..+10) — Cyclist OMITTED per spec
+    slug: 'accident_role',
+    position: 10,
+    question_text: 'Were you (or they) a:',
+    chip_source: 'inline',
+    inline_chips_json: JSON.stringify([
+      { label: 'Passenger', slug: 'passenger', score_weight: 10 },
+      { label: 'Pedestrian', slug: 'pedestrian', score_weight: 10 },
+      { label: 'Driver', slug: 'driver', score_weight: 5 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
+  {
+    // xlsx Q5 — Insurance Activity (0..+15)
+    slug: 'insurance_activity',
+    position: 11,
+    question_text: 'Has an insurance company contacted you (or them)?',
+    chip_source: 'inline',
+    inline_chips_json: JSON.stringify([
+      { label: 'Requested Recorded Statement', slug: 'requested_recorded_statement', score_weight: 15 },
+      { label: 'Offered Settlement', slug: 'offered_settlement', score_weight: 15 },
+      { label: 'Asked To Sign Documents', slug: 'asked_to_sign', score_weight: 15 },
+      { label: 'Contacted Me', slug: 'contacted_me', score_weight: 5 },
+      { label: 'Not Yet', slug: 'not_yet', score_weight: 0 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
+  {
+    // xlsx Q6 — Work Impact (0..+15)
+    slug: 'work_impact',
+    position: 12,
+    question_text: 'Has the accident affected your (or their) ability to work?',
+    chip_source: 'inline',
+    inline_chips_json: JSON.stringify([
+      { label: 'Unable To Work', slug: 'unable_to_work', score_weight: 15 },
+      { label: 'Missed Work', slug: 'missed_work', score_weight: 10 },
+      { label: 'No Impact', slug: 'no_impact', score_weight: 0 },
+      { label: 'Not Applicable', slug: 'not_applicable', score_weight: 0 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
+  {
+    // xlsx Q7 — Attorney Status (-20..+20)
+    slug: 'attorney_status',
+    position: 13,
+    question_text: 'Do you currently have a lawyer?',
+    chip_source: 'inline',
+    inline_chips_json: JSON.stringify([
+      { label: 'No', slug: 'no_lawyer', score_weight: 20 },
+      { label: "Spoke With Lawyers, Haven't Signed Yet", slug: 'spoke_not_signed', score_weight: 15 },
+      { label: 'Signed With Lawyer But Want To Change Lawyers', slug: 'want_to_change', score_weight: 10 },
+      { label: 'Yes, I Have A Lawyer', slug: 'yes_have_lawyer', score_weight: -20 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
   {
     slug: 'when',
-    position: 5,
+    position: 14,
     question_text: 'When did this happen?',
     chip_source: 'inline',
     inline_chips_json: JSON.stringify([
@@ -98,7 +318,7 @@ const _RAW_DEFAULT_SOP_STEPS: SOPStepInput[] = [
   },
   {
     slug: 'contact',
-    position: 6,
+    position: 15,
     question_text: 'Last step — please share your contact info so we can follow up.',
     chip_source: 'contact_form',
     inline_chips_json: null,
@@ -154,7 +374,7 @@ const _RAW_DEFAULT_CASE_TYPES: CaseTypeInput[] = [
     position: 3,
     is_in_scope: true,
     sub_types: [
-      { slug: 'car_accident', label: 'Car Accident', position: 1, scoring_config_json: null },
+      { slug: 'car_accident', label: 'Car Accident', position: 1, scoring_config_json: CAR_ACCIDENT_SCORING_CONFIG_JSON },
       { slug: 'slip_fall', label: 'Slip and Fall', position: 2, scoring_config_json: null },
       { slug: 'medical_malpractice', label: 'Medical Malpractice', position: 3, scoring_config_json: null },
       { slug: 'dog_bite', label: 'Dog Bite', position: 4, scoring_config_json: null },
