@@ -220,6 +220,27 @@ export async function POST(req: Request) {
       },
       now: () => Date.now(),
       sessionId: sessionId ?? undefined,
+      // Spec 016 dedup fix — pass the default `when` step's chip
+      // weights to the orchestrator so it can score the captured
+      // date bucket at finalize-time. Resolved from the live SOP
+      // config (no DB round-trip).
+      whenChipWeights: (() => {
+        const whenStep = sopBundle.sop?.steps.find((s) => s.slug === 'when');
+        if (!whenStep?.inline_chips_json) return {};
+        try {
+          const chips = JSON.parse(whenStep.inline_chips_json) as Array<{
+            slug: string;
+            score_weight?: number;
+          }>;
+          const map: Record<string, number> = {};
+          for (const c of chips) {
+            if (typeof c.score_weight === 'number') map[c.slug] = c.score_weight;
+          }
+          return map;
+        } catch {
+          return {};
+        }
+      })(),
     };
     const userText =
       typeof newUserMessage?.content === 'string' ? newUserMessage.content : '';

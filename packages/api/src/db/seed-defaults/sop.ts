@@ -119,14 +119,23 @@ const _RAW_DEFAULT_SOP_STEPS: SOPStepInput[] = [
     position: 5,
     question_text: 'When did this happen?',
     chip_source: 'inline',
+    // Per lead-classification-revamp.md Q1, the date of the incident
+    // contributes to the lead score (Today +20, ≤7d +15, ≤30d +10,
+    // ≤6mo +5, older 0). The widget chips are more granular than the
+    // spec's 5 buckets so visitors get a familiar UX; weights below
+    // map each chip onto the closest spec bucket. The branch
+    // orchestrator reads these weights from the captured chip slug
+    // at finalize-time (no separate "accident_timing" branch
+    // question — that's been merged into this default step per the
+    // dedup fix for the duplicate-when-question regression).
     inline_chips_json: JSON.stringify([
-      { label: 'Today', slug: 'today' },
-      { label: 'Yesterday', slug: 'yesterday' },
-      { label: 'This week', slug: 'this_week' },
-      { label: 'Last week', slug: 'last_week' },
-      { label: 'This month', slug: 'this_month' },
-      { label: 'Earlier this year', slug: 'earlier_this_year' },
-      { label: 'Longer ago', slug: 'longer_ago' },
+      { label: 'Today', slug: 'today', score_weight: 20 },
+      { label: 'Yesterday', slug: 'yesterday', score_weight: 15 },
+      { label: 'This week', slug: 'this_week', score_weight: 15 },
+      { label: 'Last week', slug: 'last_week', score_weight: 10 },
+      { label: 'This month', slug: 'this_month', score_weight: 10 },
+      { label: 'Earlier this year', slug: 'earlier_this_year', score_weight: 5 },
+      { label: 'Longer ago', slug: 'longer_ago', score_weight: 0 },
     ]),
     accepts_free_text: true,
     is_required: true,
@@ -199,25 +208,17 @@ const _RAW_CAR_ACCIDENT_BRANCH_QUESTIONS: BranchQuestionSeed[] = [
     free_text_allowed: false,
     multi_select: false,
   },
-  {
-    id: 'accident_timing',
-    position: 2,
-    text: 'When did the accident happen?',
-    preface: null,
-    chips: [
-      { label: 'Today', slug: 'today', score_weight: 20 },
-      { label: 'Within Last 7 Days', slug: 'within_last_7_days', score_weight: 15 },
-      { label: 'Within Last 30 Days', slug: 'within_last_30_days', score_weight: 10 },
-      { label: 'Within Last 6 Months', slug: 'within_last_6_months', score_weight: 5 },
-      { label: 'More Than 6 Months Ago', slug: 'more_than_6_months_ago', score_weight: 0 },
-      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
-    ],
-    free_text_allowed: false,
-    multi_select: false,
-  },
+  // NOTE: spec 016 originally placed an `accident_timing` question
+  // here at position 2 with chips [Today +20, Within Last 7 Days +15,
+  // …]. Removed because it duplicated the default SOP's Step 5
+  // (`when`) which asks the same thing earlier in the conversation.
+  // The `when` step's inline_chips_json now carries the same +20 /
+  // +15 / +10 / +5 / 0 weights and the branch orchestrator reads
+  // them at finalize-time (see computeWhenChipBonus in
+  // branch-orchestrator.ts). Branch is now 9 questions.
   {
     id: 'injury',
-    position: 3,
+    position: 2,
     text: 'Were you (or they) injured?',
     preface: null,
     chips: [
@@ -231,7 +232,7 @@ const _RAW_CAR_ACCIDENT_BRANCH_QUESTIONS: BranchQuestionSeed[] = [
   },
   {
     id: 'medical_treatment',
-    position: 4,
+    position: 3,
     text: 'What medical treatment was received?',
     preface: null,
     chips: [
@@ -249,7 +250,7 @@ const _RAW_CAR_ACCIDENT_BRANCH_QUESTIONS: BranchQuestionSeed[] = [
   },
   {
     id: 'accident_role',
-    position: 5,
+    position: 4,
     text: 'Were you (or they) a:',
     preface: null,
     chips: [
@@ -265,7 +266,7 @@ const _RAW_CAR_ACCIDENT_BRANCH_QUESTIONS: BranchQuestionSeed[] = [
   {
     // lead-classification-revamp.md Q5 — Liability (-20..+15)
     id: 'liability',
-    position: 6,
+    position: 5,
     text: 'Who do you believe was primarily responsible for the accident?',
     preface: null,
     chips: [
@@ -280,7 +281,7 @@ const _RAW_CAR_ACCIDENT_BRANCH_QUESTIONS: BranchQuestionSeed[] = [
   },
   {
     id: 'insurance_activity',
-    position: 7,
+    position: 6,
     text: 'Has an insurance company contacted you (or them)?',
     preface: null,
     chips: [
@@ -296,7 +297,7 @@ const _RAW_CAR_ACCIDENT_BRANCH_QUESTIONS: BranchQuestionSeed[] = [
   },
   {
     id: 'work_impact',
-    position: 8,
+    position: 7,
     text: 'Has the accident affected your (or their) ability to work?',
     preface: null,
     chips: [
@@ -311,7 +312,7 @@ const _RAW_CAR_ACCIDENT_BRANCH_QUESTIONS: BranchQuestionSeed[] = [
   },
   {
     id: 'attorney_status',
-    position: 9,
+    position: 8,
     text: 'Do you currently have a lawyer?',
     preface: null,
     chips: [

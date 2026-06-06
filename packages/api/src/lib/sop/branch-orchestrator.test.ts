@@ -406,3 +406,145 @@ describe('runBranchOrchestrator — contact bonus on finalize', () => {
     expect(result.score.score).toBe(25);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Spec 016 dedup fix — `when` chip weight (lead-classification-revamp.md Q1)
+// ---------------------------------------------------------------------------
+
+describe('runBranchOrchestrator — `when` chip bonus on finalize', () => {
+  function makeStateWithWhen(whenSlug: string): SOPState {
+    const base = makeFinalizedSopState({
+      branch_state: {
+        branch_id: 'br_test',
+        branch_version_id: 'bv_v1',
+        current_question_index: 1,
+        captured_chips: [{ question_id: 'q_role', chip_slugs: ['driver'] }],
+        captured_free_text: [],
+      },
+    });
+    return {
+      ...base,
+      steps: [
+        ...base.steps,
+        {
+          step_id: 'step_when',
+          slug: 'when',
+          status: 'complete',
+          captured_value: whenSlug,
+          captured_label: whenSlug,
+          captured_at: '2026-06-06T00:05:00Z',
+          inferred: false,
+        },
+      ],
+    };
+  }
+
+  const SPEC_WEIGHTS: Record<string, number> = {
+    today: 20,
+    yesterday: 15,
+    this_week: 15,
+    last_week: 10,
+    this_month: 10,
+    earlier_this_year: 5,
+    longer_ago: 0,
+  };
+
+  it('adds +20 when the captured `when` chip is `today`', async () => {
+    const deps = makeDeps({
+      branchLookup: { branch: SAMPLE_BRANCH, version: SAMPLE_VERSION },
+    });
+    const result = await runBranchOrchestrator({
+      accountId: ACCOUNT_ID,
+      sopState: makeStateWithWhen('today'),
+      userMessage: 'Yes',
+      deps: { ...deps, whenChipWeights: SPEC_WEIGHTS },
+    });
+    if (result.action !== 'finalize_with_branch') throw new Error('not finalized');
+    // driver(10) + yes(15) + today(20) = 45
+    expect(result.score.score).toBe(45);
+  });
+
+  it('adds +5 when the captured `when` chip is `earlier_this_year`', async () => {
+    const deps = makeDeps({
+      branchLookup: { branch: SAMPLE_BRANCH, version: SAMPLE_VERSION },
+    });
+    const result = await runBranchOrchestrator({
+      accountId: ACCOUNT_ID,
+      sopState: makeStateWithWhen('earlier_this_year'),
+      userMessage: 'Yes',
+      deps: { ...deps, whenChipWeights: SPEC_WEIGHTS },
+    });
+    if (result.action !== 'finalize_with_branch') throw new Error('not finalized');
+    // driver(10) + yes(15) + earlier_this_year(5) = 30
+    expect(result.score.score).toBe(30);
+  });
+
+  it('adds 0 when the captured `when` chip is `longer_ago`', async () => {
+    const deps = makeDeps({
+      branchLookup: { branch: SAMPLE_BRANCH, version: SAMPLE_VERSION },
+    });
+    const result = await runBranchOrchestrator({
+      accountId: ACCOUNT_ID,
+      sopState: makeStateWithWhen('longer_ago'),
+      userMessage: 'Yes',
+      deps: { ...deps, whenChipWeights: SPEC_WEIGHTS },
+    });
+    if (result.action !== 'finalize_with_branch') throw new Error('not finalized');
+    // driver(10) + yes(15) + 0 = 25
+    expect(result.score.score).toBe(25);
+  });
+
+  it('adds 0 when whenChipWeights is empty (caller did not pass weights)', async () => {
+    const deps = makeDeps({
+      branchLookup: { branch: SAMPLE_BRANCH, version: SAMPLE_VERSION },
+    });
+    const result = await runBranchOrchestrator({
+      accountId: ACCOUNT_ID,
+      sopState: makeStateWithWhen('today'),
+      userMessage: 'Yes',
+      deps,
+      // No whenChipWeights -> defaults to {}
+    });
+    if (result.action !== 'finalize_with_branch') throw new Error('not finalized');
+    expect(result.score.score).toBe(25);
+  });
+
+  it('adds 0 when the `when` step is absent from SOP state', async () => {
+    const deps = makeDeps({
+      branchLookup: { branch: SAMPLE_BRANCH, version: SAMPLE_VERSION },
+    });
+    const stateNoWhen = makeFinalizedSopState({
+      branch_state: {
+        branch_id: 'br_test',
+        branch_version_id: 'bv_v1',
+        current_question_index: 1,
+        captured_chips: [{ question_id: 'q_role', chip_slugs: ['driver'] }],
+        captured_free_text: [],
+      },
+    });
+    const result = await runBranchOrchestrator({
+      accountId: ACCOUNT_ID,
+      sopState: stateNoWhen,
+      userMessage: 'Yes',
+      deps: { ...deps, whenChipWeights: SPEC_WEIGHTS },
+    });
+    if (result.action !== 'finalize_with_branch') throw new Error('not finalized');
+    expect(result.score.score).toBe(25);
+  });
+
+  it('adds 0 when the captured `when` value is not in whenChipWeights (free-text inferred date)', async () => {
+    const deps = makeDeps({
+      branchLookup: { branch: SAMPLE_BRANCH, version: SAMPLE_VERSION },
+    });
+    // Free-text path produces an ISO date string instead of a chip slug.
+    // Bonus is 0 (date-bucket mapper deferred to follow-up).
+    const result = await runBranchOrchestrator({
+      accountId: ACCOUNT_ID,
+      sopState: makeStateWithWhen('2026-05-01'),
+      userMessage: 'Yes',
+      deps: { ...deps, whenChipWeights: SPEC_WEIGHTS },
+    });
+    if (result.action !== 'finalize_with_branch') throw new Error('not finalized');
+    expect(result.score.score).toBe(25);
+  });
+});

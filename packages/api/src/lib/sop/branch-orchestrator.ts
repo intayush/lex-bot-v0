@@ -57,6 +57,16 @@ export interface BranchOrchestratorDeps {
    * deterministic. Production deps pass the live session id.
    */
   sessionId?: string;
+  /**
+   * Spec 016 dedup fix — chip-slug → score_weight map for the
+   * default SOP's `when` step. Used to add the captured date's
+   * bucket weight (Today +20, ≤7d +15, etc.) to the branch score
+   * at finalize-time. The chat route resolves this from the live
+   * `sop_steps.inline_chips_json` and passes it in. Pass an empty
+   * record `{}` when no chip weights are configured (defaults to
+   * +0 contribution).
+   */
+  whenChipWeights?: Record<string, number>;
 }
 
 export interface BranchOrchestratorInput {
@@ -132,6 +142,32 @@ function captureRequestType(state: SOPState): LeadRequestType | null {
  * when it matches a pragmatic regex `^[^@\s]+@[^@\s]+\.[^@\s]+$`
  * (the same shape `lib/leads.ts` uses for the spec 015 contactBonus).
  */
+/**
+ * Compute the default-SOP `when`-step chip bonus per
+ * `lead-classification-revamp.md` Q1 (the date of the incident
+ * contributes Today +20 / ≤7d +15 / ≤30d +10 / ≤6mo +5 / older 0).
+ *
+ * In spec 016 this used to be a separate branch question
+ * (`accident_timing`) but was merged into the default Step 5
+ * (`when`) to fix the "asked twice" UX bug — visitors answered the
+ * same when-question once in the default flow and again in the
+ * branch. The default step's `inline_chips_json` now carries the
+ * spec's bucket weights; this helper looks up the captured chip
+ * slug and returns its weight.
+ *
+ * Returns 0 when:
+ *   - The `when` step isn't captured (visitor still in default flow).
+ *   - The captured value isn't one of the known chip slugs (free-text
+ *     "two weeks ago" — date-inferer normalised to ISO; that path
+ *     doesn't yield a chip slug, so we'd need a separate ISO-date-to-
+ *     bucket mapper for full coverage; deferred to follow-up).
+ */
+function computeWhenChipBonus(state: SOPState, whenChipWeights: Record<string, number>): number {
+  const whenStep = state.steps.find((s) => s.slug === 'when');
+  if (!whenStep || whenStep.captured_value === null) return 0;
+  return whenChipWeights[whenStep.captured_value] ?? 0;
+}
+
 function computeContactBonus(state: SOPState): number {
   const contactStep = state.steps.find((s) => s.slug === 'contact');
   if (!contactStep || contactStep.captured_value === null) return 0;
@@ -337,10 +373,20 @@ export async function runBranchOrchestrator(
     // lead-classification-revamp.md Q9 — Contact Information bonus
     // (Phone +5 / Email +5, capped at +10). Read from the captured
     // contact-form payload on Step 6 of the default SOP.
-    contactBonus: computeContactBonus({
-      ...sopState,
-      branch_state: advanceResult.updatedState,
-    }),
+    // Q1 — Accident Timing bonus is read from the default `when`
+    // step's chip weight (the question was merged from a separate
+    // branch question into the default SOP flow). Both bonuses
+    // sum into the same `contactBonus` channel so the existing
+    // [0, 100] clamp in scoreBranch handles cap.
+    contactBonus:
+      computeContactBonus({
+        ...sopState,
+        branch_state: advanceResult.updatedState,
+      }) +
+      computeWhenChipBonus(
+        { ...sopState, branch_state: advanceResult.updatedState },
+        deps.whenChipWeights ?? {},
+      ),
   });
   const snapshot = freezeBranchSnapshot({
     branch: lookup.branch,
