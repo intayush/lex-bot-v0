@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { captureLeadToolParams } from './route.js';
+import { captureLeadToolParams } from './tool-params.js';
 
 describe('captureLeadToolParams.classification — 4-value enum (spec 015)', () => {
   function parse(value: unknown) {

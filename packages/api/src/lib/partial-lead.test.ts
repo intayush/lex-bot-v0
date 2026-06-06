@@ -306,7 +306,7 @@ describe('savePartialLead', () => {
         case_type: 'Personal Injury',
         incident_date: null,
         brief_description: 'Already captured',
-        classification: 'normal',
+        classification: 'WARM',
         classification_rationale: 'Full lead capture',
         urgency_factors_json: '[]',
         status: 'new',
@@ -400,7 +400,7 @@ describe('classifyPartialLead', () => {
       { role: 'user', content: 'I want a human representative immediately' },
     ];
     const result = classifyPartialLead(messages);
-    expect(result.classification).toBe('urgent');
+    expect(result.classification).toBe('HOT');
   });
 
   it('classifies as urgent for recent DUI arrest', () => {
@@ -408,7 +408,7 @@ describe('classifyPartialLead', () => {
       { role: 'user', content: 'I got a DUI last night and was detained' },
     ];
     const result = classifyPartialLead(messages);
-    expect(result.classification).toBe('urgent');
+    expect(result.classification).toBe('HOT');
   });
 
   it('classifies as normal for legal matter without urgency', () => {
@@ -416,7 +416,7 @@ describe('classifyPartialLead', () => {
       { role: 'user', content: 'I need help with a theft charge from a few months ago' },
     ];
     const result = classifyPartialLead(messages);
-    expect(result.classification).toBe('normal');
+    expect(result.classification).toBe('WARM');
   });
 
   it('classifies as unqualified when no legal matter detected', () => {
@@ -424,7 +424,7 @@ describe('classifyPartialLead', () => {
       { role: 'user', content: 'Hello, what services do you offer?' },
     ];
     const result = classifyPartialLead(messages);
-    expect(result.classification).toBe('unqualified');
+    expect(result.classification).toBe('SPAM');
   });
 
   it('ignores assistant messages', () => {
@@ -433,6 +433,6 @@ describe('classifyPartialLead', () => {
       { role: 'user', content: 'Hi there' },
     ];
     const result = classifyPartialLead(messages);
-    expect(result.classification).toBe('unqualified');
+    expect(result.classification).toBe('SPAM');
   });
 });

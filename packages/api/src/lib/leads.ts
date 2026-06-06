@@ -14,7 +14,7 @@ interface CaptureLeadInput {
   caseType: string | null;
   incidentDate: string | null;
   briefDescription: string | null;
-  classification: 'urgent' | 'normal' | 'unqualified';
+  classification: 'HOT' | 'WARM' | 'COLD' | 'SPAM';
   classificationRationale: string;
   urgencyFactors: string[];
   /**
@@ -56,7 +56,7 @@ function resolveIncidentDate(
  * per-session at the database layer:
  *
  *   - First call for a (session_id, account_id) pair → INSERT new row.
- *     Fires an urgent_lead notification if classification === 'urgent'.
+ *     Fires an urgent_lead notification if classification === 'HOT'.
  *   - Subsequent calls for the same session → UPDATE the existing row
  *     with the new values (the LLM's later judgment usually has more
  *     context). Fires an urgent_lead notification ONLY if classification
@@ -80,8 +80,12 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
 
   if (existing.length > 0) {
     const existingRow = existing[0]!;
-    const wasNotUrgent = existingRow.classification !== 'urgent';
-    const isNowUrgent = input.classification === 'urgent';
+    // Notification fires on transition INTO the most-urgent classification.
+    // Pre-015: 'urgent'. Post-015: 'HOT'. Notification type stays
+    // 'urgent_lead' for backward-compat (consumers haven't been updated;
+    // see contracts/lead-classification-enum.md §Notification path).
+    const wasNotUrgent = existingRow.classification !== 'HOT';
+    const isNowUrgent = input.classification === 'HOT';
 
     await db
       .update(leads)
@@ -140,7 +144,7 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
     created_at: now,
   });
 
-  if (input.classification === 'urgent') {
+  if (input.classification === 'HOT') {
     await db.insert(notifications).values({
       id: nanoid(),
       account_id: input.accountId,

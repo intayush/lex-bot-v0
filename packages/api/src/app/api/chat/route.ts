@@ -19,6 +19,7 @@ import { initSOPState } from '../../../lib/sop/state-machine';
 import { advanceForVisitorMessage } from '../../../lib/sop/advancer';
 import { isOffTopic } from '../../../lib/sop/off-sop-detour';
 import { analyzeAndFollowUpTool } from '../../../lib/sop/follow-up-tool';
+import { captureLeadToolParams } from './tool-params';
 import { buildSOPStateHeader } from '../../../lib/sop/build-sop-state-header';
 import { corsHeaders } from './cors';
 import type { Manifest, SOPState } from '@legal-chatbot/shared';
@@ -181,18 +182,8 @@ export async function POST(req: Request) {
       },
     }),
     captureLead: tool({
-      description: 'Capture a qualified lead after gathering sufficient information from the visitor. Call this once you have collected their name, contact info, and understand their legal matter. Classify as urgent if there are time-sensitive factors (statute of limitations, active danger, ongoing medical treatment, court deadlines). Classify as unqualified if the matter is outside the firm practice areas.',
-      parameters: z.object({
-        name: z.string().nullable().describe('Visitor name or null if not provided'),
-        contactEmail: z.string().nullable().describe('Email address or null'),
-        contactPhone: z.string().nullable().describe('Phone number or null'),
-        caseType: z.string().nullable().describe('Type of legal matter (e.g. Personal Injury, Family Law)'),
-        incidentDate: z.string().nullable().describe('When the issue arose, ISO date format if possible'),
-        briefDescription: z.string().describe('One-sentence summary of their legal matter'),
-        classification: z.enum(['urgent', 'normal', 'unqualified']).describe('Lead classification based on urgency and qualification'),
-        classificationRationale: z.string().describe('Brief explanation for why this classification was chosen'),
-        urgencyFactors: z.array(z.string()).describe('List of urgency indicators found, empty array if none'),
-      }),
+      description: 'Capture a qualified lead after gathering sufficient information from the visitor. Call this once you have collected their name, contact info, and understand their legal matter. Classify HOT for time-sensitive factors (statute of limitations, active danger, ongoing medical treatment, court deadlines). Classify SPAM for matters outside the firm practice areas, missing contact info, or obvious test submissions.',
+      parameters: captureLeadToolParams,
       execute: async ({ name, contactEmail, contactPhone, caseType, incidentDate, briefDescription, classification, classificationRationale, urgencyFactors }) => {
         const result = await captureLead({
           accountId: auth.accountId,

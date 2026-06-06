@@ -113,7 +113,7 @@ function makeLeadInput(overrides: Record<string, unknown> = {}) {
     caseType: 'Personal Injury',
     incidentDate: '2026-01-15',
     briefDescription: 'Slip and fall at grocery store',
-    classification: 'normal' as const,
+    classification: 'WARM' as const,
     classificationRationale: 'Standard slip and fall case',
     urgencyFactors: ['recent_incident'],
     ...overrides,
@@ -164,11 +164,11 @@ describe('captureLead', () => {
     const result = await captureLead(makeLeadInput());
     expect(result.leadId).toBeDefined();
     expect(typeof result.leadId).toBe('string');
-    expect(result.classification).toBe('normal');
+    expect(result.classification).toBe('WARM');
   });
 
   it('with "normal" classification does NOT create a notification', async () => {
-    const result = await captureLead(makeLeadInput({ classification: 'normal' }));
+    const result = await captureLead(makeLeadInput({ classification: 'WARM' }));
 
     const notifs = (db as any)
       .select()
@@ -179,7 +179,7 @@ describe('captureLead', () => {
   });
 
   it('with "urgent" classification DOES create a notification', async () => {
-    const result = await captureLead(makeLeadInput({ classification: 'urgent' }));
+    const result = await captureLead(makeLeadInput({ classification: 'HOT' }));
 
     const notifs = (db as any)
       .select()
@@ -254,15 +254,15 @@ describe('captureLead', () => {
   });
 
   it('with "unqualified" classification works correctly', async () => {
-    const result = await captureLead(makeLeadInput({ classification: 'unqualified' }));
-    expect(result.classification).toBe('unqualified');
+    const result = await captureLead(makeLeadInput({ classification: 'SPAM' }));
+    expect(result.classification).toBe('SPAM');
 
     const row = (db as any)
       .select()
       .from(schema.leads)
       .where(eq(schema.leads.id, result.leadId))
       .get();
-    expect(row!.classification).toBe('unqualified');
+    expect(row!.classification).toBe('SPAM');
 
     // No notification for unqualified
     const notifs = (db as any)
@@ -275,7 +275,7 @@ describe('captureLead', () => {
 
   it('urgent notification has correct title format', async () => {
     const result = await captureLead(
-      makeLeadInput({ classification: 'urgent', caseType: 'Medical Malpractice' })
+      makeLeadInput({ classification: 'HOT', caseType: 'Medical Malpractice' })
     );
 
     const notif = (db as any)
@@ -289,7 +289,7 @@ describe('captureLead', () => {
   });
 
   it('urgent notification references the lead_id', async () => {
-    const result = await captureLead(makeLeadInput({ classification: 'urgent' }));
+    const result = await captureLead(makeLeadInput({ classification: 'HOT' }));
 
     const notif = (db as any)
       .select()
@@ -461,7 +461,7 @@ describe('captureLead — per-session dedup (multi-call fix)', () => {
 
   it('classification escalation normal→urgent on update fires a new notification', async () => {
     // First call: normal. No notification.
-    await captureLead(makeLeadInput({ classification: 'normal' }));
+    await captureLead(makeLeadInput({ classification: 'WARM' }));
     let notifs = (db as any)
       .select().from(schema.notifications)
       .where(eq(schema.notifications.account_id, TEST_ACCOUNT_ID))
@@ -470,7 +470,7 @@ describe('captureLead — per-session dedup (multi-call fix)', () => {
 
     // Second call: urgent. Notification fires for the (now-updated) lead.
     const r2 = await captureLead(makeLeadInput({
-      classification: 'urgent',
+      classification: 'HOT',
       caseType: 'DUI',
       urgencyFactors: ['recent_arrest'],
     }));
@@ -484,8 +484,8 @@ describe('captureLead — per-session dedup (multi-call fix)', () => {
   });
 
   it('repeated urgent calls do NOT fire duplicate notifications', async () => {
-    await captureLead(makeLeadInput({ classification: 'urgent' }));
-    await captureLead(makeLeadInput({ classification: 'urgent', caseType: 'DUI Updated' }));
+    await captureLead(makeLeadInput({ classification: 'HOT' }));
+    await captureLead(makeLeadInput({ classification: 'HOT', caseType: 'DUI Updated' }));
 
     const notifs = (db as any)
       .select().from(schema.notifications)
@@ -496,14 +496,14 @@ describe('captureLead — per-session dedup (multi-call fix)', () => {
 
   it('downgrade urgent→normal on update does NOT fire a notification', async () => {
     // Edge case: LLM initially classified urgent, then downgraded.
-    await captureLead(makeLeadInput({ classification: 'urgent' }));
+    await captureLead(makeLeadInput({ classification: 'HOT' }));
     let notifs = (db as any)
       .select().from(schema.notifications)
       .where(eq(schema.notifications.account_id, TEST_ACCOUNT_ID))
       .all();
     expect(notifs).toHaveLength(1); // from first call
 
-    await captureLead(makeLeadInput({ classification: 'normal' }));
+    await captureLead(makeLeadInput({ classification: 'WARM' }));
     notifs = (db as any)
       .select().from(schema.notifications)
       .where(eq(schema.notifications.account_id, TEST_ACCOUNT_ID))
@@ -516,7 +516,7 @@ describe('captureLead — per-session dedup (multi-call fix)', () => {
       .select().from(schema.leads)
       .where(eq(schema.leads.session_id, TEST_SESSION_ID))
       .get();
-    expect(lead.classification).toBe('normal');
+    expect(lead.classification).toBe('WARM');
   });
 
   it('updates sop_state_snapshot when the second call provides a richer SOP state', async () => {
@@ -781,7 +781,7 @@ describe('updateLeadSOPState — onFinish backfill helper', () => {
 
   it('does NOT touch classification, name, contact_email, or other LLM-supplied fields', async () => {
     await captureLead(makeLeadInput({
-      classification: 'urgent',
+      classification: 'HOT',
       name: 'Jane Doe',
       contactEmail: 'jane@example.com',
       caseType: 'DUI',
@@ -794,7 +794,7 @@ describe('updateLeadSOPState — onFinish backfill helper', () => {
       .select().from(schema.leads)
       .where(eq(schema.leads.session_id, TEST_SESSION_ID))
       .get();
-    expect(row.classification).toBe('urgent');
+    expect(row.classification).toBe('HOT');
     expect(row.name).toBe('Jane Doe');
     expect(row.contact_email).toBe('jane@example.com');
     expect(row.case_type).toBe('DUI');
@@ -802,7 +802,7 @@ describe('updateLeadSOPState — onFinish backfill helper', () => {
 
   it('does NOT fire a notification on backfill (notifications come from captureLead)', async () => {
     await captureLead(makeLeadInput({
-      classification: 'urgent',
+      classification: 'HOT',
       sopState: buildSOPStateWithWhen(null),
     }));
 

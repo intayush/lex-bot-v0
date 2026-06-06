@@ -135,10 +135,11 @@ export function composeSystemPrompt(
     // phrases. Direct the agent to read from the SOP block above.
     parts.push('- IMPORTANT: When the SOP "when" step has a captured value (visible in the SOP State block above), pass that exact value as `incidentDate` — NOT a phrase paraphrased from the conversation. The captured value is already in YYYY-MM-DD form when the system was able to resolve it.');
   }
-  parts.push('- Classification guide:');
-  parts.push('  - urgent: statute of limitations <30 days, active danger, ongoing medical treatment, court deadlines, restraining order/custody emergency, recent arrest/charges, user requests immediate human help');
-  parts.push('  - normal: valid legal matter with no immediate time pressure');
-  parts.push('  - unqualified: outside firm practice areas or no actionable legal issue');
+  parts.push('- Classification guide (lead-classification revamp / spec 015):');
+  parts.push('  - HOT: imminent legal urgency — recent arrest/charges, statute of limitations <30 days, active danger, ongoing medical treatment, court deadlines, restraining order/custody emergency, user requests immediate human help.');
+  parts.push('  - WARM: legitimate legal matter, motivated prospect, no immediate time pressure.');
+  parts.push('  - COLD: legitimate legal matter but low motivation signals or unclear urgency.');
+  parts.push('  - SPAM: outside firm practice areas, no actionable legal issue, no contact info, or test/junk submission.');
 
   return parts.join('\n');
 }

@@ -53,12 +53,20 @@ export function extractPartialLeadData(
 
 /**
  * Classify a partial lead based on conversation content heuristics.
- * Returns 'urgent' if the conversation contains urgency signals,
- * 'normal' if it describes a legal matter, 'unqualified' otherwise.
+ * Returns 'HOT' if the conversation contains urgency signals,
+ * 'WARM' if it describes a legal matter, 'SPAM' otherwise.
+ *
+ * Per spec 015 contracts/lead-classification-enum.md §Producers item 3:
+ * the partial-lead heuristic emits the new 4-value vocabulary directly.
+ * This is the producer for abandoned sessions where the LLM never called
+ * captureLead. There is intentionally no COLD path in MVP — the
+ * heuristic's signal coverage isn't fine-grained enough to distinguish
+ * COLD from WARM, and a coarse mapping (urgent→HOT, normal→WARM,
+ * unqualified→SPAM) preserves the legacy semantics.
  */
 export function classifyPartialLead(
   messages: Array<{ role: string; content: string }>,
-): { classification: 'urgent' | 'normal' | 'unqualified'; rationale: string } {
+): { classification: 'HOT' | 'WARM' | 'COLD' | 'SPAM'; rationale: string } {
   const userText = messages
     .filter((m) => m.role === 'user')
     .map((m) => m.content)
@@ -90,20 +98,20 @@ export function classifyPartialLead(
 
   if (urgencyHits.length >= 1 && legalHits.length >= 1) {
     return {
-      classification: 'urgent',
+      classification: 'HOT',
       rationale: `Partial lead with urgency signals: ${urgencyHits.map((p) => userText.match(p)?.[0]).join(', ')}`,
     };
   }
 
   if (legalHits.length >= 1) {
     return {
-      classification: 'normal',
+      classification: 'WARM',
       rationale: `Partial lead describing a legal matter`,
     };
   }
 
   return {
-    classification: 'unqualified',
+    classification: 'SPAM',
     rationale: 'Partial data from abandoned session — no clear legal matter identified',
   };
 }
