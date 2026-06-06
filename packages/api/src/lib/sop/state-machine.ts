@@ -290,13 +290,31 @@ export function nextPendingStep(
   state: SOPState,
   sopConfig: SOPConfiguration,
 ): SOPStep | null {
+  // Per spec 015 research.md §R2: steps with `applies_when_sub_type_slug`
+  // set only fire when the captured sub_type's slug matches. NULL on the
+  // step means "always fires" (the existing 6 default steps).
+  //
+  // Read the captured sub_type once here; defensive — empty when the
+  // SOP hasn't reached the sub_type step yet.
+  const capturedSubTypeSlug =
+    state.steps.find((s) => s.slug === 'sub_type')?.captured_value ?? null;
+
   // Steps in state are already in position order from initSOPState,
   // but advanceSOP preserves order so we iterate state.steps directly.
   for (const stateStep of state.steps) {
-    if (stateStep.status === 'pending') {
-      const cfgStep = sopConfig.steps.find((cs) => cs.id === stateStep.step_id);
-      return cfgStep ?? null;
+    if (stateStep.status !== 'pending') continue;
+
+    const cfgStep = sopConfig.steps.find((cs) => cs.id === stateStep.step_id);
+    if (!cfgStep) continue;
+
+    // Filter: skip steps whose `applies_when_sub_type_slug` doesn't match.
+    // null/undefined on the field means "always fires".
+    const requiredSubType = cfgStep.applies_when_sub_type_slug;
+    if (requiredSubType !== null && requiredSubType !== undefined) {
+      if (capturedSubTypeSlug !== requiredSubType) continue;
     }
+
+    return cfgStep;
   }
   return null;
 }
