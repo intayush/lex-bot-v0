@@ -3,19 +3,22 @@ interface QuickRepliesProps {
   options?: string[];
 }
 
-const DEFAULT_OPTIONS = [
-  'Personal Injury',
-  'Family Law',
-  'Estate Planning',
-];
-
 const CONSULTATION_OPTION = 'Schedule a Consultation';
 
 export function QuickReplies({ onSelect, options }: QuickRepliesProps) {
-  const baseOptions = options && options.length > 0 ? options : DEFAULT_OPTIONS;
-  const allOptions = baseOptions.includes(CONSULTATION_OPTION)
-    ? baseOptions
-    : [...baseOptions, CONSULTATION_OPTION];
+  // Spec 016 chip-list-flash fix: render nothing while the widget
+  // config is still loading (`options` undefined) or when the firm
+  // has no configured practice_areas (empty array). Without this
+  // guard we briefly showed a hard-coded 3-item fallback that
+  // swapped to the real list once `/api/config` resolved — a
+  // visible glitch on every widget open.
+  if (!options || options.length === 0) {
+    return null;
+  }
+
+  const allOptions = options.includes(CONSULTATION_OPTION)
+    ? options
+    : [...options, CONSULTATION_OPTION];
 
   return (
     <div
