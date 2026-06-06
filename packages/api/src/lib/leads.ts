@@ -82,8 +82,8 @@ function resolveIncidentDate(
 
 /**
  * Spec 015 — fields the rule-based scorer derives at SOP finalization.
- * `null` everywhere when scoring isn't applicable (no scoring config,
- * SOP not finalized, or sub_type lookup failed).
+ * `null` for scoring fields when scoring isn't applicable; `scoring_path`
+ * always indicates which producer the caller should treat as authoritative.
  */
 interface ScoringResult {
   classification: LeadClassification | null;
@@ -92,6 +92,20 @@ interface ScoringResult {
   request_type: 'SELF' | 'FRIEND_FAMILY' | null;
   geographic_qualification: 'IN_SERVICE_AREA' | 'OUTSIDE_SERVICE_AREA' | null;
   geographic_qualification_details_json: string | null;
+  /**
+   * Which producer path the scoring fields came from. Per
+   * `contracts/lead-finalization-log.md`. Used by the structured-log
+   * emitter to decide info vs error level and to populate the
+   * `scoring_path` field on the log entry.
+   */
+  scoring_path: 'rule_based' | 'llm_fallback' | 'scoring_error';
+  /**
+   * Optional internal error description for the `scoring_error`
+   * variant. Used to populate the log entry's `_error` field per
+   * `contracts/lead-finalization-log.md`. NEVER includes PII or stack
+   * traces (just `Error.name: Error.message`).
+   */
+  scoring_error_detail: string | null;
 }
 
 const NULL_SCORING_RESULT: ScoringResult = {
@@ -101,7 +115,77 @@ const NULL_SCORING_RESULT: ScoringResult = {
   request_type: null,
   geographic_qualification: null,
   geographic_qualification_details_json: null,
+  scoring_path: 'llm_fallback',
+  scoring_error_detail: null,
 };
+
+/**
+ * Stringify an exception into a `Name: message` form suitable for the
+ * log entry's `_error` field per `contracts/lead-finalization-log.md`.
+ * Intentionally excludes `Error.stack` (could leak code paths) and
+ * never echoes captured PII.
+ */
+function errToDetail(err: unknown): string {
+  if (err instanceof Error) {
+    return `${err.name}: ${err.message}`;
+  }
+  return String(err);
+}
+
+/**
+ * Spec 015 — structured `lead_classified` log entry per
+ * `contracts/lead-finalization-log.md`. Emitted at the end of every
+ * lead finalization (captureLead INSERT/UPDATE branches AND
+ * updateLeadSOPState). Routes to `console.info` for success paths and
+ * `console.error` for the FR-010b `scoring_error` variant.
+ *
+ * **PII boundary (Constitution V / FR-010d)**: this function MUST NOT
+ * include captured PII (name, contact_email, contact_phone, city/state
+ * details) in the emitted payload. The caller passes only the
+ * already-resolved scoring fields, the lead_id, account_id, session_id,
+ * and the captured slugs (which are admin-defined controlled
+ * vocabulary, not visitor PII).
+ */
+function emitLeadClassifiedLog(args: {
+  accountId: string;
+  leadId: string;
+  sessionId: string;
+  classification: LeadClassification;
+  scoring: ScoringResult;
+  caseTypeSlug: string | null;
+  subTypeSlug: string | null;
+  hardOverrideFired: string | null;
+  sopVersion: number | null;
+}): void {
+  const payload: Record<string, unknown> = {
+    event: 'lead_classified',
+    ts: new Date().toISOString(),
+    account_id: args.accountId,
+    lead_id: args.leadId,
+    session_id: args.sessionId,
+    classification: args.classification,
+    lead_score: args.scoring.lead_score,
+    reasons: args.scoring.score_reasons_json
+      ? JSON.parse(args.scoring.score_reasons_json)
+      : [],
+    case_type_slug: args.caseTypeSlug,
+    sub_type_slug: args.subTypeSlug,
+    hard_override_fired: args.hardOverrideFired,
+    scoring_path: args.scoring.scoring_path,
+    request_type: args.scoring.request_type,
+    geographic_qualification: args.scoring.geographic_qualification,
+    sop_version: args.sopVersion,
+  };
+
+  if (args.scoring.scoring_path === 'scoring_error') {
+    if (args.scoring.scoring_error_detail) {
+      payload._error = args.scoring.scoring_error_detail;
+    }
+    console.error(JSON.stringify(payload));
+  } else {
+    console.info(JSON.stringify(payload));
+  }
+}
 
 /**
  * Compute the rule-based scoring fields for a finalized SOP. Returns
@@ -166,7 +250,7 @@ async function computeScoringFields(
     scoringConfig = scoringConfigSchema.parse(
       JSON.parse(subTypeRow.scoring_config_json),
     );
-  } catch {
+  } catch (err) {
     return {
       classification: 'SPAM',
       lead_score: null,
@@ -174,6 +258,8 @@ async function computeScoringFields(
       request_type: null,
       geographic_qualification: null,
       geographic_qualification_details_json: null,
+      scoring_path: 'scoring_error',
+      scoring_error_detail: errToDetail(err),
     };
   }
 
@@ -224,7 +310,7 @@ async function computeScoringFields(
       chipsBySlug,
       contactBonus,
     });
-  } catch {
+  } catch (err) {
     return {
       classification: 'SPAM',
       lead_score: null,
@@ -232,6 +318,8 @@ async function computeScoringFields(
       request_type: null,
       geographic_qualification: null,
       geographic_qualification_details_json: null,
+      scoring_path: 'scoring_error',
+      scoring_error_detail: errToDetail(err),
     };
   }
 
@@ -247,6 +335,8 @@ async function computeScoringFields(
     geographic_qualification: scored.geographic_qualification,
     geographic_qualification_details_json:
       scored.geographic_qualification_details_json,
+    scoring_path: 'rule_based',
+    scoring_error_detail: null,
   };
 }
 
@@ -328,6 +418,22 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
       });
     }
 
+    emitLeadClassifiedLog({
+      accountId: input.accountId,
+      leadId: existingRow.id,
+      sessionId: input.sessionId,
+      classification: finalClassification,
+      scoring: scoringFields,
+      caseTypeSlug:
+        input.sopState?.steps.find((s) => s.slug === 'case_type')
+          ?.captured_value ?? null,
+      subTypeSlug:
+        input.sopState?.steps.find((s) => s.slug === 'sub_type')
+          ?.captured_value ?? null,
+      hardOverrideFired: null, // Phase 6 / T064 wires hard-overrides
+      sopVersion: input.sopState?.sop_version ?? null,
+    });
+
     return { leadId: existingRow.id, classification: finalClassification };
   }
 
@@ -373,6 +479,22 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
       created_at: now,
     });
   }
+
+  emitLeadClassifiedLog({
+    accountId: input.accountId,
+    leadId,
+    sessionId: input.sessionId,
+    classification: finalClassification,
+    scoring: scoringFields,
+    caseTypeSlug:
+      input.sopState?.steps.find((s) => s.slug === 'case_type')
+        ?.captured_value ?? null,
+    subTypeSlug:
+      input.sopState?.steps.find((s) => s.slug === 'sub_type')
+        ?.captured_value ?? null,
+    hardOverrideFired: null, // Phase 6 / T064 wires hard-overrides
+    sopVersion: input.sopState?.sop_version ?? null,
+  });
 
   return { leadId, classification: finalClassification };
 }
@@ -503,4 +625,20 @@ export async function updateLeadSOPState(
         scoringFields.geographic_qualification_details_json,
     })
     .where(eq(leads.id, existingRow.id));
+
+  emitLeadClassifiedLog({
+    accountId: existingRow.account_id,
+    leadId: existingRow.id,
+    sessionId,
+    classification: finalClassification,
+    scoring: scoringFields,
+    caseTypeSlug:
+      sopState.steps.find((s) => s.slug === 'case_type')?.captured_value ??
+      null,
+    subTypeSlug:
+      sopState.steps.find((s) => s.slug === 'sub_type')?.captured_value ??
+      null,
+    hardOverrideFired: null, // Phase 6 / T064 wires hard-overrides
+    sopVersion: sopState.sop_version ?? null,
+  });
 }
