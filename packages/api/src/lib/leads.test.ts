@@ -1324,3 +1324,230 @@ describe('updateLeadSOPState — spec 015 scoring engine wiring', () => {
     expect(row.geographic_qualification).toBe('IN_SERVICE_AREA');
   });
 });
+
+// ---------------------------------------------------------------------------
+// T024 — structured `lead_classified` log emission
+//
+// Per spec 015 FR-034, FR-010d, contracts/lead-finalization-log.md, and
+// Constitution V (no PII in logs). The log line is emitted once per
+// finalization (captureLead AND updateLeadSOPState) at console.info level
+// for the success path or console.error for the scoring_error variant.
+// ---------------------------------------------------------------------------
+
+describe('captureLead — structured lead_classified log emission (spec 015 T024)', () => {
+  let infoSpy: ReturnType<typeof vi.spyOn>;
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    seedScoringHarness();
+    infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    infoSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  /**
+   * Find the first console.info call whose argument is a JSON string
+   * with `event: "lead_classified"`. Returns the parsed JSON or null.
+   */
+  function findLogEntry(spy: ReturnType<typeof vi.spyOn>): Record<string, unknown> | null {
+    for (const call of spy.mock.calls) {
+      const arg = call[0];
+      if (typeof arg !== 'string') continue;
+      try {
+        const parsed = JSON.parse(arg);
+        if (parsed && parsed.event === 'lead_classified') return parsed;
+      } catch {
+        // not JSON; skip
+      }
+    }
+    return null;
+  }
+
+  it('emits a lead_classified log entry on rule-based scoring success', async () => {
+    const sopState = buildFinalizedHotWalkSOPState();
+    await captureLead(makeLeadInput({ sopState }));
+
+    const log = findLogEntry(infoSpy);
+    expect(log).not.toBeNull();
+    expect(log!.event).toBe('lead_classified');
+    expect(log!.scoring_path).toBe('rule_based');
+    expect(log!.classification).toBe('HOT');
+    expect(log!.lead_score).toBe(100);
+    expect(log!.case_type_slug).toBe('personal_injury');
+    expect(log!.sub_type_slug).toBe('car_accident');
+    expect(log!.request_type).toBe('SELF');
+    expect(log!.geographic_qualification).toBe('IN_SERVICE_AREA');
+    expect(log!.hard_override_fired).toBeNull();
+    expect(typeof log!.lead_id).toBe('string');
+    expect(typeof log!.account_id).toBe('string');
+    expect(typeof log!.session_id).toBe('string');
+    expect(typeof log!.ts).toBe('string');
+    expect(Array.isArray(log!.reasons)).toBe(true);
+  });
+
+  it('NEVER includes captured PII (name, contact_email, contact_phone) in the log payload', async () => {
+    // PII-bearing fixture — every captured PII field is a unique string
+    // we can grep for in the serialized log.
+    const sopState = buildFinalizedHotWalkSOPState();
+    await captureLead(
+      makeLeadInput({
+        name: 'PII_NAME_NEEDLE_42',
+        contactEmail: 'pii_email_needle@hidden.local',
+        contactPhone: '+1-555-PII-NEEDLE',
+        sopState,
+      }),
+    );
+
+    // Check ALL console.info calls (success path) for any occurrence
+    // of the PII strings. None should appear ANYWHERE in the
+    // serialized log entries — not as field values, not in reasons,
+    // not in any nested structure.
+    const allLogged = infoSpy.mock.calls
+      .map((c) => (typeof c[0] === 'string' ? c[0] : JSON.stringify(c[0])))
+      .join('\n');
+
+    expect(allLogged).not.toContain('PII_NAME_NEEDLE_42');
+    expect(allLogged).not.toContain('pii_email_needle');
+    expect(allLogged).not.toContain('PII-NEEDLE');
+  });
+
+  it('uses scoring_path = "llm_fallback" when sub_type has no scoring_config_json', async () => {
+    // Seed an additional sub_type without scoring config (DUI / first_offense).
+    const cfgId2 = 'cfg_dui_test';
+    const duiCaseTypeId = 'ct_dui_test';
+    const firstOffenseSubTypeId = 'st_fo_test';
+    const now = '2026-06-06T00:00:00Z';
+
+    (db as any).insert(schema.sopConfigurations).values({
+      id: cfgId2,
+      account_id: TEST_ACCOUNT_ID,
+      version: 2,
+      qualified_lead_threshold: 6,
+      is_published: false, // not published; this account's published SOP is the scored one
+      derived_from_legacy: false,
+      created_at: now,
+    }).run();
+    (db as any).insert(schema.caseTypes).values({
+      id: duiCaseTypeId,
+      account_id: TEST_ACCOUNT_ID,
+      slug: 'dui',
+      label: 'DUI',
+      position: 1,
+      is_in_scope: true,
+      created_at: now,
+    }).run();
+    (db as any).insert(schema.subTypes).values({
+      id: firstOffenseSubTypeId,
+      case_type_id: duiCaseTypeId,
+      slug: 'first_offense',
+      label: 'First Offense',
+      position: 1,
+      scoring_config_json: null,
+      created_at: now,
+    }).run();
+
+    const sopState: any = {
+      sop_configuration_id: cfgId2,
+      sop_version: 2,
+      conversation_anchor_iso: now,
+      qualified_lead_threshold: 6,
+      current_progress: 6,
+      is_finalized: true,
+      out_of_scope_termination: false,
+      steps: [
+        { step_id: 'step_case_type', slug: 'case_type', status: 'complete',
+          captured_value: 'dui', captured_label: 'DUI',
+          captured_at: now, inferred: false },
+        { step_id: 'step_sub_type', slug: 'sub_type', status: 'complete',
+          captured_value: 'first_offense', captured_label: 'First Offense',
+          captured_at: now, inferred: false },
+      ],
+    };
+
+    await captureLead(makeLeadInput({ classification: 'WARM' as const, sopState }));
+
+    const log = findLogEntry(infoSpy);
+    expect(log).not.toBeNull();
+    expect(log!.scoring_path).toBe('llm_fallback');
+    expect(log!.classification).toBe('WARM'); // LLM value preserved
+    expect(log!.lead_score).toBeNull();
+    expect(log!.reasons).toEqual([]);
+  });
+
+  it('emits ERROR-level log + scoring_error path when scoring config is malformed', async () => {
+    // Corrupt the scoring config so the scorer fails the parse step.
+    sqlite.prepare(
+      `UPDATE sub_types SET scoring_config_json = ? WHERE id = ?`
+    ).run('{"schema_version":1,"thresholds_self":"BAD"}', 'st_ca_test');
+
+    const sopState = buildFinalizedHotWalkSOPState();
+    await captureLead(makeLeadInput({ sopState }));
+
+    // Per FR-010b: lead is captured, classification is SPAM, lead_score
+    // is null, reasons are ['scoring_error'], log goes to console.error.
+    const errorLog = findLogEntry(errorSpy);
+    expect(errorLog).not.toBeNull();
+    expect(errorLog!.event).toBe('lead_classified');
+    expect(errorLog!.scoring_path).toBe('scoring_error');
+    expect(errorLog!.classification).toBe('SPAM');
+    expect(errorLog!.lead_score).toBeNull();
+    expect(errorLog!.reasons).toEqual(['scoring_error']);
+
+    // Verify the lead row also reflects the scoring_error fallback per FR-010b.
+    const row = (db as any)
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+      .get();
+    expect(row.classification).toBe('SPAM');
+    expect(row.lead_score).toBeNull();
+    expect(row.score_reasons_json).toBe(JSON.stringify(['scoring_error']));
+  });
+});
+
+describe('updateLeadSOPState — structured lead_classified log emission (spec 015 T024)', () => {
+  let infoSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    seedScoringHarness();
+    infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    infoSpy.mockRestore();
+  });
+
+  it('emits the log entry once when transitioning to is_finalized', async () => {
+    // Pre-finalize captureLead — should NOT emit lead_classified
+    const preFinalize = buildFinalizedHotWalkSOPState();
+    preFinalize.is_finalized = false;
+    await captureLead(makeLeadInput({ sopState: preFinalize }));
+
+    // Reset the spy so we only see the upcoming emission, not the
+    // pre-finalize captureLead's (which still emits with scoring_path
+    // = 'llm_fallback' since the SOP isn't finalized).
+    infoSpy.mockClear();
+
+    // Now finalize via updateLeadSOPState
+    const finalized = buildFinalizedHotWalkSOPState();
+    await updateLeadSOPState(TEST_SESSION_ID, finalized);
+
+    const allLogs = infoSpy.mock.calls
+      .map((c) => {
+        try {
+          return JSON.parse(c[0] as string);
+        } catch {
+          return null;
+        }
+      })
+      .filter((p) => p && p.event === 'lead_classified');
+
+    expect(allLogs.length).toBe(1);
+    expect(allLogs[0].scoring_path).toBe('rule_based');
+    expect(allLogs[0].classification).toBe('HOT');
+  });
+});
