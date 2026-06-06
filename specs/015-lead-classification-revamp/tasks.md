@@ -30,7 +30,13 @@ No new workspace packages, one new Drizzle migration (`0003_*.sql`).
 
 **Purpose**: Confirm the environment is healthy before introducing any code change.
 
-- [ ] T001 Verify `pnpm install` completes cleanly on branch `015-lead-classification-revamp` (or `main`), all existing tests pass (`pnpm test` and `pnpm -w turbo run typecheck`), and `pnpm dev` brings up the full local testbed per Constitution. Establishes a green baseline before introducing any code change.
+- [X] T001 Verify `pnpm install` completes cleanly on branch `015-lead-classification-revamp` (or `main`), all existing tests pass (`pnpm test` and `pnpm -w turbo run typecheck`), and `pnpm dev` brings up the full local testbed per Constitution. Establishes a green baseline before introducing any code change.
+
+      **Result**: Green baseline confirmed.
+      - `pnpm install`: clean (`Done in 942ms`).
+      - `pnpm -w turbo run typecheck`: 6 packages pass; widget, crawler, dashboard, api, shared.
+      - `pnpm test`: 21 test files, 347 tests, all pass.
+      - `pnpm dev` not invoked (would require persistent dev server); commit log + last-merge confirmed clean working tree on `main` at `ab874d1`.
 
 ---
 
