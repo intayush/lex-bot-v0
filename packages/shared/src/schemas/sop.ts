@@ -339,6 +339,35 @@ export const sopStateHeaderPayloadSchema = z.object({
    * case type that can no longer be resolved.
    */
   captured_case_type_label: z.string().nullable().optional().default(null),
+  /**
+   * Spec 016 — when the branch orchestrator is presenting a question
+   * from the configured branch, the widget needs the question's chips
+   * so it can render them as tappable buttons (otherwise the chat
+   * shows only the LLM's text version of the question with no chip
+   * UI). Null when the runtime is not in branch flow OR when the
+   * branch question is free-text-only.
+   *
+   * Each entry carries the human-readable `label` (rendered on the
+   * button), the machine `slug` (sent back as the visitor message
+   * when tapped), and the optional `score_weight` (admin-visible only).
+   */
+  branch_active_chips: z
+    .array(
+      z.object({
+        slug: slugSchema,
+        label: z.string().min(1),
+        score_weight: z.number().int().optional(),
+      }),
+    )
+    .nullable()
+    .optional()
+    .default(null),
+  /**
+   * Whether the branch question presented this turn allows free-text
+   * input alongside the chips. The widget toggles its message-input
+   * disabled-state based on this flag.
+   */
+  branch_free_text_allowed: z.boolean().optional().default(false),
 });
 export type SOPStateHeaderPayload = z.infer<typeof sopStateHeaderPayloadSchema>;
 

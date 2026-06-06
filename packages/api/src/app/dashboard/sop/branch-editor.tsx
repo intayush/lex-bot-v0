@@ -528,6 +528,14 @@ function QuestionRow({
 
       <div className="space-y-1.5">
         <div className="text-xs font-medium text-[#737373]">Chips</div>
+        {question.chips.length > 0 && (
+          <div className="flex items-center gap-1.5 px-2 text-[10px] uppercase tracking-wide text-[#A3A3A3]">
+            <div className="flex-1">Label (visible)</div>
+            <div className="w-28">Slug (machine id)</div>
+            <div className="w-16 text-right">Weight</div>
+            <div className="w-4" aria-hidden />
+          </div>
+        )}
         {question.chips.map((chip, chipIdx) => (
           <div key={chipIdx} className="flex items-center gap-1.5">
             <input
@@ -559,7 +567,7 @@ function QuestionRow({
             <button
               type="button"
               onClick={() => removeChip(chipIdx)}
-              className="text-xs text-[#991B1B] hover:underline"
+              className="w-4 text-xs text-[#991B1B] hover:underline"
               title="Remove chip"
             >
               ×

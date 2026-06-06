@@ -146,6 +146,10 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
         capturedCaseTypeSlug: sopState?.captured_case_type_slug ?? null,
         pendingStepSlug: sopState?.pending_step_slug ?? null,
         isFinalized: sopState?.is_finalized ?? false,
+        // Spec 016 — branch chips take precedence over default-step
+        // chips. The orchestrator emits these on `present_question`
+        // turns; computeActiveChips short-circuits to them.
+        branchActiveChips: sopState?.branch_active_chips ?? null,
       }),
     [widgetConfig, sopState],
   );

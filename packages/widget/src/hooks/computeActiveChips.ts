@@ -70,10 +70,26 @@ export interface ComputeChipsInput {
   /** SOP state header payload from the latest chat response. */
   pendingStepSlug: string | null;
   isFinalized: boolean;
+  /**
+   * Spec 016 — when the runtime is presenting a configured-branch
+   * question this turn, the orchestrator passes its chips through
+   * the `x-sop-state` header. Render those instead of any
+   * default-step chips. Null when not in branch flow OR when the
+   * branch question is free-text-only.
+   */
+  branchActiveChips?: Array<{ slug: string; label: string }> | null;
 }
 
 export function computeActiveChips(input: ComputeChipsInput): Chip[] {
   const { sop, caseTypes, capturedCaseTypeSlug, pendingStepSlug, isFinalized } = input;
+
+  // Spec 016 — branch flow takes precedence. When the orchestrator
+  // is presenting a branch question with configured chips, render
+  // those (the SOP step chips for `contact` would otherwise hide
+  // them since branch flow runs after `is_finalized = true`).
+  if (input.branchActiveChips && input.branchActiveChips.length > 0) {
+    return input.branchActiveChips.map((c) => ({ label: c.label, slug: c.slug }));
+  }
 
   if (!sop || isFinalized || !pendingStepSlug) return [];
 

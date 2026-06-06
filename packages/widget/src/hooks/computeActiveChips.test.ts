@@ -136,3 +136,103 @@ describe('computeActiveChips — sub_type path (014 FR-001/FR-002)', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Spec 016 — branch chips take precedence
+// ---------------------------------------------------------------------------
+
+describe('computeActiveChips — branchActiveChips precedence', () => {
+  it('returns the branch chips when supplied (regardless of default-step state)', () => {
+    const chips = computeActiveChips({
+      sop: null,
+      caseTypes: [],
+      capturedCaseTypeSlug: null,
+      pendingStepSlug: null,
+      isFinalized: true, // branch flow runs AFTER default SOP finalizes
+      branchActiveChips: [
+        { slug: 'myself', label: 'Myself' },
+        { slug: 'friend_family', label: 'Friend / Family Member' },
+      ],
+    });
+    expect(chips).toEqual([
+      { label: 'Myself', slug: 'myself' },
+      { label: 'Friend / Family Member', slug: 'friend_family' },
+    ]);
+  });
+
+  it('falls through to default-step chips when branchActiveChips is empty array', () => {
+    const sop = {
+      id: 'sop_test',
+      version: 1,
+      qualified_lead_threshold: 6,
+      steps: [
+        {
+          id: 'step_when',
+          slug: 'when',
+          position: 5,
+          question_text: 'When did this happen?',
+          chip_source: 'inline' as const,
+          inline_chips_json: JSON.stringify([
+            { slug: 'today', label: 'Today' },
+            { slug: 'yesterday', label: 'Yesterday' },
+          ]),
+          accepts_free_text: true,
+          is_required: true,
+        },
+      ],
+    };
+    const chips = computeActiveChips({
+      sop,
+      caseTypes: [],
+      capturedCaseTypeSlug: null,
+      pendingStepSlug: 'when',
+      isFinalized: false,
+      branchActiveChips: [], // empty -> not in branch flow this turn
+    });
+    expect(chips.map((c) => c.slug)).toEqual(['today', 'yesterday']);
+  });
+
+  it('falls through to default-step chips when branchActiveChips is null', () => {
+    const sop = {
+      id: 'sop_test',
+      version: 1,
+      qualified_lead_threshold: 6,
+      steps: [
+        {
+          id: 'step_when',
+          slug: 'when',
+          position: 5,
+          question_text: 'When did this happen?',
+          chip_source: 'inline' as const,
+          inline_chips_json: JSON.stringify([{ slug: 'today', label: 'Today' }]),
+          accepts_free_text: true,
+          is_required: true,
+        },
+      ],
+    };
+    const chips = computeActiveChips({
+      sop,
+      caseTypes: [],
+      capturedCaseTypeSlug: null,
+      pendingStepSlug: 'when',
+      isFinalized: false,
+      branchActiveChips: null,
+    });
+    expect(chips).toHaveLength(1);
+    expect(chips[0].slug).toBe('today');
+  });
+
+  it('omits score_weight from the rendered widget chips', () => {
+    const chips = computeActiveChips({
+      sop: null,
+      caseTypes: [],
+      capturedCaseTypeSlug: null,
+      pendingStepSlug: null,
+      isFinalized: true,
+      branchActiveChips: [{ slug: 'myself', label: 'Myself' }],
+    });
+    // Widget Chip type has only label + slug; weight is admin-side.
+    expect(chips[0]).toEqual({ label: 'Myself', slug: 'myself' });
+    expect((chips[0] as Record<string, unknown>).score_weight).toBeUndefined();
+  });
+});

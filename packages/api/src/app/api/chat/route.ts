@@ -187,6 +187,7 @@ export async function POST(req: Request) {
   // the SOP isn't yet finalized or no active branch is configured
   // (FR-007 default-only path).
   let branchPromptDirective: string | null = null;
+  let branchActiveQuestion: import('@legal-chatbot/shared').BranchQuestion | null = null;
   let branchFinalizationPayload: {
     snapshot: import('@legal-chatbot/shared').BranchSnapshot;
     score: number | null;
@@ -253,12 +254,29 @@ export async function POST(req: Request) {
     if (orchestrated.action === 'present_question') {
       sopState = orchestrated.updatedSopState;
       const q = orchestrated.question;
+      branchActiveQuestion = q;
+      // Resolve human-readable case-type / sub-type labels from the
+      // catalog so the directive carries no slug-shaped strings the
+      // LLM might echo back to the visitor.
+      const ctSlug = captureSlugFromState(sopState, 'case_type');
+      const stSlug = captureSlugFromState(sopState, 'sub_type');
+      const ctLabel =
+        sopBundle.caseTypes.find((c) => c.slug === ctSlug)?.label ?? ctSlug ?? 'this matter';
+      const stLabel =
+        sopBundle.caseTypes
+          .flatMap((c) => c.sub_types)
+          .find((s) => s.slug === stSlug)?.label ?? stSlug ?? '';
+      const chipLabels = q.chips.map((c) => c.label).join(' · ');
       branchPromptDirective =
-        `### Branch in flight\n\nThe visitor has completed the default SOP and is now answering ` +
-        `a configured branch question for (${captureSlugFromState(sopState, 'case_type')}, ` +
-        `${captureSlugFromState(sopState, 'sub_type')}). Ask: "${q.text}"\n\n` +
+        `### Branch in flight\n\n` +
+        `The visitor has completed the default SOP and is now answering a configured ` +
+        `branch question for ${ctLabel}${stLabel ? ' → ' + stLabel : ''}.\n\n` +
+        `Ask exactly: "${q.text}"\n\n` +
         (q.chips.length > 0
-          ? `Chips will be rendered by the widget; ${q.free_text_allowed ? 'free-text is also accepted' : 'this question accepts chip selection only'}.\n`
+          ? `The widget will render these chips below your message: ${chipLabels}. ` +
+            `Do NOT enumerate the options in your text — just ask the question. ` +
+            `${q.free_text_allowed ? 'Free-text answers are also accepted.' : 'Chip selection only.'}\n` +
+            `When the visitor responds, refer to their answer using its display label (NEVER an underscored slug).\n`
           : `This question accepts free-text only.\n`);
     } else if (orchestrated.action === 'awaiting_clarification') {
       sopState = orchestrated.updatedSopState;
@@ -436,7 +454,7 @@ export async function POST(req: Request) {
 
   const headers = new Headers(response.headers);
   headers.set('x-session-id', sessionId);
-  const sopHeaderPayload = buildSOPStateHeader(sopState, sopBundle.caseTypes);
+  const sopHeaderPayload = buildSOPStateHeader(sopState, sopBundle.caseTypes, branchActiveQuestion);
   if (sopHeaderPayload) {
     headers.set('x-sop-state', JSON.stringify(sopHeaderPayload));
   }
