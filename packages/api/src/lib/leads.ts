@@ -1,9 +1,20 @@
 import { nanoid } from 'nanoid';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { db } from '../db';
-import { leads, notifications } from '../db/schema';
-import type { ContactFormPayload, SOPState } from '@legal-chatbot/shared';
-import { contactFormPayloadSchema } from '@legal-chatbot/shared';
+import { leads, notifications, sopSteps, sopConfigurations, subTypes, caseTypes } from '../db/schema';
+import type {
+  Chip,
+  ContactFormPayload,
+  LeadClassification,
+  ScoringConfig,
+  SOPState,
+} from '@legal-chatbot/shared';
+import {
+  contactFormPayloadSchema,
+  scoringConfigSchema,
+} from '@legal-chatbot/shared';
+import { scoreLead } from './scoring/score-lead';
+import { buildReasons } from './scoring/reason-builder';
 
 interface CaptureLeadInput {
   accountId: string;
@@ -68,9 +79,196 @@ function resolveIncidentDate(
  *
  * Returns the (existing or newly-created) leadId either way.
  */
+
+/**
+ * Spec 015 — fields the rule-based scorer derives at SOP finalization.
+ * `null` everywhere when scoring isn't applicable (no scoring config,
+ * SOP not finalized, or sub_type lookup failed).
+ */
+interface ScoringResult {
+  classification: LeadClassification | null;
+  lead_score: number | null;
+  score_reasons_json: string | null;
+  request_type: 'SELF' | 'FRIEND_FAMILY' | null;
+  geographic_qualification: 'IN_SERVICE_AREA' | 'OUTSIDE_SERVICE_AREA' | null;
+  geographic_qualification_details_json: string | null;
+}
+
+const NULL_SCORING_RESULT: ScoringResult = {
+  classification: null,
+  lead_score: null,
+  score_reasons_json: null,
+  request_type: null,
+  geographic_qualification: null,
+  geographic_qualification_details_json: null,
+};
+
+/**
+ * Compute the rule-based scoring fields for a finalized SOP. Returns
+ * NULL_SCORING_RESULT when scoring should NOT apply:
+ *   - sopState is null/missing
+ *   - sopState.is_finalized !== true (per the user's decision: scoring
+ *     runs only at finalization)
+ *   - no case_type or sub_type captured
+ *   - the captured sub_type has no scoring_config_json (FR-022 LLM
+ *     fallback path)
+ *
+ * When scoring applies, looks up the sub_type's scoring_config_json,
+ * builds the chip catalog from the relevant sop_steps, calls scoreLead,
+ * and renders the reasons array via buildReasons.
+ *
+ * Per spec 015 FR-001..FR-006, FR-010a, FR-010b, research.md §R7.
+ */
+async function computeScoringFields(
+  accountId: string,
+  sopState: SOPState | null | undefined,
+  contactPhone: string | null,
+  contactEmail: string | null,
+): Promise<ScoringResult> {
+  if (!sopState || sopState.is_finalized !== true) {
+    return NULL_SCORING_RESULT;
+  }
+
+  const subTypeStep = sopState.steps.find((s) => s.slug === 'sub_type');
+  const capturedSubTypeSlug = subTypeStep?.captured_value ?? null;
+  if (!capturedSubTypeSlug) return NULL_SCORING_RESULT;
+
+  const caseTypeStep = sopState.steps.find((s) => s.slug === 'case_type');
+  const capturedCaseTypeSlug = caseTypeStep?.captured_value ?? null;
+  if (!capturedCaseTypeSlug) return NULL_SCORING_RESULT;
+
+  // Locate the sub_type row for this account / captured slug.
+  const subTypeRows = await db
+    .select()
+    .from(subTypes)
+    .innerJoin(caseTypes, eq(subTypes.case_type_id, caseTypes.id))
+    .where(
+      and(
+        eq(caseTypes.account_id, accountId),
+        eq(caseTypes.slug, capturedCaseTypeSlug),
+        eq(subTypes.slug, capturedSubTypeSlug),
+      ),
+    )
+    .limit(1);
+
+  const subTypeRow = subTypeRows[0]?.sub_types;
+  if (!subTypeRow || !subTypeRow.scoring_config_json) {
+    // No scoring config for this sub_type → LLM fallback path.
+    return NULL_SCORING_RESULT;
+  }
+
+  // Parse + validate the scoring config. If it's malformed, fall back to
+  // FR-010b's safe-default per scoring_error semantics. (We treat parse
+  // failures as scoring_error here too; the structured-log emission
+  // happens in the caller.)
+  let scoringConfig: ScoringConfig;
+  try {
+    scoringConfig = scoringConfigSchema.parse(
+      JSON.parse(subTypeRow.scoring_config_json),
+    );
+  } catch {
+    return {
+      classification: 'SPAM',
+      lead_score: null,
+      score_reasons_json: JSON.stringify(['scoring_error']),
+      request_type: null,
+      geographic_qualification: null,
+      geographic_qualification_details_json: null,
+    };
+  }
+
+  // Build the chip catalog from the sub_type-scoped sop_steps.
+  // Each row's inline_chips_json is parsed into an array of Chip
+  // objects; we flatten them into a slug → Chip map.
+  const stepRows = await db
+    .select()
+    .from(sopSteps)
+    .innerJoin(
+      sopConfigurations,
+      eq(sopSteps.sop_configuration_id, sopConfigurations.id),
+    )
+    .where(
+      and(
+        eq(sopConfigurations.account_id, accountId),
+        eq(sopConfigurations.is_published, true),
+        eq(sopSteps.applies_when_sub_type_slug, capturedSubTypeSlug),
+      ),
+    );
+
+  const chipsBySlug = new Map<string, Chip>();
+  for (const row of stepRows) {
+    const inline = row.sop_steps.inline_chips_json;
+    if (!inline) continue;
+    try {
+      const chips = JSON.parse(inline) as Chip[];
+      for (const chip of chips) {
+        chipsBySlug.set(chip.slug, chip);
+      }
+    } catch {
+      // Malformed inline_chips_json on a step is non-fatal; the
+      // scorer simply won't find chip weights for that step's
+      // captures. Per FR-010b's tolerance for partial config.
+    }
+  }
+
+  // Compute the contact-form bonus (xlsx Q8: phone +10, email +5).
+  const contactBonus =
+    (contactPhone && contactPhone.replace(/[^0-9]/g, '').length >= 7 ? 10 : 0) +
+    (contactEmail && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail) ? 5 : 0);
+
+  let scored;
+  try {
+    scored = scoreLead({
+      sopState,
+      scoringConfig,
+      chipsBySlug,
+      contactBonus,
+    });
+  } catch {
+    return {
+      classification: 'SPAM',
+      lead_score: null,
+      score_reasons_json: JSON.stringify(['scoring_error']),
+      request_type: null,
+      geographic_qualification: null,
+      geographic_qualification_details_json: null,
+    };
+  }
+
+  // Build the reasons array. Hard-overrides aren't applied here yet
+  // (Phase 6 / T064 wires them in); for now firedOverrides is empty.
+  const reasons = buildReasons(scored.reasons, []);
+
+  return {
+    classification: scored.classification,
+    lead_score: scored.lead_score,
+    score_reasons_json: JSON.stringify(reasons),
+    request_type: scored.request_type,
+    geographic_qualification: scored.geographic_qualification,
+    geographic_qualification_details_json:
+      scored.geographic_qualification_details_json,
+  };
+}
+
 export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: string; classification: string }> {
   const now = new Date().toISOString();
   const resolvedIncidentDate = resolveIncidentDate(input.incidentDate, input.sopState);
+
+  // Spec 015 — compute rule-based scoring fields ONCE if SOP is finalized
+  // and the captured sub_type has scoring config. Returns NULL_SCORING_RESULT
+  // for the LLM-fallback path (per FR-022) or pre-finalize invocations.
+  const scoringFields = await computeScoringFields(
+    input.accountId,
+    input.sopState,
+    input.contactPhone,
+    input.contactEmail,
+  );
+
+  // When the rule-based scorer produced a classification, it wins over
+  // the LLM-supplied value (per FR-001). Otherwise (LLM fallback path),
+  // the LLM's classification is preserved.
+  const finalClassification: LeadClassification =
+    scoringFields.classification ?? input.classification;
 
   const existing = await db
     .select()
@@ -84,8 +282,9 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
     // Pre-015: 'urgent'. Post-015: 'HOT'. Notification type stays
     // 'urgent_lead' for backward-compat (consumers haven't been updated;
     // see contracts/lead-classification-enum.md §Notification path).
+    // Compares the FINAL classification (rule-based scorer wins over LLM).
     const wasNotUrgent = existingRow.classification !== 'HOT';
-    const isNowUrgent = input.classification === 'HOT';
+    const isNowUrgent = finalClassification === 'HOT';
 
     await db
       .update(leads)
@@ -96,10 +295,19 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
         case_type: input.caseType,
         incident_date: resolvedIncidentDate,
         brief_description: input.briefDescription,
-        classification: input.classification,
+        classification: finalClassification,
         classification_rationale: input.classificationRationale,
         urgency_factors_json: JSON.stringify(input.urgencyFactors),
         sop_state_snapshot: input.sopState ? JSON.stringify(input.sopState) : null,
+        // Spec 015 — rule-based scoring fields. NULL on the LLM
+        // fallback path (computeScoringFields returned
+        // NULL_SCORING_RESULT) and on pre-finalize invocations.
+        lead_score: scoringFields.lead_score,
+        score_reasons_json: scoringFields.score_reasons_json,
+        request_type: scoringFields.request_type,
+        geographic_qualification: scoringFields.geographic_qualification,
+        geographic_qualification_details_json:
+          scoringFields.geographic_qualification_details_json,
       })
       .where(eq(leads.id, existingRow.id));
 
@@ -120,7 +328,7 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
       });
     }
 
-    return { leadId: existingRow.id, classification: input.classification };
+    return { leadId: existingRow.id, classification: finalClassification };
   }
 
   // First-time insert.
@@ -136,15 +344,22 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
     case_type: input.caseType,
     incident_date: resolvedIncidentDate,
     brief_description: input.briefDescription,
-    classification: input.classification,
+    classification: finalClassification,
     classification_rationale: input.classificationRationale,
     urgency_factors_json: JSON.stringify(input.urgencyFactors),
     sop_state_snapshot: input.sopState ? JSON.stringify(input.sopState) : null,
+    // Spec 015 — rule-based scoring fields (NULL on LLM fallback path).
+    lead_score: scoringFields.lead_score,
+    score_reasons_json: scoringFields.score_reasons_json,
+    request_type: scoringFields.request_type,
+    geographic_qualification: scoringFields.geographic_qualification,
+    geographic_qualification_details_json:
+      scoringFields.geographic_qualification_details_json,
     status: 'new',
     created_at: now,
   });
 
-  if (input.classification === 'HOT') {
+  if (finalClassification === 'HOT') {
     await db.insert(notifications).values({
       id: nanoid(),
       account_id: input.accountId,
@@ -159,7 +374,7 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
     });
   }
 
-  return { leadId, classification: input.classification };
+  return { leadId, classification: finalClassification };
 }
 
 /**
@@ -250,6 +465,23 @@ export async function updateLeadSOPState(
       ? contactPayload.contact_phone
       : existingRow.contact_phone;
 
+  // Spec 015 — invoke the rule-based scorer if the SOP just finalized
+  // and the captured sub_type has scoring config. Use the post-backfill
+  // contact values so the scorer's contactBonus reflects the final
+  // contact form data.
+  const scoringFields = await computeScoringFields(
+    existingRow.account_id,
+    sopState,
+    newPhone,
+    newEmail,
+  );
+
+  // Override classification when the rule-based scorer applied; preserve
+  // the existing value (LLM-supplied) when it didn't.
+  const finalClassification: LeadClassification =
+    scoringFields.classification ??
+    (existingRow.classification as LeadClassification);
+
   await db
     .update(leads)
     .set({
@@ -258,6 +490,17 @@ export async function updateLeadSOPState(
       name: newName,
       contact_email: newEmail,
       contact_phone: newPhone,
+      classification: finalClassification,
+      // Spec 015 — write scoring fields. NULL on LLM fallback path.
+      // We DON'T null these out if a previous captureLead already set
+      // them; computeScoringFields returns the appropriate values for
+      // the current SOP state.
+      lead_score: scoringFields.lead_score,
+      score_reasons_json: scoringFields.score_reasons_json,
+      request_type: scoringFields.request_type,
+      geographic_qualification: scoringFields.geographic_qualification,
+      geographic_qualification_details_json:
+        scoringFields.geographic_qualification_details_json,
     })
     .where(eq(leads.id, existingRow.id));
 }
