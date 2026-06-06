@@ -32,6 +32,21 @@ export const positionSchema = z.number().int().positive();
 export const chipSchema = z.object({
   label: z.string().min(1).max(100),
   slug: slugSchema,
+  /**
+   * Optional integer score weight for chips on scoring SOP steps
+   * (spec 015). When set, the chip contributes its weight to the
+   * lead score on selection. Bounded `[-50, +50]` per
+   * `contracts/chip-with-score.md`. Three semantically distinct
+   * states:
+   * - field absent → chip does not contribute (e.g., chips on the
+   *   existing 6 default steps such as `when` / `case_type`).
+   * - `0` → chip is a scoring chip but contributes nothing AND is
+   *   excluded from the reasons array (per FR-010a's `|w| ≥ 5`
+   *   inclusion rule); used by every "I Don't Know" chip.
+   * - non-zero → chip contributes its weight; reasons-eligible iff
+   *   `|score_weight| ≥ 5`.
+   */
+  score_weight: z.number().int().min(-50).max(50).optional(),
 });
 export type Chip = z.infer<typeof chipSchema>;
 
