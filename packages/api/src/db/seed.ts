@@ -9,6 +9,9 @@ import {
   DEFAULT_CASE_TYPES,
   DEFAULT_GOODBYE_PHRASES,
   DEFAULT_QUALIFIED_LEAD_THRESHOLD,
+  CAR_ACCIDENT_BRANCH_HARD_OVERRIDES_JSON,
+  CAR_ACCIDENT_BRANCH_QUESTIONS_JSON,
+  CAR_ACCIDENT_BRANCH_THRESHOLDS_JSON,
 } from './seed-defaults/sop.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -96,18 +99,48 @@ export async function seedSopForAccount(accountId: string): Promise<void> {
     });
   }
 
+  // 5. Spec 016 — seed the (personal_injury, car_accident) Branch with the
+  // 9 scoring questions, thresholds, and hard-override toggles relocated
+  // from spec 015 (FR-016).
+  const branchId = nanoid();
+  const versionId = nanoid();
+  await db.insert(schema.branches).values({
+    id: branchId,
+    account_id: accountId,
+    case_type_slug: 'personal_injury',
+    sub_type_slug: 'car_accident',
+    is_active: true,
+    current_version_id: versionId,
+    created_at: now,
+    updated_at: now,
+  });
+  await db.insert(schema.branchVersions).values({
+    id: versionId,
+    branch_id: branchId,
+    version_number: 1,
+    is_published: true,
+    questions_json: CAR_ACCIDENT_BRANCH_QUESTIONS_JSON,
+    classification_thresholds_json: CAR_ACCIDENT_BRANCH_THRESHOLDS_JSON,
+    hard_override_toggles_json: CAR_ACCIDENT_BRANCH_HARD_OVERRIDES_JSON,
+    published_at: now,
+    created_at: now,
+    created_by_user_id: 'system_seed_016',
+  });
+
   const subTypeCount = DEFAULT_CASE_TYPES.reduce((acc, ct) => acc + ct.sub_types.length, 0);
   console.log(
     `  SOP seeded for account ${accountId}: ` +
     `1 config, ${DEFAULT_SOP_STEPS.length} steps, ` +
     `${DEFAULT_CASE_TYPES.length} case types, ${subTypeCount} sub-types, ` +
-    `${DEFAULT_GOODBYE_PHRASES.length} goodbye phrases.`,
+    `${DEFAULT_GOODBYE_PHRASES.length} goodbye phrases, 1 car-accident branch (spec 016).`,
   );
 }
 
 async function seed() {
   // Clear existing data for idempotent re-runs
   // Order matters due to foreign keys
+  await db.delete(schema.branchVersions);
+  await db.delete(schema.branches);
   await db.delete(schema.notifications);
   await db.delete(schema.leads);
   await db.delete(schema.sessions);

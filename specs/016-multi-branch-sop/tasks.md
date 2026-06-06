@@ -54,13 +54,13 @@ Web monorepo (Constitution IV.2): `packages/{api,dashboard,widget,shared,crawler
 
 ### Seed defaults
 
-- [ ] T012 Update `packages/api/src/db/seed-defaults/default-sop.ts` to add Step 6 (contact) at position 6 with the configurable prompt "What's your name and how can we reach you?" and threshold `N = 6`. Add tests in `default-sop.test.ts` (or sibling) verifying the seed produces a 6-step SOP with the expected slugs and order.
-- [ ] T013 Add `packages/api/src/db/seed-defaults/car-accident-branch.ts` containing the JSON fixture for the seeded Personal Injury → Car Accident Branch (eight questions, chips, weights, thresholds, hard-override toggles — all relocated verbatim from the spec 015 source-of-truth). Wire into `packages/api/src/db/seed.ts`. Failing test in `car-accident-branch.test.ts` asserts: chip count and weights per question match a hand-checked fixture; classification thresholds match spec 015 numbers exactly.
+- [X] T012 Update `packages/api/src/db/seed-defaults/default-sop.ts` to add Step 6 (contact) at position 6 with the configurable prompt "What's your name and how can we reach you?" and threshold `N = 6`. Add tests in `default-sop.test.ts` (or sibling) verifying the seed produces a 6-step SOP with the expected slugs and order.
+- [X] T013 Add `packages/api/src/db/seed-defaults/car-accident-branch.ts` containing the JSON fixture for the seeded Personal Injury → Car Accident Branch (eight questions, chips, weights, thresholds, hard-override toggles — all relocated verbatim from the spec 015 source-of-truth). Wire into `packages/api/src/db/seed.ts`. Failing test in `car-accident-branch.test.ts` asserts: chip count and weights per question match a hand-checked fixture; classification thresholds match spec 015 numbers exactly.
 
 ### Boot-time idempotent migration (FR-004 / FR-030)
 
-- [ ] T014 Replace `packages/api/src/db/ensure-car-accident-scoring.ts` with `ensure-car-accident-branch.ts` operating on the new `branches` table. Idempotent. Update the existing `ensure-car-accident-scoring.test.ts` → `ensure-car-accident-branch.test.ts` to assert the new behaviour.
-- [ ] T015 Extend `packages/api/src/db/ensure-contact-step.ts` to detect firms whose SOP matches the spec 010 seeded 5-step default fingerprint (per research.md R9) and insert Step 6 (contact) at position 6 + bump `N` from 5 to 6. Skip firms with custom SOPs. Failing test in `ensure-contact-step.test.ts` covers: (a) seeded firm gets Step 6 inserted, N becomes 6, (b) firm with custom step list is left alone, (c) firm with custom N=4 is left alone, (d) re-running is a no-op.
+- [X] T014 Replace `packages/api/src/db/ensure-car-accident-scoring.ts` with `ensure-car-accident-branch.ts` operating on the new `branches` table. Idempotent. Update the existing `ensure-car-accident-scoring.test.ts` → `ensure-car-accident-branch.test.ts` to assert the new behaviour.
+- [X] T015 Extend `packages/api/src/db/ensure-contact-step.ts` to detect firms whose SOP matches the spec 010 seeded 5-step default fingerprint (per research.md R9) and insert Step 6 (contact) at position 6 + bump `N` from 5 to 6. Skip firms with custom SOPs. Failing test in `ensure-contact-step.test.ts` covers: (a) seeded firm gets Step 6 inserted, N becomes 6, (b) firm with custom step list is left alone, (c) firm with custom N=4 is left alone, (d) re-running is a no-op.
 
 **Checkpoint**: schemas + DB migration + boot-time migrations green. User stories can begin.
 

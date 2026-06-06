@@ -54,7 +54,11 @@ export const CAR_ACCIDENT_SCORING_CONFIG_JSON: string = JSON.stringify(
 );
 
 // ---------------------------------------------------------------------------
-// 5 default SOP steps (FR-001)
+// 6 default SOP steps (FR-001 — spec 016 reordered default).
+// case_type → sub_type → where → what → when → contact.
+// Threshold N = 6 (DEFAULT_QUALIFIED_LEAD_THRESHOLD below).
+// Spec 015's 9 inline scoring questions have moved to the Branch model;
+// see CAR_ACCIDENT_BRANCH_QUESTIONS_JSON below.
 // ---------------------------------------------------------------------------
 
 const _RAW_DEFAULT_SOP_STEPS: SOPStepInput[] = [
@@ -110,194 +114,9 @@ const _RAW_DEFAULT_SOP_STEPS: SOPStepInput[] = [
     skip_condition_json: null,
     applies_when_sub_type_slug: null,
   },
-  // -------------------------------------------------------------------------
-  // 9 sub_type-scoped steps for spec 015 (Lead Classification Revamp).
-  // Positions 5–13. Activate ONLY when captured sub_type matches
-  // `applies_when_sub_type_slug` (per research.md §R2). All have
-  // `counts_toward_threshold: false` so they don't gate finalization
-  // (FR-013); the existing 6-step threshold continues to apply.
-  // Chip weights match `lex-chat.xlsx` per `contracts/scoring-config.md`.
-  // -------------------------------------------------------------------------
-  {
-    // Metadata — selects classification-threshold table (FR-014).
-    slug: 'request_type',
-    position: 5,
-    question_text: 'Are you asking for yourself or a friend/family member?',
-    chip_source: 'inline',
-    inline_chips_json: JSON.stringify([
-      { label: 'Myself', slug: 'myself', score_weight: 0 },
-      { label: 'Friend / Family Member', slug: 'friend_family', score_weight: 0 },
-    ]),
-    accepts_free_text: false,
-    is_required: false,
-    counts_toward_threshold: false,
-    is_default: true,
-    skip_condition_json: null,
-    applies_when_sub_type_slug: 'car_accident',
-  },
-  {
-    // Metadata — service-area gate (FR-015).
-    slug: 'geographic_qualification',
-    position: 6,
-    question_text: 'Did the accident happen in or near our service area?',
-    chip_source: 'inline',
-    inline_chips_json: JSON.stringify([
-      { label: 'Yes', slug: 'yes_in_area', score_weight: 0 },
-      { label: 'No', slug: 'no_outside_area', score_weight: 0 },
-    ]),
-    accepts_free_text: false,
-    is_required: false,
-    counts_toward_threshold: false,
-    is_default: true,
-    skip_condition_json: null,
-    applies_when_sub_type_slug: 'car_accident',
-  },
-  {
-    // xlsx Q1 — Accident Timing (0..+20)
-    slug: 'accident_timing',
-    position: 7,
-    question_text: 'When did the accident happen?',
-    chip_source: 'inline',
-    inline_chips_json: JSON.stringify([
-      { label: 'Today', slug: 'today', score_weight: 20 },
-      { label: 'Within Last 7 Days', slug: 'within_last_7_days', score_weight: 15 },
-      { label: 'Within Last 30 Days', slug: 'within_last_30_days', score_weight: 10 },
-      { label: 'Within Last 6 Months', slug: 'within_last_6_months', score_weight: 5 },
-      { label: 'More Than 6 Months Ago', slug: 'more_than_6_months_ago', score_weight: 0 },
-      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
-    ]),
-    accepts_free_text: false,
-    is_required: false,
-    counts_toward_threshold: false,
-    is_default: true,
-    skip_condition_json: null,
-    applies_when_sub_type_slug: 'car_accident',
-  },
-  {
-    // xlsx Q2 — Injury (-20..+15)
-    slug: 'injury',
-    position: 8,
-    question_text: 'Were you (or they) injured?',
-    chip_source: 'inline',
-    inline_chips_json: JSON.stringify([
-      { label: 'Yes', slug: 'injury_yes', score_weight: 15 },
-      { label: 'Still Being Evaluated', slug: 'injury_evaluating', score_weight: 10 },
-      { label: 'Not Sure Yet', slug: 'injury_not_sure', score_weight: 5 },
-      { label: 'No', slug: 'injury_no', score_weight: -20 },
-    ]),
-    accepts_free_text: false,
-    is_required: false,
-    counts_toward_threshold: false,
-    is_default: true,
-    skip_condition_json: null,
-    applies_when_sub_type_slug: 'car_accident',
-  },
-  {
-    // xlsx Q3 — Medical Treatment (-10..+25)
-    slug: 'medical_treatment',
-    position: 9,
-    question_text: 'What medical treatment was received?',
-    chip_source: 'inline',
-    inline_chips_json: JSON.stringify([
-      { label: 'Surgery', slug: 'surgery', score_weight: 25 },
-      { label: 'Hospitalization', slug: 'hospitalization', score_weight: 20 },
-      { label: 'Emergency Room Visit', slug: 'er_visit', score_weight: 15 },
-      { label: 'Doctor Visit', slug: 'doctor_visit', score_weight: 10 },
-      { label: 'Physical Therapy / Chiropractor', slug: 'pt_chiro', score_weight: 8 },
-      { label: 'No Treatment Yet', slug: 'no_treatment_yet', score_weight: 5 },
-      { label: 'No Treatment', slug: 'no_treatment', score_weight: -10 },
-      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
-    ]),
-    accepts_free_text: false,
-    is_required: false,
-    counts_toward_threshold: false,
-    is_default: true,
-    skip_condition_json: null,
-    applies_when_sub_type_slug: 'car_accident',
-  },
-  {
-    // xlsx Q4 — Accident Role (0..+10) — Cyclist OMITTED per spec
-    slug: 'accident_role',
-    position: 10,
-    question_text: 'Were you (or they) a:',
-    chip_source: 'inline',
-    inline_chips_json: JSON.stringify([
-      { label: 'Passenger', slug: 'passenger', score_weight: 10 },
-      { label: 'Pedestrian', slug: 'pedestrian', score_weight: 10 },
-      { label: 'Driver', slug: 'driver', score_weight: 5 },
-      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
-    ]),
-    accepts_free_text: false,
-    is_required: false,
-    counts_toward_threshold: false,
-    is_default: true,
-    skip_condition_json: null,
-    applies_when_sub_type_slug: 'car_accident',
-  },
-  {
-    // xlsx Q5 — Insurance Activity (0..+15)
-    slug: 'insurance_activity',
-    position: 11,
-    question_text: 'Has an insurance company contacted you (or them)?',
-    chip_source: 'inline',
-    inline_chips_json: JSON.stringify([
-      { label: 'Requested Recorded Statement', slug: 'requested_recorded_statement', score_weight: 15 },
-      { label: 'Offered Settlement', slug: 'offered_settlement', score_weight: 15 },
-      { label: 'Asked To Sign Documents', slug: 'asked_to_sign', score_weight: 15 },
-      { label: 'Contacted Me', slug: 'contacted_me', score_weight: 5 },
-      { label: 'Not Yet', slug: 'not_yet', score_weight: 0 },
-      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
-    ]),
-    accepts_free_text: false,
-    is_required: false,
-    counts_toward_threshold: false,
-    is_default: true,
-    skip_condition_json: null,
-    applies_when_sub_type_slug: 'car_accident',
-  },
-  {
-    // xlsx Q6 — Work Impact (0..+15)
-    slug: 'work_impact',
-    position: 12,
-    question_text: 'Has the accident affected your (or their) ability to work?',
-    chip_source: 'inline',
-    inline_chips_json: JSON.stringify([
-      { label: 'Unable To Work', slug: 'unable_to_work', score_weight: 15 },
-      { label: 'Missed Work', slug: 'missed_work', score_weight: 10 },
-      { label: 'No Impact', slug: 'no_impact', score_weight: 0 },
-      { label: 'Not Applicable', slug: 'not_applicable', score_weight: 0 },
-      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
-    ]),
-    accepts_free_text: false,
-    is_required: false,
-    counts_toward_threshold: false,
-    is_default: true,
-    skip_condition_json: null,
-    applies_when_sub_type_slug: 'car_accident',
-  },
-  {
-    // xlsx Q7 — Attorney Status (-20..+20)
-    slug: 'attorney_status',
-    position: 13,
-    question_text: 'Do you currently have a lawyer?',
-    chip_source: 'inline',
-    inline_chips_json: JSON.stringify([
-      { label: 'No', slug: 'no_lawyer', score_weight: 20 },
-      { label: "Spoke With Lawyers, Haven't Signed Yet", slug: 'spoke_not_signed', score_weight: 15 },
-      { label: 'Signed With Lawyer But Want To Change Lawyers', slug: 'want_to_change', score_weight: 10 },
-      { label: 'Yes, I Have A Lawyer', slug: 'yes_have_lawyer', score_weight: -20 },
-      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
-    ]),
-    accepts_free_text: false,
-    is_required: false,
-    counts_toward_threshold: false,
-    is_default: true,
-    skip_condition_json: null,
-    applies_when_sub_type_slug: 'car_accident',
-  },
   {
     slug: 'when',
-    position: 14,
+    position: 5,
     question_text: 'When did this happen?',
     chip_source: 'inline',
     inline_chips_json: JSON.stringify([
@@ -318,7 +137,7 @@ const _RAW_DEFAULT_SOP_STEPS: SOPStepInput[] = [
   },
   {
     slug: 'contact',
-    position: 15,
+    position: 6,
     question_text: 'Last step — please share your contact info so we can follow up.',
     chip_source: 'contact_form',
     inline_chips_json: null,
@@ -333,6 +152,189 @@ const _RAW_DEFAULT_SOP_STEPS: SOPStepInput[] = [
     applies_when_sub_type_slug: null,
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Spec 016 — Car Accident Branch (formerly the spec 015 inline scoring
+// questions at sop_steps positions 5–13). These NINE questions move out
+// of the default SOP (which is now 6 steps) and into the new Branch
+// model. The seed inserts them as `branch_versions.questions_json` for
+// the (personal_injury, car_accident) branch row at first boot.
+//
+// Question content / chip weights / order are preserved verbatim from
+// spec 015's xlsx so SC-002 ("no score regressions") holds.
+// ---------------------------------------------------------------------------
+
+interface BranchQuestionSeed {
+  id: string;
+  position: number;
+  text: string;
+  preface: string | null;
+  chips: Array<{ label: string; slug: string; score_weight: number }>;
+  free_text_allowed: boolean;
+  multi_select: boolean;
+}
+
+const _RAW_CAR_ACCIDENT_BRANCH_QUESTIONS: BranchQuestionSeed[] = [
+  {
+    id: 'request_type',
+    position: 0,
+    text: 'Are you asking for yourself or a friend/family member?',
+    preface: null,
+    chips: [
+      { label: 'Myself', slug: 'myself', score_weight: 0 },
+      { label: 'Friend / Family Member', slug: 'friend_family', score_weight: 0 },
+    ],
+    free_text_allowed: false,
+    multi_select: false,
+  },
+  {
+    id: 'geographic_qualification',
+    position: 1,
+    text: 'Did the accident happen in or near our service area?',
+    preface: null,
+    chips: [
+      { label: 'Yes', slug: 'yes_in_area', score_weight: 0 },
+      { label: 'No', slug: 'no_outside_area', score_weight: 0 },
+    ],
+    free_text_allowed: false,
+    multi_select: false,
+  },
+  {
+    id: 'accident_timing',
+    position: 2,
+    text: 'When did the accident happen?',
+    preface: null,
+    chips: [
+      { label: 'Today', slug: 'today', score_weight: 20 },
+      { label: 'Within Last 7 Days', slug: 'within_last_7_days', score_weight: 15 },
+      { label: 'Within Last 30 Days', slug: 'within_last_30_days', score_weight: 10 },
+      { label: 'Within Last 6 Months', slug: 'within_last_6_months', score_weight: 5 },
+      { label: 'More Than 6 Months Ago', slug: 'more_than_6_months_ago', score_weight: 0 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ],
+    free_text_allowed: false,
+    multi_select: false,
+  },
+  {
+    id: 'injury',
+    position: 3,
+    text: 'Were you (or they) injured?',
+    preface: null,
+    chips: [
+      { label: 'Yes', slug: 'injury_yes', score_weight: 15 },
+      { label: 'Still Being Evaluated', slug: 'injury_evaluating', score_weight: 10 },
+      { label: 'Not Sure Yet', slug: 'injury_not_sure', score_weight: 5 },
+      { label: 'No', slug: 'injury_no', score_weight: -20 },
+    ],
+    free_text_allowed: false,
+    multi_select: false,
+  },
+  {
+    id: 'medical_treatment',
+    position: 4,
+    text: 'What medical treatment was received?',
+    preface: null,
+    chips: [
+      { label: 'Surgery', slug: 'surgery', score_weight: 25 },
+      { label: 'Hospitalization', slug: 'hospitalization', score_weight: 20 },
+      { label: 'Emergency Room Visit', slug: 'er_visit', score_weight: 15 },
+      { label: 'Doctor Visit', slug: 'doctor_visit', score_weight: 10 },
+      { label: 'Physical Therapy / Chiropractor', slug: 'pt_chiro', score_weight: 8 },
+      { label: 'No Treatment Yet', slug: 'no_treatment_yet', score_weight: 5 },
+      { label: 'No Treatment', slug: 'no_treatment', score_weight: -10 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ],
+    free_text_allowed: false,
+    multi_select: false,
+  },
+  {
+    id: 'accident_role',
+    position: 5,
+    text: 'Were you (or they) a:',
+    preface: null,
+    chips: [
+      { label: 'Passenger', slug: 'passenger', score_weight: 10 },
+      { label: 'Pedestrian', slug: 'pedestrian', score_weight: 10 },
+      { label: 'Driver', slug: 'driver', score_weight: 5 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ],
+    free_text_allowed: false,
+    multi_select: false,
+  },
+  {
+    id: 'insurance_activity',
+    position: 6,
+    text: 'Has an insurance company contacted you (or them)?',
+    preface: null,
+    chips: [
+      { label: 'Requested Recorded Statement', slug: 'requested_recorded_statement', score_weight: 15 },
+      { label: 'Offered Settlement', slug: 'offered_settlement', score_weight: 15 },
+      { label: 'Asked To Sign Documents', slug: 'asked_to_sign', score_weight: 15 },
+      { label: 'Contacted Me', slug: 'contacted_me', score_weight: 5 },
+      { label: 'Not Yet', slug: 'not_yet', score_weight: 0 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ],
+    free_text_allowed: false,
+    multi_select: false,
+  },
+  {
+    id: 'work_impact',
+    position: 7,
+    text: 'Has the accident affected your (or their) ability to work?',
+    preface: null,
+    chips: [
+      { label: 'Unable To Work', slug: 'unable_to_work', score_weight: 15 },
+      { label: 'Missed Work', slug: 'missed_work', score_weight: 10 },
+      { label: 'No Impact', slug: 'no_impact', score_weight: 0 },
+      { label: 'Not Applicable', slug: 'not_applicable', score_weight: 0 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ],
+    free_text_allowed: false,
+    multi_select: false,
+  },
+  {
+    id: 'attorney_status',
+    position: 8,
+    text: 'Do you currently have a lawyer?',
+    preface: null,
+    chips: [
+      { label: 'No', slug: 'no_lawyer', score_weight: 20 },
+      { label: "Spoke With Lawyers, Haven't Signed Yet", slug: 'spoke_not_signed', score_weight: 15 },
+      { label: 'Signed With Lawyer But Want To Change Lawyers', slug: 'want_to_change', score_weight: 10 },
+      { label: 'Yes, I Have A Lawyer', slug: 'yes_have_lawyer', score_weight: -20 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ],
+    free_text_allowed: false,
+    multi_select: false,
+  },
+];
+
+/**
+ * Pre-serialised JSON ready for `branch_versions.questions_json` writes.
+ * Materialized from the spec 015 xlsx fixtures (FR-016).
+ */
+export const CAR_ACCIDENT_BRANCH_QUESTIONS_JSON: string = JSON.stringify(
+  _RAW_CAR_ACCIDENT_BRANCH_QUESTIONS,
+);
+
+/**
+ * Pre-serialised JSON for `branch_versions.classification_thresholds_json`.
+ * Same payload as spec 015's `_CAR_ACCIDENT_SCORING_CONFIG`, restructured
+ * for the spec 016 Branch model: `{ self, family_friend }`.
+ */
+export const CAR_ACCIDENT_BRANCH_THRESHOLDS_JSON: string = JSON.stringify({
+  self: _CAR_ACCIDENT_SCORING_CONFIG.thresholds_self,
+  family_friend: _CAR_ACCIDENT_SCORING_CONFIG.thresholds_family_friend,
+});
+
+/**
+ * Pre-serialised JSON for `branch_versions.hard_override_toggles_json`.
+ * Same shape as spec 015 `_CAR_ACCIDENT_SCORING_CONFIG.hard_overrides_enabled`.
+ */
+export const CAR_ACCIDENT_BRANCH_HARD_OVERRIDES_JSON: string = JSON.stringify(
+  _CAR_ACCIDENT_SCORING_CONFIG.hard_overrides_enabled,
+);
+
 
 /** 5 default SOP steps validated against the shared schema. */
 export const DEFAULT_SOP_STEPS: readonly SOPStepInput[] = Object.freeze(

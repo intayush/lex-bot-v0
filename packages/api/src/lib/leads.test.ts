@@ -1008,6 +1008,187 @@ import {
   DEFAULT_SOP_STEPS,
 } from '../db/seed-defaults/sop.js';
 
+// ---------------------------------------------------------------------------
+// Legacy spec 015 scoring steps used to exercise the spec-015 rule-based
+// scoring path that still operates on `sop_steps` rows tagged with
+// `applies_when_sub_type_slug = 'car_accident'`. These steps were removed
+// from `_RAW_DEFAULT_SOP_STEPS` in spec 016 (the same chip data lives on
+// `branch_versions.questions_json` now). The harness re-inserts them so
+// the spec 015 scorer still sees a chip catalog while spec 016's runtime
+// migration is in flight.
+// ---------------------------------------------------------------------------
+
+const LEGACY_CAR_ACCIDENT_SCORING_STEPS = [
+  {
+    slug: 'request_type',
+    position: 5,
+    question_text: 'Are you asking for yourself or a friend/family member?',
+    chip_source: 'inline' as const,
+    inline_chips_json: JSON.stringify([
+      { label: 'Myself', slug: 'myself', score_weight: 0 },
+      { label: 'Friend / Family Member', slug: 'friend_family', score_weight: 0 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
+  {
+    slug: 'geographic_qualification',
+    position: 6,
+    question_text: 'Did the accident happen in or near our service area?',
+    chip_source: 'inline' as const,
+    inline_chips_json: JSON.stringify([
+      { label: 'Yes', slug: 'yes_in_area', score_weight: 0 },
+      { label: 'No', slug: 'no_outside_area', score_weight: 0 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
+  {
+    slug: 'accident_timing',
+    position: 7,
+    question_text: 'When did the accident happen?',
+    chip_source: 'inline' as const,
+    inline_chips_json: JSON.stringify([
+      { label: 'Today', slug: 'today', score_weight: 20 },
+      { label: 'Within Last 7 Days', slug: 'within_last_7_days', score_weight: 15 },
+      { label: 'Within Last 30 Days', slug: 'within_last_30_days', score_weight: 10 },
+      { label: 'Within Last 6 Months', slug: 'within_last_6_months', score_weight: 5 },
+      { label: 'More Than 6 Months Ago', slug: 'more_than_6_months_ago', score_weight: 0 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
+  {
+    slug: 'injury',
+    position: 8,
+    question_text: 'Were you (or they) injured?',
+    chip_source: 'inline' as const,
+    inline_chips_json: JSON.stringify([
+      { label: 'Yes', slug: 'injury_yes', score_weight: 15 },
+      { label: 'Still Being Evaluated', slug: 'injury_evaluating', score_weight: 10 },
+      { label: 'Not Sure Yet', slug: 'injury_not_sure', score_weight: 5 },
+      { label: 'No', slug: 'injury_no', score_weight: -20 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
+  {
+    slug: 'medical_treatment',
+    position: 9,
+    question_text: 'What medical treatment was received?',
+    chip_source: 'inline' as const,
+    inline_chips_json: JSON.stringify([
+      { label: 'Surgery', slug: 'surgery', score_weight: 25 },
+      { label: 'Hospitalization', slug: 'hospitalization', score_weight: 20 },
+      { label: 'Emergency Room Visit', slug: 'er_visit', score_weight: 15 },
+      { label: 'Doctor Visit', slug: 'doctor_visit', score_weight: 10 },
+      { label: 'Physical Therapy / Chiropractor', slug: 'pt_chiro', score_weight: 8 },
+      { label: 'No Treatment Yet', slug: 'no_treatment_yet', score_weight: 5 },
+      { label: 'No Treatment', slug: 'no_treatment', score_weight: -10 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
+  {
+    slug: 'accident_role',
+    position: 10,
+    question_text: 'Were you (or they) a:',
+    chip_source: 'inline' as const,
+    inline_chips_json: JSON.stringify([
+      { label: 'Passenger', slug: 'passenger', score_weight: 10 },
+      { label: 'Pedestrian', slug: 'pedestrian', score_weight: 10 },
+      { label: 'Driver', slug: 'driver', score_weight: 5 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
+  {
+    slug: 'insurance_activity',
+    position: 11,
+    question_text: 'Has an insurance company contacted you (or them)?',
+    chip_source: 'inline' as const,
+    inline_chips_json: JSON.stringify([
+      { label: 'Requested Recorded Statement', slug: 'requested_recorded_statement', score_weight: 15 },
+      { label: 'Offered Settlement', slug: 'offered_settlement', score_weight: 15 },
+      { label: 'Asked To Sign Documents', slug: 'asked_to_sign', score_weight: 15 },
+      { label: 'Contacted Me', slug: 'contacted_me', score_weight: 5 },
+      { label: 'Not Yet', slug: 'not_yet', score_weight: 0 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
+  {
+    slug: 'work_impact',
+    position: 12,
+    question_text: 'Has the accident affected your (or their) ability to work?',
+    chip_source: 'inline' as const,
+    inline_chips_json: JSON.stringify([
+      { label: 'Unable To Work', slug: 'unable_to_work', score_weight: 15 },
+      { label: 'Missed Work', slug: 'missed_work', score_weight: 10 },
+      { label: 'No Impact', slug: 'no_impact', score_weight: 0 },
+      { label: 'Not Applicable', slug: 'not_applicable', score_weight: 0 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
+  {
+    slug: 'attorney_status',
+    position: 13,
+    question_text: 'Do you currently have a lawyer?',
+    chip_source: 'inline' as const,
+    inline_chips_json: JSON.stringify([
+      { label: 'No', slug: 'no_lawyer', score_weight: 20 },
+      { label: "Spoke With Lawyers, Haven't Signed Yet", slug: 'spoke_not_signed', score_weight: 15 },
+      { label: 'Signed With Lawyer But Want To Change Lawyers', slug: 'want_to_change', score_weight: 10 },
+      { label: 'Yes, I Have A Lawyer', slug: 'yes_have_lawyer', score_weight: -20 },
+      { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
+    ]),
+    accepts_free_text: false,
+    is_required: false,
+    counts_toward_threshold: false,
+    is_default: true,
+    skip_condition_json: null,
+    applies_when_sub_type_slug: 'car_accident',
+  },
+];
+
 /**
  * Seed a published SOP, the personal_injury → car_accident sub_type with
  * its scoring_config_json, and the 9 car-accident-scoped scoring step
@@ -1052,8 +1233,11 @@ function seedScoringHarness() {
     created_at: now,
   }).run();
 
-  // sop_steps: insert all 15 default steps (the 6 default + 9 car-accident-scoped)
-  for (const step of DEFAULT_SOP_STEPS) {
+  // sop_steps: insert the 6 default steps (spec 016) plus the 9 legacy
+  // car-accident-scoped steps (spec 015) so the rule-based scorer's chip
+  // catalog is populated.
+  const allSteps = [...DEFAULT_SOP_STEPS, ...LEGACY_CAR_ACCIDENT_SCORING_STEPS];
+  for (const step of allSteps) {
     (db as any).insert(schema.sopSteps).values({
       id: `step_${step.slug}_test`,
       sop_configuration_id: cfgId,
@@ -1106,7 +1290,7 @@ function buildFinalizedHotWalkSOPState(): any {
     current_progress: 6,
     is_finalized: true,
     out_of_scope_termination: false,
-    steps: DEFAULT_SOP_STEPS.map((s) => ({
+    steps: [...DEFAULT_SOP_STEPS, ...LEGACY_CAR_ACCIDENT_SCORING_STEPS].map((s) => ({
       step_id: `step_${s.slug}_test`,
       slug: s.slug,
       status: stepCaptures[s.slug] !== undefined ? 'complete' : 'pending',
