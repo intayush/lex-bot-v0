@@ -19,6 +19,7 @@
 import { advanceBranch } from './branch-advancer';
 import { freezeBranchSnapshot } from './branch-snapshot';
 import { scoreBranch, type ScoreBranchResult } from '../scoring/score-lead-partial';
+import { emitBranchEvent } from './branch-events';
 import type {
   Branch,
   BranchQuestion,
@@ -48,6 +49,14 @@ export interface BranchOrchestratorDeps {
   getVersionById: (versionId: string) => Promise<BranchVersion | null>;
   /** Injectable clock (epoch ms). */
   now: () => number;
+  /**
+   * Caller-supplied context for structured-log events (Constitution V).
+   * The orchestrator emits branch_started / branch_question_answered /
+   * branch_completed / branch_skipped as side effects; tests pass a
+   * stub session_id (e.g., 'test_session') to make assertions
+   * deterministic. Production deps pass the live session id.
+   */
+  sessionId?: string;
 }
 
 export interface BranchOrchestratorInput {
@@ -131,7 +140,19 @@ export async function runBranchOrchestrator(
       caseTypeSlug,
       subTypeSlug,
     });
-    if (lookup.branch === null) return { action: 'noop' };
+    if (lookup.branch === null) {
+      // FR-033: emit branch_skipped event when lookup returns null
+      // for a finalized SOP (default-only path is about to fire).
+      emitBranchEvent({
+        event: 'branch_skipped',
+        account_id: accountId,
+        session_id: deps.sessionId ?? 'unknown',
+        case_type_slug: caseTypeSlug,
+        sub_type_slug: subTypeSlug,
+        reason: 'no_branch_configured',
+      });
+      return { action: 'noop' };
+    }
 
     // Initialize branch_state and present Q1.
     const updatedSopState: SOPState = {
@@ -152,8 +173,26 @@ export async function runBranchOrchestrator(
     if (advanceResult.type !== 'next_question') {
       // Defensive: branch with zero questions returns finalize
       // immediately. Re-route as default-only by clearing branch_state.
+      emitBranchEvent({
+        event: 'branch_skipped',
+        account_id: accountId,
+        session_id: deps.sessionId ?? 'unknown',
+        case_type_slug: caseTypeSlug,
+        sub_type_slug: subTypeSlug,
+        reason: 'branch_zero_questions',
+      });
       return { action: 'noop' };
     }
+    // FR-033: branch_started fires on the first question presentation.
+    emitBranchEvent({
+      event: 'branch_started',
+      account_id: accountId,
+      session_id: deps.sessionId ?? 'unknown',
+      case_type_slug: caseTypeSlug,
+      sub_type_slug: subTypeSlug,
+      branch_id: lookup.branch.id,
+      branch_version_id: lookup.version.id,
+    });
     return {
       action: 'present_question',
       question: advanceResult.question,
@@ -200,6 +239,28 @@ export async function runBranchOrchestrator(
   }
 
   if (advanceResult.type === 'next_question') {
+    // FR-033: branch_question_answered fires when a visitor's input
+    // captures an answer. The just-answered question is the one at
+    // the index BEFORE advanceBranch incremented; the captured chip
+    // entry sits at the tail of advanceResult.updatedState.captured_chips.
+    const justAnswered =
+      advanceResult.updatedState.captured_chips[
+        advanceResult.updatedState.captured_chips.length - 1
+      ];
+    if (justAnswered) {
+      emitBranchEvent({
+        event: 'branch_question_answered',
+        account_id: accountId,
+        session_id: deps.sessionId ?? 'unknown',
+        case_type_slug: caseTypeSlug,
+        sub_type_slug: subTypeSlug,
+        branch_id: lookup.branch.id,
+        branch_version_id: pinnedVersion.id,
+        question_id: justAnswered.question_id,
+        chip_slugs: justAnswered.chip_slugs,
+        is_free_text: justAnswered.chip_slugs.length === 0,
+      });
+    }
     return {
       action: 'present_question',
       question: advanceResult.question,
@@ -208,6 +269,24 @@ export async function runBranchOrchestrator(
   }
 
   // type === 'finalize'
+  // First emit branch_question_answered for the final question.
+  const lastAnswered =
+    advanceResult.capturedChips[advanceResult.capturedChips.length - 1];
+  if (lastAnswered) {
+    emitBranchEvent({
+      event: 'branch_question_answered',
+      account_id: accountId,
+      session_id: deps.sessionId ?? 'unknown',
+      case_type_slug: caseTypeSlug,
+      sub_type_slug: subTypeSlug,
+      branch_id: lookup.branch.id,
+      branch_version_id: pinnedVersion.id,
+      question_id: lastAnswered.question_id,
+      chip_slugs: lastAnswered.chip_slugs,
+      is_free_text: lastAnswered.chip_slugs.length === 0,
+    });
+  }
+
   const score = scoreBranch({
     branchVersion: pinnedVersion,
     capturedChips: advanceResult.capturedChips,
@@ -226,6 +305,20 @@ export async function runBranchOrchestrator(
     reasons: score.reasons,
     branchIncomplete: false,
     finalizedAt: deps.now(),
+  });
+
+  // FR-033: branch_completed fires once the branch finalizes.
+  emitBranchEvent({
+    event: 'branch_completed',
+    account_id: accountId,
+    session_id: deps.sessionId ?? 'unknown',
+    case_type_slug: caseTypeSlug,
+    sub_type_slug: subTypeSlug,
+    branch_id: lookup.branch.id,
+    branch_version_id: pinnedVersion.id,
+    lead_score: score.score,
+    classification: score.classification,
+    reasons: score.reasons,
   });
 
   return {

@@ -55,6 +55,34 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     ? JSON.parse(lead.urgency_factors_json)
     : [];
 
+  // Spec 016 — parse the branch snapshot (FR-018) when present.
+  // The snapshot is frozen at finalization; rendering it here lets
+  // lawyers see exactly which questions/answers contributed to the
+  // lead's score, even if the live branch was later edited or deleted.
+  type BranchSnapshotShape = {
+    branch_id: string;
+    branch_version_id: string;
+    version_number: number;
+    case_type_slug: string;
+    sub_type_slug: string;
+    questions_snapshot: Array<{
+      id: string;
+      position: number;
+      text: string;
+      chips: Array<{ slug: string; label: string; score_weight: number }>;
+    }>;
+    captured_chips: Array<{ question_id: string; chip_slugs: string[] }>;
+    captured_free_text: Array<{ question_id: string; text: string }>;
+    score: number;
+    classification: string;
+    reasons: string[];
+    branch_incomplete: boolean;
+    finalized_at: number;
+  };
+  const branchSnapshot: BranchSnapshotShape | null = lead.branch_snapshot_json
+    ? (JSON.parse(lead.branch_snapshot_json) as BranchSnapshotShape)
+    : null;
+
   const cls = classificationStyles[lead.classification || 'normal'] ?? classificationStyles.normal;
   const sts = statusStyles[lead.status || 'new'] ?? statusStyles.new;
 
@@ -170,6 +198,91 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {/* Spec 016 — Branch snapshot (FR-018). Rendered when the lead
+              came through a configured branch. Survives branch
+              deletion. */}
+          {branchSnapshot && (
+            <div className="bg-white rounded-xl border border-[#E5E5E5] p-6">
+              <div className="flex items-baseline justify-between mb-3">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-[#A3A3A3]">
+                  Branch intake
+                </h3>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] text-[#A3A3A3]">
+                    v{branchSnapshot.version_number}
+                  </span>
+                  {branchSnapshot.branch_incomplete && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#FEF3C7] text-[#92400E]">
+                      Partial
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-3">
+                {branchSnapshot.questions_snapshot
+                  .slice()
+                  .sort((a, b) => a.position - b.position)
+                  .map((q) => {
+                    const captured = branchSnapshot.captured_chips.find(
+                      (c) => c.question_id === q.id,
+                    );
+                    const freeText = branchSnapshot.captured_free_text.find(
+                      (c) => c.question_id === q.id,
+                    );
+                    const chosenChips = captured
+                      ? q.chips.filter((c) => captured.chip_slugs.includes(c.slug))
+                      : [];
+                    return (
+                      <div
+                        key={q.id}
+                        className="border-l-2 border-[#E5E5E5] pl-3 py-1"
+                      >
+                        <p className="text-xs text-[#737373] mb-1">{q.text}</p>
+                        {chosenChips.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {chosenChips.map((chip) => (
+                              <span
+                                key={chip.slug}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[#F5F5F5] text-[#171717]"
+                              >
+                                {chip.label}
+                                <span className="text-[10px] text-[#737373] tabular-nums">
+                                  {chip.score_weight >= 0
+                                    ? `+${chip.score_weight}`
+                                    : chip.score_weight}
+                                </span>
+                              </span>
+                            ))}
+                          </div>
+                        ) : freeText ? (
+                          <p className="text-sm text-[#171717] italic">
+                            &ldquo;{freeText.text}&rdquo;
+                          </p>
+                        ) : (
+                          <p className="text-xs text-[#A3A3A3] italic">
+                            (not answered)
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          {/* Spec 016 — when the captured (case_type, sub_type) had no
+              configured branch, surface a small notice so lawyers can
+              tell at a glance that scoring was driven by the legacy
+              classifier rather than the deterministic branch. */}
+          {!branchSnapshot && lead.case_type && (
+            <div className="bg-white rounded-xl border border-[#E5E5E5] p-4">
+              <p className="text-xs text-[#737373]">
+                No branch was configured for this matter. Classification was
+                set by the legacy LLM classifier (default-only flow).
+              </p>
             </div>
           )}
         </div>

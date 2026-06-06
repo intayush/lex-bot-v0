@@ -197,12 +197,12 @@ Web monorepo (Constitution IV.2): `packages/{api,dashboard,widget,shared,crawler
 
 ### Structured logging (FR-033)
 
-- [ ] T059 [P] Implement the five new structured-log event types per `contracts/branch-runtime-contract.md` §Logging contract: `branch_started`, `branch_question_answered`, `branch_completed`, `branch_skipped`, `branch_incomplete_finalized`. Wire emissions into `branch-lookup.ts` (skipped), `state-machine.ts` (started, completed), `branch-advancer.ts` (question_answered), and `session.ts` (incomplete_finalized). Add tests asserting (a) each event fires at the expected transition, (b) no PII is in any field — only chip slugs, question ids, rule names, and category-level metadata. Use the existing log-redaction helper from `packages/api/src/lib/sop/pii-redactor.ts`.
+- [X] T059 [P] Implement the five new structured-log event types per `contracts/branch-runtime-contract.md` §Logging contract: `branch_started`, `branch_question_answered`, `branch_completed`, `branch_skipped`, `branch_incomplete_finalized`. Wire emissions into `branch-lookup.ts` (skipped), `state-machine.ts` (started, completed), `branch-advancer.ts` (question_answered), and `session.ts` (incomplete_finalized). Add tests asserting (a) each event fires at the expected transition, (b) no PII is in any field — only chip slugs, question ids, rule names, and category-level metadata. Use the existing log-redaction helper from `packages/api/src/lib/sop/pii-redactor.ts`.
 
 ### Leads dashboard surfacing (FR-011b)
 
-- [ ] T060 [P] Update `packages/dashboard/src/app/dashboard/leads/page.tsx` to surface a `Branch incomplete` badge on lead rows where `branch_incomplete = 1`. Add a filter chip "Show only branch-incomplete leads". Add a component test.
-- [ ] T061 [P] Update the lead detail view in `packages/dashboard/src/app/dashboard/leads/lead-detail.tsx` to render the `branch_snapshot_json` payload: per-question text + captured chip slugs + chip labels + per-chip weight contribution + final score + classification + reasons. For default-only leads (`branch_snapshot_json = null`), render a simple "No branch was configured for this matter" notice. Add a component test for both states.
+- [X] T060 [P] Update `packages/dashboard/src/app/dashboard/leads/page.tsx` to surface a `Branch incomplete` badge on lead rows where `branch_incomplete = 1`. Add a filter chip "Show only branch-incomplete leads". Add a component test.
+- [X] T061 [P] Update the lead detail view in `packages/dashboard/src/app/dashboard/leads/lead-detail.tsx` to render the `branch_snapshot_json` payload: per-question text + captured chip slugs + chip labels + per-chip weight contribution + final score + classification + reasons. For default-only leads (`branch_snapshot_json = null`), render a simple "No branch was configured for this matter" notice. Add a component test for both states.
 
 ### Cleanup and regression sweep
 

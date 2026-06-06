@@ -13,6 +13,8 @@ interface Lead {
   status: string | null;
   /** 013-lead-action-tracking: lawyer-recorded follow-up action slug or null. */
   follow_up_action: string | null;
+  /** Spec 016 — branch in flight when the session ended (FR-011a / FR-011b). */
+  branch_incomplete?: boolean;
   created_at: string | null;
 }
 
@@ -144,10 +146,21 @@ export function LeadTable({ leads }: { leads: Lead[] }) {
                       </td>
                       <td className="px-5 py-4 text-sm text-[#737373]">{lead.case_type || <span className="text-[#D4D4D4]">&mdash;</span>}</td>
                       <td className="px-5 py-4">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cls.bg} ${cls.text}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${cls.dot}`} />
-                          {lead.classification || 'unknown'}
-                        </span>
+                        <div className="inline-flex items-center gap-1.5">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cls.bg} ${cls.text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${cls.dot}`} />
+                            {lead.classification || 'unknown'}
+                          </span>
+                          {lead.branch_incomplete && (
+                            <span
+                              title="The configured branch was abandoned mid-flow. Score reflects partial captures."
+                              className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#FEF3C7] text-[#92400E]"
+                            >
+                              <span className="w-1 h-1 rounded-full bg-[#92400E]" />
+                              Partial
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-5 py-4">
                         <span className={`inline-flex items-center gap-1.5 text-xs font-medium capitalize ${sts.text}`}>
@@ -211,10 +224,17 @@ export function LeadTable({ leads }: { leads: Lead[] }) {
                       <p className="font-medium text-[#171717] text-sm">{lead.name || 'Anonymous'}</p>
                       <p className="text-xs text-[#A3A3A3] mt-0.5">{lead.case_type || 'No case type'}</p>
                     </div>
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cls.bg} ${cls.text}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${cls.dot}`} />
-                      {lead.classification || 'unknown'}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${cls.bg} ${cls.text}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${cls.dot}`} />
+                        {lead.classification || 'unknown'}
+                      </span>
+                      {lead.branch_incomplete && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#FEF3C7] text-[#92400E]">
+                          Partial
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className={`inline-flex items-center gap-1.5 font-medium capitalize ${sts.text}`}>

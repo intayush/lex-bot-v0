@@ -219,6 +219,7 @@ export async function POST(req: Request) {
         };
       },
       now: () => Date.now(),
+      sessionId: sessionId ?? undefined,
     };
     const userText =
       typeof newUserMessage?.content === 'string' ? newUserMessage.content : '';
