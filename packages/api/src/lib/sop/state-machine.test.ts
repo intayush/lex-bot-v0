@@ -429,3 +429,236 @@ describe('nextPendingStep', () => {
     expect(nextPendingStep(s, sopConfig)).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// nextPendingStep — sub_type-conditional step filtering (spec 015 / FR-011)
+//
+// Per research.md §R2 and contracts/scoring-config.md, steps with
+// `applies_when_sub_type_slug` set are skipped by nextPendingStep
+// unless the captured sub_type matches. This test covers:
+// - Default-flow steps (applies_when_sub_type_slug = null) always fire
+// - Scoped step is skipped when captured sub_type doesn't match
+// - Scoped step fires when captured sub_type matches
+// - Scoped step is skipped when no sub_type captured yet (defensive)
+// ---------------------------------------------------------------------------
+
+describe('nextPendingStep — applies_when_sub_type_slug filtering (spec 015)', () => {
+  /**
+   * Build a config that mirrors the post-015 layout: 4 default steps
+   * + 1 car-accident-scoped scoring step + when + contact, with the
+   * scoped step inserted between `what` (position 4) and `when`
+   * (position 14 post-renumbering).
+   */
+  function buildScoredSOPConfig(): SOPConfiguration {
+    const steps = [
+      {
+        id: 'step_1',
+        sop_configuration_id: 'cfg_scored',
+        position: 1,
+        slug: 'case_type',
+        question_text: 'What kind of legal matter?',
+        chip_source: 'case_types' as const,
+        inline_chips_json: null,
+        accepts_free_text: true,
+        is_required: true,
+        counts_toward_threshold: true,
+        is_default: true,
+        skip_condition_json: null,
+        applies_when_sub_type_slug: null,
+      },
+      {
+        id: 'step_2',
+        sop_configuration_id: 'cfg_scored',
+        position: 2,
+        slug: 'sub_type',
+        question_text: 'What kind of matter?',
+        chip_source: 'sub_types' as const,
+        inline_chips_json: null,
+        accepts_free_text: true,
+        is_required: true,
+        counts_toward_threshold: true,
+        is_default: true,
+        skip_condition_json: null,
+        applies_when_sub_type_slug: null,
+      },
+      {
+        id: 'step_3',
+        sop_configuration_id: 'cfg_scored',
+        position: 3,
+        slug: 'where',
+        question_text: 'Where did this happen?',
+        chip_source: null,
+        inline_chips_json: null,
+        accepts_free_text: true,
+        is_required: true,
+        counts_toward_threshold: true,
+        is_default: true,
+        skip_condition_json: null,
+        applies_when_sub_type_slug: null,
+      },
+      {
+        id: 'step_4',
+        sop_configuration_id: 'cfg_scored',
+        position: 4,
+        slug: 'what',
+        question_text: 'What happened?',
+        chip_source: null,
+        inline_chips_json: null,
+        accepts_free_text: true,
+        is_required: true,
+        counts_toward_threshold: true,
+        is_default: true,
+        skip_condition_json: null,
+        applies_when_sub_type_slug: null,
+      },
+      {
+        // Car-accident-scoped scoring step
+        id: 'step_5',
+        sop_configuration_id: 'cfg_scored',
+        position: 5,
+        slug: 'accident_timing',
+        question_text: 'When did the accident happen?',
+        chip_source: 'inline' as const,
+        inline_chips_json: JSON.stringify([
+          { label: 'Today', slug: 'today', score_weight: 20 },
+        ]),
+        accepts_free_text: false,
+        is_required: false,
+        counts_toward_threshold: false,
+        is_default: true,
+        skip_condition_json: null,
+        applies_when_sub_type_slug: 'car_accident',
+      },
+      {
+        id: 'step_6',
+        sop_configuration_id: 'cfg_scored',
+        position: 14,
+        slug: 'when',
+        question_text: 'When did this happen?',
+        chip_source: null,
+        inline_chips_json: null,
+        accepts_free_text: true,
+        is_required: true,
+        counts_toward_threshold: true,
+        is_default: true,
+        skip_condition_json: null,
+        applies_when_sub_type_slug: null,
+      },
+    ];
+
+    return {
+      id: 'cfg_scored',
+      account_id: 'acct_test',
+      version: 1,
+      qualified_lead_threshold: 5,
+      is_published: true,
+      derived_from_legacy: false,
+      created_at: ANCHOR_ISO,
+      steps,
+    };
+  }
+
+  it('skips a scoped step when the captured sub_type does NOT match', () => {
+    const sopConfig = buildScoredSOPConfig();
+    let s = initSOPState(sopConfig, ANCHOR_ISO);
+
+    // Capture case_type, sub_type=first_offense (DUI; doesn't match car_accident)
+    s = advanceSOP(
+      s,
+      { type: 'capture_step', step_id: 'step_1', value: 'dui', capturedAt: T1 },
+      sopConfig,
+    );
+    s = advanceSOP(
+      s,
+      { type: 'capture_step', step_id: 'step_2', value: 'first_offense', capturedAt: T1 },
+      sopConfig,
+    );
+    s = advanceSOP(
+      s,
+      { type: 'capture_step', step_id: 'step_3', value: 'Boston', capturedAt: T1 },
+      sopConfig,
+    );
+    s = advanceSOP(
+      s,
+      { type: 'capture_step', step_id: 'step_4', value: 'red light', capturedAt: T1 },
+      sopConfig,
+    );
+
+    // Next pending should jump over `accident_timing` (scoped to car_accident)
+    // straight to `when`.
+    const next = nextPendingStep(s, sopConfig);
+    expect(next?.slug).toBe('when');
+  });
+
+  it('returns the scoped step when the captured sub_type matches', () => {
+    const sopConfig = buildScoredSOPConfig();
+    let s = initSOPState(sopConfig, ANCHOR_ISO);
+
+    s = advanceSOP(
+      s,
+      { type: 'capture_step', step_id: 'step_1', value: 'personal_injury', capturedAt: T1 },
+      sopConfig,
+    );
+    s = advanceSOP(
+      s,
+      { type: 'capture_step', step_id: 'step_2', value: 'car_accident', capturedAt: T1 },
+      sopConfig,
+    );
+    s = advanceSOP(
+      s,
+      { type: 'capture_step', step_id: 'step_3', value: 'Boston', capturedAt: T1 },
+      sopConfig,
+    );
+    s = advanceSOP(
+      s,
+      { type: 'capture_step', step_id: 'step_4', value: 'red light', capturedAt: T1 },
+      sopConfig,
+    );
+
+    const next = nextPendingStep(s, sopConfig);
+    expect(next?.slug).toBe('accident_timing');
+  });
+
+  it('skips a scoped step when no sub_type has been captured yet', () => {
+    // Defensive: if the visitor somehow got past the sub_type step
+    // without capturing a value, the scoped scoring step must NOT
+    // fire. (In production this can't happen because sub_type is a
+    // required default step; the test enforces the invariant anyway.)
+    const sopConfig = buildScoredSOPConfig();
+    let s = initSOPState(sopConfig, ANCHOR_ISO);
+
+    // Skip past sub_type without capturing it
+    s = advanceSOP(
+      s,
+      { type: 'capture_step', step_id: 'step_1', value: 'personal_injury', capturedAt: T1 },
+      sopConfig,
+    );
+    s = advanceSOP(s, { type: 'skip_step', step_id: 'step_2' }, sopConfig);
+    s = advanceSOP(
+      s,
+      { type: 'capture_step', step_id: 'step_3', value: 'Boston', capturedAt: T1 },
+      sopConfig,
+    );
+    s = advanceSOP(
+      s,
+      { type: 'capture_step', step_id: 'step_4', value: 'red light', capturedAt: T1 },
+      sopConfig,
+    );
+
+    const next = nextPendingStep(s, sopConfig);
+    // Should jump to when, not accident_timing
+    expect(next?.slug).toBe('when');
+  });
+
+  it('default-flow steps with applies_when_sub_type_slug = null always fire (regression check)', () => {
+    // Existing behavior: any step with applies_when_sub_type_slug = null
+    // (or undefined) fires regardless of captured sub_type. This test
+    // is a regression guard so the new conditional logic doesn't
+    // accidentally break the existing 6-step default flow.
+    const sopConfig = buildScoredSOPConfig();
+    const s = initSOPState(sopConfig, ANCHOR_ISO);
+
+    const next = nextPendingStep(s, sopConfig);
+    expect(next?.slug).toBe('case_type');
+  });
+});
