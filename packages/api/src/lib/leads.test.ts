@@ -95,6 +95,56 @@ CREATE TABLE \`notifications\` (
   FOREIGN KEY (\`account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE no action,
   FOREIGN KEY (\`lead_id\`) REFERENCES \`leads\`(\`id\`) ON UPDATE no action ON DELETE no action
 );
+
+CREATE TABLE \`sop_configurations\` (
+  \`id\` text PRIMARY KEY NOT NULL,
+  \`account_id\` text NOT NULL,
+  \`version\` integer NOT NULL,
+  \`qualified_lead_threshold\` integer DEFAULT 5 NOT NULL,
+  \`is_published\` integer DEFAULT 0 NOT NULL,
+  \`derived_from_legacy\` integer DEFAULT 0 NOT NULL,
+  \`created_at\` text NOT NULL,
+  FOREIGN KEY (\`account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE no action
+);
+
+CREATE TABLE \`sop_steps\` (
+  \`id\` text PRIMARY KEY NOT NULL,
+  \`sop_configuration_id\` text NOT NULL,
+  \`position\` integer NOT NULL,
+  \`slug\` text NOT NULL,
+  \`question_text\` text NOT NULL,
+  \`chip_source\` text,
+  \`inline_chips_json\` text,
+  \`accepts_free_text\` integer DEFAULT 1 NOT NULL,
+  \`is_required\` integer DEFAULT 1 NOT NULL,
+  \`counts_toward_threshold\` integer DEFAULT 1 NOT NULL,
+  \`is_default\` integer DEFAULT 0 NOT NULL,
+  \`skip_condition_json\` text,
+  \`applies_when_sub_type_slug\` text,
+  FOREIGN KEY (\`sop_configuration_id\`) REFERENCES \`sop_configurations\`(\`id\`) ON UPDATE no action ON DELETE no action
+);
+
+CREATE TABLE \`case_types\` (
+  \`id\` text PRIMARY KEY NOT NULL,
+  \`account_id\` text NOT NULL,
+  \`slug\` text NOT NULL,
+  \`label\` text NOT NULL,
+  \`position\` integer NOT NULL,
+  \`is_in_scope\` integer DEFAULT 1 NOT NULL,
+  \`created_at\` text NOT NULL,
+  FOREIGN KEY (\`account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE no action
+);
+
+CREATE TABLE \`sub_types\` (
+  \`id\` text PRIMARY KEY NOT NULL,
+  \`case_type_id\` text NOT NULL,
+  \`slug\` text NOT NULL,
+  \`label\` text NOT NULL,
+  \`position\` integer NOT NULL,
+  \`scoring_config_json\` text,
+  \`created_at\` text NOT NULL,
+  FOREIGN KEY (\`case_type_id\`) REFERENCES \`case_types\`(\`id\`) ON UPDATE no action ON DELETE no action
+);
 `;
 
 const TEST_ACCOUNT_ID = 'acct_test_001';
@@ -149,6 +199,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  sqlite.exec('DROP TABLE IF EXISTS sub_types');
+  sqlite.exec('DROP TABLE IF EXISTS case_types');
+  sqlite.exec('DROP TABLE IF EXISTS sop_steps');
+  sqlite.exec('DROP TABLE IF EXISTS sop_configurations');
   sqlite.exec('DROP TABLE IF EXISTS notifications');
   sqlite.exec('DROP TABLE IF EXISTS leads');
   sqlite.exec('DROP TABLE IF EXISTS sessions');
@@ -937,5 +991,336 @@ describe('updateLeadSOPState — contact step backfill', () => {
       .where(eq(schema.leads.session_id, TEST_SESSION_ID))
       .get();
     expect(row.name).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T017 / T018 — captureLead and updateLeadSOPState invoke scoreLead at SOP
+// finalization and write the new 015 columns. Per spec 015 FR-001..FR-006,
+// FR-013, contracts/lead-finalization-log.md, and the user's decision that
+// scoring runs only when sopState.is_finalized === true.
+// ---------------------------------------------------------------------------
+
+import {
+  CAR_ACCIDENT_SCORING_CONFIG_JSON,
+  DEFAULT_SOP_STEPS,
+} from '../db/seed-defaults/sop.js';
+
+/**
+ * Seed a published SOP, the personal_injury → car_accident sub_type with
+ * its scoring_config_json, and the 9 car-accident-scoped scoring step
+ * rows. Returns IDs needed for crafting an SOPState fixture.
+ */
+function seedScoringHarness() {
+  const cfgId = 'cfg_test_scored';
+  const piCaseTypeId = 'ct_pi_test';
+  const carAccidentSubTypeId = 'st_ca_test';
+  const now = '2026-06-06T00:00:00Z';
+
+  // sop_configurations
+  (db as any).insert(schema.sopConfigurations).values({
+    id: cfgId,
+    account_id: TEST_ACCOUNT_ID,
+    version: 1,
+    qualified_lead_threshold: 6,
+    is_published: true,
+    derived_from_legacy: false,
+    created_at: now,
+  }).run();
+
+  // case_types: personal_injury
+  (db as any).insert(schema.caseTypes).values({
+    id: piCaseTypeId,
+    account_id: TEST_ACCOUNT_ID,
+    slug: 'personal_injury',
+    label: 'Personal Injury',
+    position: 3,
+    is_in_scope: true,
+    created_at: now,
+  }).run();
+
+  // sub_types: car_accident with seeded scoring_config_json
+  (db as any).insert(schema.subTypes).values({
+    id: carAccidentSubTypeId,
+    case_type_id: piCaseTypeId,
+    slug: 'car_accident',
+    label: 'Car Accident',
+    position: 1,
+    scoring_config_json: CAR_ACCIDENT_SCORING_CONFIG_JSON,
+    created_at: now,
+  }).run();
+
+  // sop_steps: insert all 15 default steps (the 6 default + 9 car-accident-scoped)
+  for (const step of DEFAULT_SOP_STEPS) {
+    (db as any).insert(schema.sopSteps).values({
+      id: `step_${step.slug}_test`,
+      sop_configuration_id: cfgId,
+      position: step.position,
+      slug: step.slug,
+      question_text: step.question_text,
+      chip_source: step.chip_source,
+      inline_chips_json: step.inline_chips_json,
+      accepts_free_text: step.accepts_free_text,
+      is_required: step.is_required,
+      counts_toward_threshold: step.counts_toward_threshold,
+      is_default: step.is_default,
+      skip_condition_json: step.skip_condition_json,
+      applies_when_sub_type_slug: step.applies_when_sub_type_slug ?? null,
+    }).run();
+  }
+
+  return { cfgId, piCaseTypeId, carAccidentSubTypeId };
+}
+
+/**
+ * Build a finalized SOPState for the HOT-walk fixture. Captures
+ * personal_injury → car_accident plus the 9 scoring/metadata answers
+ * that produce a HOT classification with capped score 100.
+ */
+function buildFinalizedHotWalkSOPState(): any {
+  const stepCaptures: Record<string, string> = {
+    case_type: 'personal_injury',
+    sub_type: 'car_accident',
+    where: 'Boston, MA',
+    what: 'Other driver ran a red light',
+    request_type: 'myself',
+    geographic_qualification: 'yes_in_area',
+    accident_timing: 'today',                       // +20
+    injury: 'injury_yes',                           // +15
+    medical_treatment: 'er_visit',                  // +15
+    accident_role: 'driver',                        // +5
+    insurance_activity: 'requested_recorded_statement', // +15
+    work_impact: 'missed_work',                     // +10
+    attorney_status: 'no_lawyer',                   // +20
+    when: '2026-06-06',
+    contact: '{"name":"Jane Doe","contact_email":"jane@example.com","contact_phone":"5551234567"}',
+  };
+
+  return {
+    sop_configuration_id: 'cfg_test_scored',
+    sop_version: 1,
+    conversation_anchor_iso: '2026-06-06T00:00:00Z',
+    qualified_lead_threshold: 6,
+    current_progress: 6,
+    is_finalized: true,
+    out_of_scope_termination: false,
+    steps: DEFAULT_SOP_STEPS.map((s) => ({
+      step_id: `step_${s.slug}_test`,
+      slug: s.slug,
+      status: stepCaptures[s.slug] !== undefined ? 'complete' : 'pending',
+      captured_value: stepCaptures[s.slug] ?? null,
+      captured_label: null,
+      captured_at:
+        stepCaptures[s.slug] !== undefined ? '2026-06-06T00:01:00Z' : null,
+      inferred: false,
+    })),
+  };
+}
+
+describe('captureLead — spec 015 scoring engine wiring', () => {
+  describe('when sopState is finalized AND sub_type has scoring_config_json', () => {
+    beforeEach(() => {
+      seedScoringHarness();
+    });
+
+    it('writes lead_score, score_reasons_json, classification, request_type, geographic_qualification', async () => {
+      const sopState = buildFinalizedHotWalkSOPState();
+
+      // The LLM-side classification is irrelevant for car_accident
+      // (rule-based scorer wins per FR-001); pass anything valid.
+      await captureLead(
+        makeLeadInput({
+          classification: 'WARM' as const,
+          sopState,
+        }),
+      );
+
+      const row = (db as any)
+        .select()
+        .from(schema.leads)
+        .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+        .get();
+
+      expect(row.classification).toBe('HOT');
+      expect(row.lead_score).toBe(100); // sum 100, cap 100
+      expect(row.request_type).toBe('SELF');
+      expect(row.geographic_qualification).toBe('IN_SERVICE_AREA');
+
+      const reasons = JSON.parse(row.score_reasons_json) as string[];
+      // 8 chip-derived phrases (each |w| >= 5) + 0 hard-overrides since
+      // contact info is valid and case_type is in_scope. Per FR-010a.
+      expect(reasons.length).toBeGreaterThanOrEqual(7);
+      expect(reasons).toContain('Today');
+      expect(reasons).toContain('Yes'); // injury_yes label = 'Yes'
+      expect(reasons).toContain('Emergency Room Visit');
+      expect(reasons).toContain('No'); // no_lawyer label = 'No'
+    });
+
+    it('produces deterministic output across two calls for the same session', async () => {
+      const sopState = buildFinalizedHotWalkSOPState();
+
+      // First call inserts; second call updates. Both should produce
+      // identical scoring fields per FR-004.
+      await captureLead(makeLeadInput({ sopState }));
+      const row1 = (db as any)
+        .select()
+        .from(schema.leads)
+        .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+        .get();
+
+      await captureLead(makeLeadInput({ sopState }));
+      const row2 = (db as any)
+        .select()
+        .from(schema.leads)
+        .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+        .get();
+
+      expect(row2.classification).toBe(row1.classification);
+      expect(row2.lead_score).toBe(row1.lead_score);
+      expect(row2.score_reasons_json).toBe(row1.score_reasons_json);
+    });
+  });
+
+  describe('when sopState is NOT finalized (pre-finalize captureLead invocation)', () => {
+    beforeEach(() => {
+      seedScoringHarness();
+    });
+
+    it('does NOT invoke the scorer; lead_score and score_reasons_json stay null', async () => {
+      // Per the user's decision: scoring runs only at SOP finalization.
+      // Pre-finalize captureLead invocations skip the scorer entirely;
+      // the LLM's classification is persisted as-is.
+      const sopState = buildFinalizedHotWalkSOPState();
+      sopState.is_finalized = false;
+      sopState.current_progress = 4;
+
+      await captureLead(
+        makeLeadInput({
+          classification: 'WARM' as const,
+          sopState,
+        }),
+      );
+
+      const row = (db as any)
+        .select()
+        .from(schema.leads)
+        .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+        .get();
+
+      expect(row.classification).toBe('WARM'); // LLM value preserved
+      expect(row.lead_score).toBeNull();
+      expect(row.score_reasons_json).toBeNull();
+      expect(row.request_type).toBeNull();
+      expect(row.geographic_qualification).toBeNull();
+    });
+  });
+
+  describe('when sub_type has NO scoring_config_json (LLM fallback path per FR-022)', () => {
+    it('does NOT invoke the scorer; LLM classification is persisted; new columns stay null', async () => {
+      // Seed with a non-scoring sub_type (e.g., DUI / first_offense)
+      const cfgId = 'cfg_test_nosc';
+      const duiCaseTypeId = 'ct_dui_test';
+      const firstOffenseSubTypeId = 'st_fo_test';
+      const now = '2026-06-06T00:00:00Z';
+
+      (db as any).insert(schema.sopConfigurations).values({
+        id: cfgId,
+        account_id: TEST_ACCOUNT_ID,
+        version: 1,
+        qualified_lead_threshold: 6,
+        is_published: true,
+        derived_from_legacy: false,
+        created_at: now,
+      }).run();
+      (db as any).insert(schema.caseTypes).values({
+        id: duiCaseTypeId,
+        account_id: TEST_ACCOUNT_ID,
+        slug: 'dui',
+        label: 'DUI',
+        position: 1,
+        is_in_scope: true,
+        created_at: now,
+      }).run();
+      (db as any).insert(schema.subTypes).values({
+        id: firstOffenseSubTypeId,
+        case_type_id: duiCaseTypeId,
+        slug: 'first_offense',
+        label: 'First Offense',
+        position: 1,
+        scoring_config_json: null, // explicit fallback
+        created_at: now,
+      }).run();
+
+      const sopState: any = {
+        sop_configuration_id: cfgId,
+        sop_version: 1,
+        conversation_anchor_iso: '2026-06-06T00:00:00Z',
+        qualified_lead_threshold: 6,
+        current_progress: 6,
+        is_finalized: true,
+        out_of_scope_termination: false,
+        steps: [
+          { step_id: 'step_case_type', slug: 'case_type', status: 'complete',
+            captured_value: 'dui', captured_label: 'DUI',
+            captured_at: now, inferred: false },
+          { step_id: 'step_sub_type', slug: 'sub_type', status: 'complete',
+            captured_value: 'first_offense', captured_label: 'First Offense',
+            captured_at: now, inferred: false },
+        ],
+      };
+
+      await captureLead(
+        makeLeadInput({
+          classification: 'WARM' as const,
+          sopState,
+        }),
+      );
+
+      const row = (db as any)
+        .select()
+        .from(schema.leads)
+        .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+        .get();
+
+      expect(row.classification).toBe('WARM'); // LLM value preserved
+      expect(row.lead_score).toBeNull();
+      expect(row.score_reasons_json).toBeNull();
+    });
+  });
+});
+
+describe('updateLeadSOPState — spec 015 scoring engine wiring', () => {
+  beforeEach(() => {
+    seedScoringHarness();
+  });
+
+  it('invokes the scorer when transitioning to a finalized SOP state', async () => {
+    // First captureLead with non-finalized SOP — no scoring yet.
+    const sopState = buildFinalizedHotWalkSOPState();
+    sopState.is_finalized = false;
+    sopState.current_progress = 5;
+
+    await captureLead(makeLeadInput({ sopState }));
+
+    let row = (db as any)
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+      .get();
+    expect(row.lead_score).toBeNull();
+
+    // updateLeadSOPState with finalized SOP — should now score.
+    const finalizedSop = buildFinalizedHotWalkSOPState();
+    await updateLeadSOPState(TEST_SESSION_ID, finalizedSop);
+
+    row = (db as any)
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+      .get();
+    expect(row.classification).toBe('HOT');
+    expect(row.lead_score).toBe(100);
+    expect(row.request_type).toBe('SELF');
+    expect(row.geographic_qualification).toBe('IN_SERVICE_AREA');
   });
 });
