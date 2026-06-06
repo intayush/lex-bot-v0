@@ -115,6 +115,46 @@ function captureRequestType(state: SOPState): LeadRequestType | null {
   return 'SELF';
 }
 
+/**
+ * Compute the Question 9 contact-information bonus per
+ * `lead-classification-revamp.md`:
+ *
+ *   - Valid phone number  → +5
+ *   - Valid email address → +5
+ *   - Maximum             → +10
+ *
+ * Reads the captured contact-form payload off the default SOP's
+ * Step 6 `contact` step (JSON-stringified ContactFormPayload).
+ * Returns 0 when the step is missing OR yields no valid email/phone.
+ *
+ * Phone is "valid" when it has ≥ 7 digits after stripping non-digit
+ * characters (mirrors spec 015 contact-form regex). Email is "valid"
+ * when it matches a pragmatic regex `^[^@\s]+@[^@\s]+\.[^@\s]+$`
+ * (the same shape `lib/leads.ts` uses for the spec 015 contactBonus).
+ */
+function computeContactBonus(state: SOPState): number {
+  const contactStep = state.steps.find((s) => s.slug === 'contact');
+  if (!contactStep || contactStep.captured_value === null) return 0;
+
+  let payload: { contact_email?: string | null; contact_phone?: string | null };
+  try {
+    payload = JSON.parse(contactStep.captured_value);
+  } catch {
+    return 0;
+  }
+
+  const phoneDigits = (payload.contact_phone ?? '').replace(/[^0-9]/g, '');
+  const phoneBonus = phoneDigits.length >= 7 ? 5 : 0;
+
+  const emailBonus =
+    payload.contact_email &&
+    /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(payload.contact_email)
+      ? 5
+      : 0;
+
+  return phoneBonus + emailBonus;
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -291,6 +331,13 @@ export async function runBranchOrchestrator(
     branchVersion: pinnedVersion,
     capturedChips: advanceResult.capturedChips,
     requestType: captureRequestType({
+      ...sopState,
+      branch_state: advanceResult.updatedState,
+    }),
+    // lead-classification-revamp.md Q9 — Contact Information bonus
+    // (Phone +5 / Email +5, capped at +10). Read from the captured
+    // contact-form payload on Step 6 of the default SOP.
+    contactBonus: computeContactBonus({
       ...sopState,
       branch_state: advanceResult.updatedState,
     }),

@@ -273,3 +273,136 @@ describe('runBranchOrchestrator — clarification path', () => {
     expect(result.action).toBe('awaiting_clarification');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Q9 contact-information bonus (lead-classification-revamp.md)
+// ---------------------------------------------------------------------------
+
+describe('runBranchOrchestrator — contact bonus on finalize', () => {
+  function makeStateWithContact(payload: {
+    name?: string | null;
+    email?: string | null;
+    phone?: string | null;
+  }): SOPState {
+    const contactValue = JSON.stringify({
+      name: payload.name ?? null,
+      contact_email: payload.email ?? null,
+      contact_phone: payload.phone ?? null,
+    });
+    const base = makeFinalizedSopState({
+      branch_state: {
+        branch_id: 'br_test',
+        branch_version_id: 'bv_v1',
+        current_question_index: 1,
+        captured_chips: [{ question_id: 'q_role', chip_slugs: ['driver'] }],
+        captured_free_text: [],
+      },
+    });
+    return {
+      ...base,
+      steps: [
+        ...base.steps,
+        {
+          step_id: 'step_contact',
+          slug: 'contact',
+          status: 'complete',
+          captured_value: contactValue,
+          captured_label: null,
+          captured_at: '2026-06-06T00:06:00Z',
+          inferred: false,
+        },
+      ],
+    };
+  }
+
+  it('adds +10 (5+5) when both phone and email are valid', async () => {
+    const deps = makeDeps({
+      branchLookup: { branch: SAMPLE_BRANCH, version: SAMPLE_VERSION },
+    });
+    const result = await runBranchOrchestrator({
+      accountId: ACCOUNT_ID,
+      sopState: makeStateWithContact({
+        email: 'pat@example.com',
+        phone: '+15551234567',
+      }),
+      userMessage: 'Yes',
+      deps,
+    });
+    expect(result.action).toBe('finalize_with_branch');
+    if (result.action !== 'finalize_with_branch') return;
+    // driver(10) + yes(15) + contact(10) = 35
+    expect(result.score.score).toBe(35);
+  });
+
+  it('adds +5 when only the email is valid (phone missing)', async () => {
+    const deps = makeDeps({
+      branchLookup: { branch: SAMPLE_BRANCH, version: SAMPLE_VERSION },
+    });
+    const result = await runBranchOrchestrator({
+      accountId: ACCOUNT_ID,
+      sopState: makeStateWithContact({ email: 'pat@example.com', phone: null }),
+      userMessage: 'Yes',
+      deps,
+    });
+    if (result.action !== 'finalize_with_branch') throw new Error('not finalized');
+    // driver(10) + yes(15) + email(5) = 30
+    expect(result.score.score).toBe(30);
+  });
+
+  it('adds +5 when only the phone is valid (email missing)', async () => {
+    const deps = makeDeps({
+      branchLookup: { branch: SAMPLE_BRANCH, version: SAMPLE_VERSION },
+    });
+    const result = await runBranchOrchestrator({
+      accountId: ACCOUNT_ID,
+      sopState: makeStateWithContact({ email: null, phone: '+15551234567' }),
+      userMessage: 'Yes',
+      deps,
+    });
+    if (result.action !== 'finalize_with_branch') throw new Error('not finalized');
+    // driver(10) + yes(15) + phone(5) = 30
+    expect(result.score.score).toBe(30);
+  });
+
+  it('adds 0 when contact step is absent', async () => {
+    const deps = makeDeps({
+      branchLookup: { branch: SAMPLE_BRANCH, version: SAMPLE_VERSION },
+    });
+    const stateAtLastQ = makeFinalizedSopState({
+      branch_state: {
+        branch_id: 'br_test',
+        branch_version_id: 'bv_v1',
+        current_question_index: 1,
+        captured_chips: [{ question_id: 'q_role', chip_slugs: ['driver'] }],
+        captured_free_text: [],
+      },
+    });
+    const result = await runBranchOrchestrator({
+      accountId: ACCOUNT_ID,
+      sopState: stateAtLastQ,
+      userMessage: 'Yes',
+      deps,
+    });
+    if (result.action !== 'finalize_with_branch') throw new Error('not finalized');
+    // driver(10) + yes(15) = 25 (no contact bonus)
+    expect(result.score.score).toBe(25);
+  });
+
+  it('does NOT credit invalid email or short phone', async () => {
+    const deps = makeDeps({
+      branchLookup: { branch: SAMPLE_BRANCH, version: SAMPLE_VERSION },
+    });
+    const result = await runBranchOrchestrator({
+      accountId: ACCOUNT_ID,
+      sopState: makeStateWithContact({
+        email: 'not-an-email',
+        phone: '12345', // < 7 digits
+      }),
+      userMessage: 'Yes',
+      deps,
+    });
+    if (result.action !== 'finalize_with_branch') throw new Error('not finalized');
+    // driver(10) + yes(15) + 0 = 25
+    expect(result.score.score).toBe(25);
+  });
+});

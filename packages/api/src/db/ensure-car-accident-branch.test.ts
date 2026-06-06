@@ -161,10 +161,14 @@ describe('ensureCarAccidentBranchForAccount', () => {
     expect(versions).toHaveLength(1);
     expect(versions[0].is_published).toBe(true);
     expect(versions[0].created_by_user_id).toBe('system_seed_016');
-    // Spot-check: questions_json must contain the 9 spec-015 questions.
+    // Spot-check: questions_json must contain the 10 questions per
+    // lead-classification-revamp.md (request_type, geographic_qualification,
+    // accident_timing, injury, medical_treatment, accident_role, liability,
+    // insurance_activity, work_impact, attorney_status).
     const questions = JSON.parse(versions[0].questions_json) as Array<{ id: string }>;
-    expect(questions).toHaveLength(9);
+    expect(questions).toHaveLength(10);
     expect(questions.map((q) => q.id)).toContain('accident_role');
+    expect(questions.map((q) => q.id)).toContain('liability');
     expect(questions.map((q) => q.id)).toContain('attorney_status');
   });
 

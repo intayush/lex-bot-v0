@@ -255,6 +255,7 @@ const _RAW_CAR_ACCIDENT_BRANCH_QUESTIONS: BranchQuestionSeed[] = [
     chips: [
       { label: 'Passenger', slug: 'passenger', score_weight: 10 },
       { label: 'Pedestrian', slug: 'pedestrian', score_weight: 10 },
+      { label: 'Cyclist', slug: 'cyclist', score_weight: 8 },
       { label: 'Driver', slug: 'driver', score_weight: 5 },
       { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
     ],
@@ -262,8 +263,24 @@ const _RAW_CAR_ACCIDENT_BRANCH_QUESTIONS: BranchQuestionSeed[] = [
     multi_select: false,
   },
   {
-    id: 'insurance_activity',
+    // lead-classification-revamp.md Q5 — Liability (-20..+15)
+    id: 'liability',
     position: 6,
+    text: 'Who do you believe was primarily responsible for the accident?',
+    preface: null,
+    chips: [
+      { label: 'The Other Driver', slug: 'other_driver', score_weight: 15 },
+      { label: 'Mostly The Other Driver', slug: 'mostly_other_driver', score_weight: 10 },
+      { label: 'Not Sure', slug: 'liability_not_sure', score_weight: 5 },
+      { label: 'Both Drivers', slug: 'both_drivers', score_weight: 0 },
+      { label: 'Mostly Me', slug: 'mostly_me', score_weight: -20 },
+    ],
+    free_text_allowed: false,
+    multi_select: false,
+  },
+  {
+    id: 'insurance_activity',
+    position: 7,
     text: 'Has an insurance company contacted you (or them)?',
     preface: null,
     chips: [
@@ -279,7 +296,7 @@ const _RAW_CAR_ACCIDENT_BRANCH_QUESTIONS: BranchQuestionSeed[] = [
   },
   {
     id: 'work_impact',
-    position: 7,
+    position: 8,
     text: 'Has the accident affected your (or their) ability to work?',
     preface: null,
     chips: [
@@ -294,14 +311,15 @@ const _RAW_CAR_ACCIDENT_BRANCH_QUESTIONS: BranchQuestionSeed[] = [
   },
   {
     id: 'attorney_status',
-    position: 8,
+    position: 9,
     text: 'Do you currently have a lawyer?',
     preface: null,
     chips: [
-      { label: 'No', slug: 'no_lawyer', score_weight: 20 },
-      { label: "Spoke With Lawyers, Haven't Signed Yet", slug: 'spoke_not_signed', score_weight: 15 },
-      { label: 'Signed With Lawyer But Want To Change Lawyers', slug: 'want_to_change', score_weight: 10 },
-      { label: 'Yes, I Have A Lawyer', slug: 'yes_have_lawyer', score_weight: -20 },
+      // Per lead-classification-revamp.md Q8: weights are +15 / +12 / +5 / -25.
+      { label: 'No', slug: 'no_lawyer', score_weight: 15 },
+      { label: "Spoke With Lawyers, Haven't Signed Yet", slug: 'spoke_not_signed', score_weight: 12 },
+      { label: 'Signed With Lawyer But Want To Change Lawyers', slug: 'want_to_change', score_weight: 5 },
+      { label: 'Yes, I Have A Lawyer', slug: 'yes_have_lawyer', score_weight: -25 },
       { label: "I Don't Know", slug: 'i_dont_know', score_weight: 0 },
     ],
     free_text_allowed: false,
