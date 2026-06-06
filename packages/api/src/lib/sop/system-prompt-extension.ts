@@ -81,7 +81,16 @@ export function composeSopBlock(
   );
   lines.push('');
 
-  if (sopState.is_finalized) {
+  // Spec 016 US2: when a configured branch is in flight, the SOP is
+  // technically `is_finalized=true` (Step 6 satisfied) but the
+  // conversation is NOT actually done — the branch is asking
+  // additional questions. Skip the "Finalized" prompt section in
+  // that case. The branchPromptDirective (appended by the chat
+  // route) supersedes it with a per-turn directive that tells the
+  // agent which branch question to ask next.
+  const branchInFlight = sopState.is_finalized && sopState.branch_state != null;
+
+  if (sopState.is_finalized && !branchInFlight) {
     lines.push(...composeFinalizedSection(sopState));
     lines.push('');
     lines.push(...composeGoodbyeRule(goodbyePhrases));

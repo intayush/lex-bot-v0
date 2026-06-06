@@ -284,14 +284,40 @@ export async function POST(req: Request) {
       description: 'Capture a qualified lead after gathering sufficient information from the visitor. Call this once you have collected their name, contact info, and understand their legal matter. Classify HOT for time-sensitive factors (statute of limitations, active danger, ongoing medical treatment, court deadlines). Classify SPAM for matters outside the firm practice areas, missing contact info, or obvious test submissions.',
       parameters: captureLeadToolParams,
       execute: async ({ name, contactEmail, contactPhone, caseType, incidentDate, briefDescription, classification, classificationRationale, urgencyFactors }) => {
+        // Fallback: when the LLM didn't pass contact fields (because
+        // PII redaction stripped them from the system prompt), read
+        // them from the SOP state's contact step. Spec 016 FR-002b
+        // requires every captured lead to carry at least one of
+        // {email, phone}; this fallback ensures we honour that
+        // contract even when the agent's tool call is missing fields.
+        let resolvedName = name ?? null;
+        let resolvedEmail = contactEmail ?? null;
+        let resolvedPhone = contactPhone ?? null;
+        if (sopState && (resolvedName === null || resolvedEmail === null || resolvedPhone === null)) {
+          const contactStep = sopState.steps.find((s) => s.slug === 'contact');
+          if (contactStep?.captured_value) {
+            try {
+              const payload = JSON.parse(contactStep.captured_value) as {
+                name?: string | null;
+                contact_email?: string | null;
+                contact_phone?: string | null;
+              };
+              resolvedName ??= payload.name ?? null;
+              resolvedEmail ??= payload.contact_email ?? null;
+              resolvedPhone ??= payload.contact_phone ?? null;
+            } catch {
+              // Captured value isn't JSON (free-text contact); leave unresolved.
+            }
+          }
+        }
         const result = await captureLead({
           accountId: auth.accountId,
           sessionId: sessionId!,
-          name,
-          contactEmail,
-          contactPhone,
-          caseType,
-          incidentDate,
+          name: resolvedName,
+          contactEmail: resolvedEmail,
+          contactPhone: resolvedPhone,
+          caseType: caseType ?? null,
+          incidentDate: incidentDate ?? null,
           briefDescription,
           classification,
           classificationRationale,

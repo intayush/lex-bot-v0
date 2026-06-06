@@ -19,16 +19,25 @@ import { z } from 'zod';
  * item 2.
  */
 export const captureLeadToolParams = z.object({
-  name: z.string().nullable().describe('Visitor name or null if not provided'),
-  contactEmail: z.string().nullable().describe('Email address or null'),
-  contactPhone: z.string().nullable().describe('Phone number or null'),
+  name: z
+    .string()
+    .nullish()
+    .describe('Visitor name or null/omit if not provided'),
+  contactEmail: z
+    .string()
+    .nullish()
+    .describe('Email address or null/omit'),
+  contactPhone: z
+    .string()
+    .nullish()
+    .describe('Phone number or null/omit'),
   caseType: z
     .string()
-    .nullable()
+    .nullish()
     .describe('Type of legal matter (e.g. Personal Injury, Family Law)'),
   incidentDate: z
     .string()
-    .nullable()
+    .nullish()
     .describe('When the issue arose, ISO date format if possible'),
   briefDescription: z
     .string()
