@@ -48,9 +48,15 @@ No new workspace packages, one new Drizzle migration (`0003_*.sql`).
 
 ### Tests for Foundational (write FIRST, must FAIL)
 
-- [ ] T002 [P] Write failing unit test in `packages/shared/src/schemas/leads.test.ts` (extend if exists, else create) asserting that `leadClassificationSchema` parses each of `'HOT'`, `'WARM'`, `'COLD'`, `'SPAM'` and rejects each of `'urgent'`, `'normal'`, `'unqualified'` with a Zod parse error.
-- [ ] T003 [P] Write failing unit test in `packages/shared/src/schemas/sop.test.ts` asserting that `chipSchema` accepts a chip with `score_weight: 20`, accepts a chip with `score_weight: 0`, accepts a chip with `score_weight` absent, rejects `score_weight: 51` (out of bounds), rejects `score_weight: -51`, and rejects `score_weight: 1.5` (non-integer).
-- [ ] T004 [P] Write failing unit test in `packages/shared/src/schemas/sop.test.ts` asserting that `scoringConfigSchema` (NEW) accepts the seeded car-accident default config from `contracts/scoring-config.md`, rejects a config where Self thresholds have a gap (e.g., `cold = [26, 49]` while `warm = [51, 75]`), rejects a config where Self thresholds overlap (e.g., `cold = [26, 55]` and `warm = [51, 75]`), rejects a config missing the `family_friend` thresholds, rejects `schema_version: 2`, and surfaces stable `params.code` values (`THRESHOLDS_GAP`, `THRESHOLDS_OVERLAP`, `SCHEMA_VERSION_UNSUPPORTED`).
+- [X] T002 [P] Write failing unit test in `packages/shared/src/schemas/leads.test.ts` (extend if exists, else create) asserting that `leadClassificationSchema` parses each of `'HOT'`, `'WARM'`, `'COLD'`, `'SPAM'` and rejects each of `'urgent'`, `'normal'`, `'unqualified'` with a Zod parse error.
+
+      **Result**: Failing test committed first per Constitution III. Now passes via T005's impl.
+- [X] T003 [P] Write failing unit test in `packages/shared/src/schemas/sop.test.ts` asserting that `chipSchema` accepts a chip with `score_weight: 20`, accepts a chip with `score_weight: 0`, accepts a chip with `score_weight` absent, rejects `score_weight: 51` (out of bounds), rejects `score_weight: -51`, and rejects `score_weight: 1.5` (non-integer).
+
+      **Result**: Failing test committed first per Constitution III. Now passes via T006's impl.
+- [X] T004 [P] Write failing unit test in `packages/shared/src/schemas/sop.test.ts` asserting that `scoringConfigSchema` (NEW) accepts the seeded car-accident default config from `contracts/scoring-config.md`, rejects a config where Self thresholds have a gap (e.g., `cold = [26, 49]` while `warm = [51, 75]`), rejects a config where Self thresholds overlap (e.g., `cold = [26, 55]` and `warm = [51, 75]`), rejects a config missing the `family_friend` thresholds, rejects `schema_version: 2`, and surfaces stable `params.code` values (`THRESHOLDS_GAP`, `THRESHOLDS_OVERLAP`, `SCHEMA_VERSION_UNSUPPORTED`).
+
+      **Result**: Failing test committed first per Constitution III. Now passes via T007's impl.
 
 ### Implementation for Foundational
 
