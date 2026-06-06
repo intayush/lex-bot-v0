@@ -80,6 +80,37 @@ export const leads = pgTable('leads', {
    * (out of scope for v1 per spec.md).
    */
   follow_up_action_changed_at: text('follow_up_action_changed_at'),
+  /**
+   * Numeric lead score in `[0, 100]` inclusive when set; NULL when
+   * the lead was scored by the LLM fallback path, the partial-lead
+   * heuristic, the legacy migration, or when the rule-based scorer
+   * threw at finalization (FR-010b safe-default capture). Spec 015.
+   */
+  lead_score: integer('lead_score'),
+  /**
+   * JSON-encoded array of human-readable reason phrases. NULL for
+   * unscored leads. Special sentinel `'["scoring_error"]'` flags a
+   * scorer-failure capture per FR-010b. Spec 015.
+   */
+  score_reasons_json: text('score_reasons_json'),
+  /**
+   * Captured request-type metadata from the new SOP step. One of
+   * `'SELF'` or `'FRIEND_FAMILY'`; NULL on legacy / fallback paths
+   * where the question was not asked. Selects which
+   * classification-threshold table the scorer applies. Spec 015 FR-014.
+   */
+  request_type: text('request_type'),
+  /**
+   * Captured geographic-qualification metadata. One of
+   * `'IN_SERVICE_AREA'` or `'OUTSIDE_SERVICE_AREA'`; NULL when not
+   * asked. Spec 015 FR-015.
+   */
+  geographic_qualification: text('geographic_qualification'),
+  /**
+   * JSON-encoded `{ city, state }` populated only when
+   * `geographic_qualification = 'OUTSIDE_SERVICE_AREA'`. Spec 015 FR-015.
+   */
+  geographic_qualification_details_json: text('geographic_qualification_details_json'),
   created_at: text('created_at').notNull(),
 });
 
@@ -148,6 +179,15 @@ export const sopSteps = pgTable('sop_steps', {
   is_default: boolean('is_default').notNull().default(false),
   /** Reserved for advanced skip rules (post-MVP). */
   skip_condition_json: text('skip_condition_json'),
+  /**
+   * When set, this step only fires for visitors whose captured
+   * `sub_type` slug matches this value. NULL means "always fires"
+   * (the default for the existing 6 default steps). Used by spec
+   * 015 to scope the 9 new car-accident scoring steps to
+   * `'car_accident'`. Filtered at runtime in `nextPendingStep`
+   * (research.md §R2). Spec 015.
+   */
+  applies_when_sub_type_slug: text('applies_when_sub_type_slug'),
 }, (table) => [
   uniqueIndex('sop_steps_config_slug_unique').on(table.sop_configuration_id, table.slug),
 ]);
@@ -176,6 +216,16 @@ export const subTypes = pgTable('sub_types', {
   slug: text('slug').notNull(),
   label: text('label').notNull(),
   position: integer('position').notNull(),
+  /**
+   * Per-sub_type lead-classification scoring configuration.
+   * JSON-encoded `ScoringConfig` (see
+   * `packages/shared/src/schemas/sop.ts → scoringConfigSchema` and
+   * `specs/015-lead-classification-revamp/contracts/scoring-config.md`).
+   * NULL means "no scoring configuration; fall through to the LLM
+   * classifier" (FR-022). Validated by Zod at every boundary read /
+   * write. Spec 015.
+   */
+  scoring_config_json: text('scoring_config_json'),
   created_at: text('created_at').notNull(),
 }, (table) => [
   uniqueIndex('sub_types_case_type_slug_unique').on(table.case_type_id, table.slug),
