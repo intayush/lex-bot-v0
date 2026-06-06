@@ -26,18 +26,21 @@ import type {
 import { StepForm, type StepDraft } from './step-form';
 import { CaseTypesTab } from './case-types-tab';
 import { GoodbyePhrasesTab } from './goodbye-phrases-tab';
+import { BranchesTab } from './branches-tab';
 import { useIsMounted } from './use-is-mounted';
+import type { BranchPairSummary } from '@legal-chatbot/shared';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type TabId = 'steps' | 'case_types' | 'goodbye_phrases';
+type TabId = 'steps' | 'case_types' | 'goodbye_phrases' | 'branches';
 
 interface SopEditorProps {
   initialSop: SOPConfiguration | null;
   initialCaseTypes: CaseType[];
   initialGoodbyePhrases: string[];
+  initialBranchPairs: BranchPairSummary[];
 }
 
 interface ResultMessage {
@@ -53,6 +56,7 @@ export function SopEditor({
   initialSop,
   initialCaseTypes,
   initialGoodbyePhrases,
+  initialBranchPairs,
 }: SopEditorProps) {
   const [activeTab, setActiveTab] = useState<TabId>('steps');
 
@@ -66,6 +70,9 @@ export function SopEditor({
         <TabButton active={activeTab === 'case_types'} onClick={() => setActiveTab('case_types')}>
           Case Types
         </TabButton>
+        <TabButton active={activeTab === 'branches'} onClick={() => setActiveTab('branches')}>
+          Branches
+        </TabButton>
         <TabButton active={activeTab === 'goodbye_phrases'} onClick={() => setActiveTab('goodbye_phrases')}>
           Goodbye Phrases
         </TabButton>
@@ -73,6 +80,7 @@ export function SopEditor({
 
       {activeTab === 'steps' && <StepsTab initialSop={initialSop} />}
       {activeTab === 'case_types' && <CaseTypesTab initialCaseTypes={initialCaseTypes} />}
+      {activeTab === 'branches' && <BranchesTab initialPairs={initialBranchPairs} />}
       {activeTab === 'goodbye_phrases' && <GoodbyePhrasesTab initialPhrases={initialGoodbyePhrases} />}
     </div>
   );

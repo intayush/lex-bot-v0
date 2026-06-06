@@ -5,6 +5,7 @@ import {
   getCaseTypes,
   getGoodbyePhrases,
 } from '../../../lib/sop-config';
+import { listBranchPairsForAccount } from '../../../lib/branches-config';
 import { SopEditor } from './sop-editor';
 import { PreviewChat } from '../config/preview-chat';
 
@@ -37,10 +38,11 @@ export default async function SopPage() {
   const session = await getAuthSession();
   if (!session.accountId) redirect('/login');
 
-  const [sop, caseTypes, goodbyePhrases] = await Promise.all([
+  const [sop, caseTypes, goodbyePhrases, branchPairs] = await Promise.all([
     getLatestSOP(session.accountId),
     getCaseTypes(session.accountId),
     getGoodbyePhrases(session.accountId),
+    listBranchPairsForAccount(session.accountId),
   ]);
 
   // Tagline: tell the lawyer whether they're looking at the live
@@ -89,6 +91,7 @@ export default async function SopPage() {
             initialSop={sop}
             initialCaseTypes={caseTypes}
             initialGoodbyePhrases={goodbyePhrases}
+            initialBranchPairs={branchPairs}
           />
         </div>
         <div className="lg:col-span-1">

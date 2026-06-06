@@ -1,0 +1,679 @@
+'use client';
+
+/**
+ * Spec 016 US4 — Branch editor (T054 / FR-022 / FR-023 / FR-024 / FR-025).
+ *
+ * Loads the per-pair detail from
+ * `GET /api/dashboard/branches/[caseType]/[subType]` and renders an
+ * inline editor with:
+ *
+ *   - Active toggle (FR-025)
+ *   - Ordered question list (text + per-chip weights + free-text flag)
+ *   - Add / remove / move-up / move-down questions (FR-022)
+ *   - Add / remove / edit chips per question (label + slug + weight)
+ *   - Threshold inputs (Self table only in v1; family_friend uses
+ *     same defaults — admin-overridable later) (FR-024)
+ *   - Hard-override toggles (FR-024)
+ *   - Save (creates a new draft) and Publish (FR-017)
+ *   - Delete (FR-026, with confirm)
+ *
+ * Save warnings (negative_total_max / positive_total_max_above_100 /
+ * zero_questions) are displayed inline below the Save button (T056).
+ *
+ * Drag-and-drop reordering deferred to a later iteration; up/down
+ * arrows keep the editor accessible without dnd-kit ceremony.
+ */
+
+import { useCallback, useEffect, useState } from 'react';
+import type {
+  BranchDetailResponse,
+  BranchQuestion,
+  BranchSaveResponse,
+  BranchSaveWarning,
+  ThresholdsFamilyFriend,
+  ThresholdsSelf,
+} from '@legal-chatbot/shared';
+
+interface BranchEditorProps {
+  caseTypeSlug: string;
+  subTypeSlug: string;
+  caseTypeLabel: string;
+  subTypeLabel: string;
+  existingBranchId: string | null;
+  onAfterMutation: () => void | Promise<void>;
+  onClose: () => void;
+}
+
+interface ResultMessage {
+  ok: boolean;
+  message: string;
+}
+
+const DEFAULT_THRESHOLDS_SELF: ThresholdsSelf = {
+  hot: [76, 100],
+  warm: [51, 75],
+  cold: [26, 50],
+  spam: [0, 25],
+};
+
+const DEFAULT_THRESHOLDS_FAMILY: ThresholdsFamilyFriend = {
+  hot: [71, 100],
+  warm: [46, 70],
+  spam: [0, 45],
+};
+
+const DEFAULT_OVERRIDES = {
+  missing_contact: true,
+  out_of_scope: true,
+  no_injury_no_treatment: true,
+  fake_info: true,
+};
+
+function emptyQuestion(position: number): BranchQuestion {
+  return {
+    id: `new_q_${Date.now()}_${position}`,
+    position,
+    text: '',
+    preface: null,
+    chips: [],
+    free_text_allowed: true,
+    multi_select: false,
+  };
+}
+
+export function BranchEditor({
+  caseTypeSlug,
+  subTypeSlug,
+  caseTypeLabel,
+  subTypeLabel,
+  existingBranchId,
+  onAfterMutation,
+  onClose,
+}: BranchEditorProps) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isActive, setIsActive] = useState(true);
+  const [questions, setQuestions] = useState<BranchQuestion[]>([]);
+  const [thresholdsSelf, setThresholdsSelf] = useState<ThresholdsSelf>(DEFAULT_THRESHOLDS_SELF);
+  const [thresholdsFamily, setThresholdsFamily] =
+    useState<ThresholdsFamilyFriend>(DEFAULT_THRESHOLDS_FAMILY);
+  const [overrides, setOverrides] = useState(DEFAULT_OVERRIDES);
+  const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [result, setResult] = useState<ResultMessage | null>(null);
+  const [warnings, setWarnings] = useState<BranchSaveWarning[]>([]);
+  const [hasDraft, setHasDraft] = useState(false);
+
+  const load = useCallback(async () => {
+    if (!existingBranchId) {
+      setLoading(false);
+      // Fresh branch: start with one empty question + defaults.
+      setQuestions([emptyQuestion(0)]);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/dashboard/branches/${encodeURIComponent(caseTypeSlug)}/${encodeURIComponent(subTypeSlug)}`,
+        { cache: 'no-store' },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as BranchDetailResponse;
+      setIsActive(data.branch.is_active);
+      // Prefer draft over current_version in the editor (admins want
+      // to keep iterating their pending edits).
+      const v = data.draft_version ?? data.current_version;
+      if (v) {
+        setQuestions(v.questions);
+        setThresholdsSelf(v.classification_thresholds.self);
+        setThresholdsFamily(v.classification_thresholds.family_friend);
+        setOverrides(v.hard_override_toggles);
+      }
+      setHasDraft(data.draft_version !== null);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Unknown error';
+      setError(`Failed to load branch: ${message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [caseTypeSlug, existingBranchId, subTypeSlug]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  function moveQuestion(index: number, delta: -1 | 1) {
+    setQuestions((curr) => {
+      const target = index + delta;
+      if (target < 0 || target >= curr.length) return curr;
+      const copy = [...curr];
+      [copy[index], copy[target]] = [copy[target], copy[index]];
+      return copy.map((q, i) => ({ ...q, position: i }));
+    });
+  }
+
+  function addQuestion() {
+    setQuestions((curr) => [...curr, emptyQuestion(curr.length)]);
+  }
+
+  function removeQuestion(index: number) {
+    setQuestions((curr) =>
+      curr.filter((_, i) => i !== index).map((q, i) => ({ ...q, position: i })),
+    );
+  }
+
+  function updateQuestion(index: number, patch: Partial<BranchQuestion>) {
+    setQuestions((curr) => curr.map((q, i) => (i === index ? { ...q, ...patch } : q)));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    setResult(null);
+    setWarnings([]);
+    try {
+      const res = await fetch(
+        `/api/dashboard/branches/${encodeURIComponent(caseTypeSlug)}/${encodeURIComponent(subTypeSlug)}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            is_active: isActive,
+            questions,
+            classification_thresholds: {
+              self: thresholdsSelf,
+              family_friend: thresholdsFamily,
+            },
+            hard_override_toggles: overrides,
+          }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setResult({
+          ok: false,
+          message: data?.message ?? `HTTP ${res.status}`,
+        });
+        return;
+      }
+      const saved = data as BranchSaveResponse;
+      setWarnings(saved.warnings);
+      setResult({
+        ok: true,
+        message: `Saved as draft v${saved.version_number}.${
+          existingBranchId === null ? ' (Auto-published as v1.)' : ''
+        }`,
+      });
+      setHasDraft(existingBranchId !== null); // first save auto-publishes
+      await onAfterMutation();
+    } catch (e) {
+      setResult({ ok: false, message: e instanceof Error ? e.message : 'Save failed' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handlePublish() {
+    setPublishing(true);
+    setResult(null);
+    try {
+      const res = await fetch(
+        `/api/dashboard/branches/${encodeURIComponent(caseTypeSlug)}/${encodeURIComponent(subTypeSlug)}/publish`,
+        { method: 'POST' },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setResult({
+          ok: false,
+          message: data?.message ?? `HTTP ${res.status}`,
+        });
+        return;
+      }
+      setResult({
+        ok: true,
+        message: `Published v${data.version_number}.`,
+      });
+      setHasDraft(false);
+      await onAfterMutation();
+    } catch (e) {
+      setResult({ ok: false, message: e instanceof Error ? e.message : 'Publish failed' });
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!existingBranchId) return;
+    if (
+      !window.confirm(
+        `Delete the branch for ${caseTypeLabel} → ${subTypeLabel}?\n\nHistorical leads keep their captured snapshots — only the live configuration is removed. New conversations will use the default-only flow.`,
+      )
+    )
+      return;
+    setDeleting(true);
+    setResult(null);
+    try {
+      const res = await fetch(
+        `/api/dashboard/branches/${encodeURIComponent(caseTypeSlug)}/${encodeURIComponent(subTypeSlug)}`,
+        { method: 'DELETE' },
+      );
+      if (res.status !== 204) {
+        const text = await res.text();
+        throw new Error(text || `HTTP ${res.status}`);
+      }
+      setResult({ ok: true, message: 'Branch deleted.' });
+      await onAfterMutation();
+      onClose();
+    } catch (e) {
+      setResult({ ok: false, message: e instanceof Error ? e.message : 'Delete failed' });
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  if (loading) {
+    return <p className="text-sm text-[#737373]">Loading…</p>;
+  }
+  if (error) {
+    return (
+      <div className="text-sm text-[#991B1B] bg-[#FEF2F2] border border-[#FECACA] rounded-lg px-3 py-2">
+        {error}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Active toggle */}
+      <div className="flex items-center gap-2">
+        <input
+          id={`branch-active-${caseTypeSlug}-${subTypeSlug}`}
+          type="checkbox"
+          checked={isActive}
+          onChange={(e) => setIsActive(e.target.checked)}
+          className="h-4 w-4 rounded border-[#A3A3A3]"
+        />
+        <label
+          htmlFor={`branch-active-${caseTypeSlug}-${subTypeSlug}`}
+          className="text-sm text-[#171717]"
+        >
+          Active — fires after Step 6 for this pair when published.
+        </label>
+      </div>
+
+      {/* Questions */}
+      <div>
+        <div className="flex items-baseline justify-between mb-2">
+          <h4 className="text-sm font-semibold text-[#171717]">
+            Questions ({questions.length})
+          </h4>
+          <button
+            type="button"
+            onClick={addQuestion}
+            className="text-xs font-medium text-[#171717] hover:underline"
+          >
+            + Add question
+          </button>
+        </div>
+        <div className="space-y-3">
+          {questions.map((q, index) => (
+            <QuestionRow
+              key={q.id}
+              question={q}
+              index={index}
+              total={questions.length}
+              onChange={(patch) => updateQuestion(index, patch)}
+              onRemove={() => removeQuestion(index)}
+              onMoveUp={() => moveQuestion(index, -1)}
+              onMoveDown={() => moveQuestion(index, 1)}
+            />
+          ))}
+          {questions.length === 0 && (
+            <p className="text-xs text-[#737373] italic">
+              No questions yet. Click &ldquo;Add question&rdquo; to begin.
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Thresholds */}
+      <ThresholdEditor
+        thresholdsSelf={thresholdsSelf}
+        thresholdsFamily={thresholdsFamily}
+        onChangeSelf={setThresholdsSelf}
+        onChangeFamily={setThresholdsFamily}
+      />
+
+      {/* Hard overrides */}
+      <div>
+        <h4 className="text-sm font-semibold text-[#171717] mb-2">
+          Hard-override SPAM rules
+        </h4>
+        <div className="grid grid-cols-2 gap-2">
+          {(Object.keys(overrides) as Array<keyof typeof overrides>).map((k) => (
+            <label key={k} className="flex items-center gap-2 text-sm text-[#171717]">
+              <input
+                type="checkbox"
+                checked={overrides[k]}
+                onChange={(e) =>
+                  setOverrides((curr) => ({ ...curr, [k]: e.target.checked }))
+                }
+                className="h-4 w-4 rounded border-[#A3A3A3]"
+              />
+              {k.replace(/_/g, ' ')}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Action bar */}
+      <div className="flex items-center gap-2 pt-3 border-t border-[#E5E5E5]">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="px-3 py-1.5 rounded-md bg-[#171717] text-white text-sm font-medium hover:bg-[#404040] disabled:opacity-60"
+        >
+          {saving ? 'Saving…' : 'Save draft'}
+        </button>
+        <button
+          type="button"
+          onClick={handlePublish}
+          disabled={publishing || !hasDraft}
+          title={hasDraft ? 'Make draft live' : 'No draft to publish'}
+          className="px-3 py-1.5 rounded-md bg-[#059669] text-white text-sm font-medium hover:bg-[#047857] disabled:opacity-60"
+        >
+          {publishing ? 'Publishing…' : 'Publish'}
+        </button>
+        {existingBranchId && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="ml-auto px-3 py-1.5 rounded-md border border-[#FECACA] text-[#991B1B] text-sm font-medium hover:bg-[#FEF2F2] disabled:opacity-60"
+          >
+            {deleting ? 'Deleting…' : 'Delete branch'}
+          </button>
+        )}
+      </div>
+
+      {/* Result + warnings */}
+      {result && (
+        <div
+          className={`rounded-lg px-3 py-2 text-sm ${
+            result.ok
+              ? 'border border-[#A7F3D0] bg-[#ECFDF5] text-[#065F46]'
+              : 'border border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]'
+          }`}
+        >
+          {result.message}
+        </div>
+      )}
+      {warnings.length > 0 && (
+        <div className="rounded-lg border border-[#FDE68A] bg-[#FFFBEB] px-3 py-2 text-sm text-[#92400E]">
+          <div className="font-medium mb-1">Warnings</div>
+          <ul className="list-disc list-inside space-y-0.5">
+            {warnings.map((w) => (
+              <li key={w.code}>{w.message}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// QuestionRow
+// ---------------------------------------------------------------------------
+
+interface QuestionRowProps {
+  question: BranchQuestion;
+  index: number;
+  total: number;
+  onChange: (patch: Partial<BranchQuestion>) => void;
+  onRemove: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+}
+
+function QuestionRow({
+  question,
+  index,
+  total,
+  onChange,
+  onRemove,
+  onMoveUp,
+  onMoveDown,
+}: QuestionRowProps) {
+  function updateChip(chipIdx: number, patch: Partial<BranchQuestion['chips'][0]>) {
+    onChange({
+      chips: question.chips.map((c, i) => (i === chipIdx ? { ...c, ...patch } : c)),
+    });
+  }
+  function addChip() {
+    onChange({
+      chips: [
+        ...question.chips,
+        { slug: `chip_${question.chips.length + 1}`, label: 'New chip', score_weight: 0 },
+      ],
+    });
+  }
+  function removeChip(chipIdx: number) {
+    onChange({ chips: question.chips.filter((_, i) => i !== chipIdx) });
+  }
+
+  return (
+    <div className="rounded-md border border-[#E5E5E5] bg-[#FAFAFA] p-3">
+      <div className="flex items-baseline justify-between mb-2">
+        <span className="text-xs font-medium text-[#737373]">Q{index + 1}</span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onMoveUp}
+            disabled={index === 0}
+            className="text-xs text-[#737373] hover:text-[#171717] disabled:opacity-30"
+            title="Move up"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            onClick={onMoveDown}
+            disabled={index === total - 1}
+            className="text-xs text-[#737373] hover:text-[#171717] disabled:opacity-30"
+            title="Move down"
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            className="ml-2 text-xs text-[#991B1B] hover:underline"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+
+      <input
+        type="text"
+        value={question.text}
+        onChange={(e) => onChange({ text: e.target.value })}
+        placeholder="Question text"
+        className="w-full px-2 py-1.5 text-sm rounded border border-[#E5E5E5] bg-white mb-2"
+      />
+
+      <div className="flex items-center gap-3 mb-2 text-xs text-[#737373]">
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={question.free_text_allowed}
+            onChange={(e) => onChange({ free_text_allowed: e.target.checked })}
+            className="h-3 w-3"
+          />
+          Allow free-text
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={question.multi_select}
+            onChange={(e) => onChange({ multi_select: e.target.checked })}
+            className="h-3 w-3"
+          />
+          Multi-select
+        </label>
+      </div>
+
+      <div className="space-y-1.5">
+        <div className="text-xs font-medium text-[#737373]">Chips</div>
+        {question.chips.map((chip, chipIdx) => (
+          <div key={chipIdx} className="flex items-center gap-1.5">
+            <input
+              type="text"
+              value={chip.label}
+              onChange={(e) => updateChip(chipIdx, { label: e.target.value })}
+              placeholder="Label"
+              className="flex-1 px-2 py-1 text-xs rounded border border-[#E5E5E5] bg-white"
+            />
+            <input
+              type="text"
+              value={chip.slug}
+              onChange={(e) => updateChip(chipIdx, { slug: e.target.value })}
+              placeholder="slug"
+              pattern="[a-z0-9_-]+"
+              className="w-28 px-2 py-1 text-xs rounded border border-[#E5E5E5] bg-white font-mono"
+            />
+            <input
+              type="number"
+              value={chip.score_weight}
+              onChange={(e) =>
+                updateChip(chipIdx, { score_weight: Number(e.target.value) })
+              }
+              step={1}
+              min={-50}
+              max={50}
+              className="w-16 px-2 py-1 text-xs rounded border border-[#E5E5E5] bg-white text-right"
+            />
+            <button
+              type="button"
+              onClick={() => removeChip(chipIdx)}
+              className="text-xs text-[#991B1B] hover:underline"
+              title="Remove chip"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={addChip}
+          className="text-xs text-[#171717] hover:underline"
+        >
+          + Add chip
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ThresholdEditor
+// ---------------------------------------------------------------------------
+
+interface ThresholdEditorProps {
+  thresholdsSelf: ThresholdsSelf;
+  thresholdsFamily: ThresholdsFamilyFriend;
+  onChangeSelf: (next: ThresholdsSelf) => void;
+  onChangeFamily: (next: ThresholdsFamilyFriend) => void;
+}
+
+function ThresholdEditor({
+  thresholdsSelf,
+  thresholdsFamily,
+  onChangeSelf,
+  onChangeFamily,
+}: ThresholdEditorProps) {
+  return (
+    <div>
+      <h4 className="text-sm font-semibold text-[#171717] mb-2">
+        Classification thresholds
+      </h4>
+      <p className="text-xs text-[#737373] mb-3">
+        Score ranges (inclusive) that map a numeric lead_score to a
+        classification. Both tables MUST cover [0, 100] without gaps or
+        overlaps.
+      </p>
+      <div className="grid grid-cols-2 gap-4">
+        <ThresholdTable
+          title="Self"
+          buckets={[
+            { name: 'hot', range: thresholdsSelf.hot, label: 'HOT' },
+            { name: 'warm', range: thresholdsSelf.warm, label: 'WARM' },
+            { name: 'cold', range: thresholdsSelf.cold, label: 'COLD' },
+            { name: 'spam', range: thresholdsSelf.spam, label: 'SPAM' },
+          ]}
+          onChange={(name, range) =>
+            onChangeSelf({ ...thresholdsSelf, [name]: range })
+          }
+        />
+        <ThresholdTable
+          title="Family / Friend"
+          buckets={[
+            { name: 'hot', range: thresholdsFamily.hot, label: 'HOT' },
+            { name: 'warm', range: thresholdsFamily.warm, label: 'WARM' },
+            { name: 'spam', range: thresholdsFamily.spam, label: 'SPAM' },
+          ]}
+          onChange={(name, range) =>
+            onChangeFamily({ ...thresholdsFamily, [name]: range })
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+interface ThresholdTableProps {
+  title: string;
+  buckets: Array<{ name: string; range: [number, number]; label: string }>;
+  onChange: (name: string, range: [number, number]) => void;
+}
+
+function ThresholdTable({ title, buckets, onChange }: ThresholdTableProps) {
+  return (
+    <div>
+      <div className="text-xs font-medium text-[#737373] mb-1.5">{title}</div>
+      <div className="space-y-1">
+        {buckets.map((b) => (
+          <div key={b.name} className="flex items-center gap-1.5 text-xs">
+            <span className="w-12 text-[#171717]">{b.label}</span>
+            <input
+              type="number"
+              value={b.range[0]}
+              min={0}
+              max={100}
+              step={1}
+              onChange={(e) =>
+                onChange(b.name, [Number(e.target.value), b.range[1]])
+              }
+              className="w-14 px-1.5 py-1 rounded border border-[#E5E5E5] bg-white text-right"
+            />
+            <span className="text-[#737373]">–</span>
+            <input
+              type="number"
+              value={b.range[1]}
+              min={0}
+              max={100}
+              step={1}
+              onChange={(e) =>
+                onChange(b.name, [b.range[0], Number(e.target.value)])
+              }
+              className="w-14 px-1.5 py-1 rounded border border-[#E5E5E5] bg-white text-right"
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
