@@ -83,6 +83,8 @@ describe('leadSchema (extended)', () => {
     geographic_qualification: 'IN_SERVICE_AREA' as const,
     geographic_qualification_details_json: null,
     sop_state_snapshot: null,
+    branch_snapshot_json: null,
+    branch_incomplete: false,
     status: 'new' as const,
     follow_up_action: null,
     follow_up_action_changed_at: null,
@@ -138,5 +140,51 @@ describe('leadSchema (extended)', () => {
       leadSchema.safeParse({ ...baseValidLead, classification: 'urgent' })
         .success,
     ).toBe(false);
+  });
+
+  // -------------------------------------------------------------------------
+  // Spec 016 multi-branch SOP additions (T005)
+  // -------------------------------------------------------------------------
+
+  describe('spec 016 branch snapshot columns', () => {
+    it('accepts a default-only lead (no branch fired)', () => {
+      const defaultOnly = {
+        ...baseValidLead,
+        branch_snapshot_json: null,
+        branch_incomplete: false,
+      };
+      expect(leadSchema.safeParse(defaultOnly).success).toBe(true);
+    });
+
+    it('accepts a completed-branch lead', () => {
+      const completed = {
+        ...baseValidLead,
+        branch_snapshot_json: '{"branch_id":"br_abc","branch_version_id":"bv_xyz"}', // shape validated separately by branchSnapshotSchema
+        branch_incomplete: false,
+      };
+      expect(leadSchema.safeParse(completed).success).toBe(true);
+    });
+
+    it('accepts a partial-branch lead with branch_incomplete=true (FR-011a)', () => {
+      const partial = {
+        ...baseValidLead,
+        lead_score: 35,
+        classification: 'COLD' as const,
+        branch_snapshot_json: '{"partial":"snapshot"}',
+        branch_incomplete: true,
+      };
+      expect(leadSchema.safeParse(partial).success).toBe(true);
+    });
+
+    it('rejects branch_incomplete being non-boolean', () => {
+      expect(
+        leadSchema.safeParse({ ...baseValidLead, branch_incomplete: 'yes' }).success,
+      ).toBe(false);
+    });
+
+    it('rejects missing branch_incomplete (it is REQUIRED, default false applies at DB layer)', () => {
+      const { branch_incomplete: _omit, ...without } = baseValidLead;
+      expect(leadSchema.safeParse(without).success).toBe(false);
+    });
   });
 });

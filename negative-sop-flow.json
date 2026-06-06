@@ -1,0 +1,702 @@
+[
+  {
+    "role": "user",
+    "content": "I need help with Assault Charges",
+    "parts": [
+      {
+        "type": "text",
+        "text": "I need help with Assault Charges"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": "Thanks for letting me know. I can certainly help you with information regarding assault charges. Attorney David Shrager has over 25 years of experience in criminal defense.\n\nTo help me understand a bit more, where did this happen?",
+    "parts": [
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "text",
+        "text": "Thanks for letting me know. I can certainly help you with information regarding assault charges. Attorney David Shrager has over 25 years of experience in criminal defense.\n\nTo help me understand a bit more, where did this happen?"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "in pittsburg county",
+    "parts": [
+      {
+        "type": "text",
+        "text": "in pittsburg county"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": "Thanks for that information. Can you briefly tell us what happened?",
+    "parts": [
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "text",
+        "text": "Thanks for that information. Can you briefly tell us what happened?"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "i assaulted a police officer accidentally",
+    "parts": [
+      {
+        "type": "text",
+        "text": "i assaulted a police officer accidentally"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": "Thanks for sharing that. I understand this is a sensitive situation.\n\nAre you asking for yourself or a friend/family member?",
+    "toolInvocations": [
+      {
+        "state": "result",
+        "step": 0,
+        "toolCallId": "comiTlB7B2ECFtRC",
+        "toolName": "captureLead",
+        "args": {
+          "name": null,
+          "contactEmail": null,
+          "contactPhone": null,
+          "caseType": "Criminal Defense",
+          "incidentDate": null,
+          "briefDescription": "Assaulted a police officer in Pittsburg County.",
+          "classification": "WARM",
+          "classificationRationale": "User is seeking help for assault charges.",
+          "urgencyFactors": []
+        },
+        "result": {
+          "success": true,
+          "leadId": "tPDwyFrXwOYiPaNRXrQvb",
+          "classification": "WARM"
+        }
+      }
+    ],
+    "parts": [
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "tool-invocation",
+        "toolInvocation": {
+          "state": "result",
+          "step": 0,
+          "toolCallId": "comiTlB7B2ECFtRC",
+          "toolName": "captureLead",
+          "args": {
+            "name": null,
+            "contactEmail": null,
+            "contactPhone": null,
+            "caseType": "Criminal Defense",
+            "incidentDate": null,
+            "briefDescription": "Assaulted a police officer in Pittsburg County.",
+            "classification": "WARM",
+            "classificationRationale": "User is seeking help for assault charges.",
+            "urgencyFactors": []
+          },
+          "result": {
+            "success": true,
+            "leadId": "tPDwyFrXwOYiPaNRXrQvb",
+            "classification": "WARM"
+          }
+        }
+      },
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "text",
+        "text": "Thanks for sharing that. I understand this is a sensitive situation.\n\nAre you asking for yourself or a friend/family member?"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "Myself",
+    "parts": [
+      {
+        "type": "text",
+        "text": "Myself"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": "Thanks for confirming. I want to make sure you get the best help possible.\n\nDid the accident happen in or near our service area?",
+    "parts": [
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "text",
+        "text": "Thanks for confirming. I want to make sure you get the best help possible.\n\nDid the accident happen in or near our service area?"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "Yes",
+    "parts": [
+      {
+        "type": "text",
+        "text": "Yes"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": "Thanks for confirming.\n\nWhen did the accident happen?",
+    "parts": [
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "text",
+        "text": "Thanks for confirming.\n\nWhen did the accident happen?"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "Within Last 7 Days",
+    "parts": [
+      {
+        "type": "text",
+        "text": "Within Last 7 Days"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": "Thanks for providing those details.\n\nWere there any injuries as a result of the incident?",
+    "parts": [
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "text",
+        "text": "Thanks for providing those details.\n\nWere there any injuries as a result of the incident?"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "Doctor Visit",
+    "parts": [
+      {
+        "type": "text",
+        "text": "Doctor Visit"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": "Thanks for letting me know.\n\nWere you (or they) a:",
+    "parts": [
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "text",
+        "text": "Thanks for letting me know.\n\nWere you (or they) a:"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "Passenger",
+    "parts": [
+      {
+        "type": "text",
+        "text": "Passenger"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": "Thanks for providing that information. I've noted that you were a passenger.\n\nHas an insurance company contacted you (or them)?",
+    "toolInvocations": [
+      {
+        "state": "result",
+        "step": 0,
+        "toolCallId": "lauxHN0p1gzSab18",
+        "toolName": "captureLead",
+        "args": {
+          "name": null,
+          "contactEmail": null,
+          "contactPhone": null,
+          "caseType": "Criminal Defense",
+          "incidentDate": null,
+          "briefDescription": "User is facing assault charges for accidentally assaulting a police officer in Pittsburgh County within the last 7 days, resulting in a doctor visit. User was a passenger.",
+          "classification": "HOT",
+          "classificationRationale": "Assault on a police officer, recent incident (within last 7 days), potential for immediate legal action.",
+          "urgencyFactors": [
+            "Recent incident (within last 7 days)"
+          ]
+        },
+        "result": {
+          "success": true,
+          "leadId": "tPDwyFrXwOYiPaNRXrQvb",
+          "classification": "HOT"
+        }
+      }
+    ],
+    "parts": [
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "tool-invocation",
+        "toolInvocation": {
+          "state": "result",
+          "step": 0,
+          "toolCallId": "lauxHN0p1gzSab18",
+          "toolName": "captureLead",
+          "args": {
+            "name": null,
+            "contactEmail": null,
+            "contactPhone": null,
+            "caseType": "Criminal Defense",
+            "incidentDate": null,
+            "briefDescription": "User is facing assault charges for accidentally assaulting a police officer in Pittsburgh County within the last 7 days, resulting in a doctor visit. User was a passenger.",
+            "classification": "HOT",
+            "classificationRationale": "Assault on a police officer, recent incident (within last 7 days), potential for immediate legal action.",
+            "urgencyFactors": [
+              "Recent incident (within last 7 days)"
+            ]
+          },
+          "result": {
+            "success": true,
+            "leadId": "tPDwyFrXwOYiPaNRXrQvb",
+            "classification": "HOT"
+          }
+        }
+      },
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "text",
+        "text": "Thanks for providing that information. I've noted that you were a passenger.\n\nHas an insurance company contacted you (or them)?"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "Not Yet",
+    "parts": [
+      {
+        "type": "text",
+        "text": "Not Yet"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": "Thanks for letting me know that an insurance company hasn't contacted you yet.\n\nHas the accident affected your (or their) ability to work?",
+    "parts": [
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "text",
+        "text": "Thanks for letting me know that an insurance company hasn't contacted you yet.\n\nHas the accident affected your (or their) ability to work?"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "Missed Work",
+    "parts": [
+      {
+        "type": "text",
+        "text": "Missed Work"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": "Thanks for sharing that you've missed work due to the incident. I've captured the details of your situation.\n\nDo you currently have a lawyer?",
+    "toolInvocations": [
+      {
+        "state": "result",
+        "step": 0,
+        "toolCallId": "48SjH66HaqIKxuyE",
+        "toolName": "captureLead",
+        "args": {
+          "name": null,
+          "contactEmail": null,
+          "contactPhone": null,
+          "caseType": "Criminal Defense",
+          "incidentDate": null,
+          "briefDescription": "User assaulted a police officer accidentally in Pittsburgh County, resulting in a doctor visit and missed work.",
+          "classification": "HOT",
+          "classificationRationale": "User assaulted a police officer recently (within 7 days), resulting in a doctor visit and missed work. This is a serious criminal defense matter.",
+          "urgencyFactors": [
+            "recent arrest/charges",
+            "ongoing medical treatment",
+            "missed work"
+          ]
+        },
+        "result": {
+          "success": true,
+          "leadId": "tPDwyFrXwOYiPaNRXrQvb",
+          "classification": "HOT"
+        }
+      }
+    ],
+    "parts": [
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "tool-invocation",
+        "toolInvocation": {
+          "state": "result",
+          "step": 0,
+          "toolCallId": "48SjH66HaqIKxuyE",
+          "toolName": "captureLead",
+          "args": {
+            "name": null,
+            "contactEmail": null,
+            "contactPhone": null,
+            "caseType": "Criminal Defense",
+            "incidentDate": null,
+            "briefDescription": "User assaulted a police officer accidentally in Pittsburgh County, resulting in a doctor visit and missed work.",
+            "classification": "HOT",
+            "classificationRationale": "User assaulted a police officer recently (within 7 days), resulting in a doctor visit and missed work. This is a serious criminal defense matter.",
+            "urgencyFactors": [
+              "recent arrest/charges",
+              "ongoing medical treatment",
+              "missed work"
+            ]
+          },
+          "result": {
+            "success": true,
+            "leadId": "tPDwyFrXwOYiPaNRXrQvb",
+            "classification": "HOT"
+          }
+        }
+      },
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "text",
+        "text": "Thanks for sharing that you've missed work due to the incident. I've captured the details of your situation.\n\nDo you currently have a lawyer?"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "No",
+    "parts": [
+      {
+        "type": "text",
+        "text": "No"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": "Thanks for letting me know you don't have a lawyer. I understand you're looking for help with assault charges after an incident in Pittsburgh County within the last 7 days, where you accidentally assaulted a police officer, resulting in a doctor visit and missed work. You were a passenger in the incident.\n\nWhen did this happen?",
+    "toolInvocations": [
+      {
+        "state": "result",
+        "step": 0,
+        "toolCallId": "Gn4czAUHzXRe5NJU",
+        "toolName": "captureLead",
+        "args": {
+          "name": null,
+          "contactEmail": null,
+          "contactPhone": null,
+          "caseType": "Criminal Defense",
+          "incidentDate": null,
+          "briefDescription": "User is seeking help for assault charges after accidentally assaulting a police officer in Pittsburgh County within the last 7 days, resulting in a doctor visit and missed work. The user was a passenger and does not have a lawyer.",
+          "classification": "WARM",
+          "classificationRationale": "User is seeking help for an assault charge, has missed work and visited a doctor, indicating a legitimate legal matter. No immediate court date or active danger mentioned.",
+          "urgencyFactors": [
+            "Missed work",
+            "Doctor visit"
+          ]
+        },
+        "result": {
+          "success": true,
+          "leadId": "tPDwyFrXwOYiPaNRXrQvb",
+          "classification": "WARM"
+        }
+      }
+    ],
+    "parts": [
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "tool-invocation",
+        "toolInvocation": {
+          "state": "result",
+          "step": 0,
+          "toolCallId": "Gn4czAUHzXRe5NJU",
+          "toolName": "captureLead",
+          "args": {
+            "name": null,
+            "contactEmail": null,
+            "contactPhone": null,
+            "caseType": "Criminal Defense",
+            "incidentDate": null,
+            "briefDescription": "User is seeking help for assault charges after accidentally assaulting a police officer in Pittsburgh County within the last 7 days, resulting in a doctor visit and missed work. The user was a passenger and does not have a lawyer.",
+            "classification": "WARM",
+            "classificationRationale": "User is seeking help for an assault charge, has missed work and visited a doctor, indicating a legitimate legal matter. No immediate court date or active danger mentioned.",
+            "urgencyFactors": [
+              "Missed work",
+              "Doctor visit"
+            ]
+          },
+          "result": {
+            "success": true,
+            "leadId": "tPDwyFrXwOYiPaNRXrQvb",
+            "classification": "WARM"
+          }
+        }
+      },
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "text",
+        "text": "Thanks for letting me know you don't have a lawyer. I understand you're looking for help with assault charges after an incident in Pittsburgh County within the last 7 days, where you accidentally assaulted a police officer, resulting in a doctor visit and missed work. You were a passenger in the incident.\n\nWhen did this happen?"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "Today",
+    "parts": [
+      {
+        "type": "text",
+        "text": "Today"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": "Thanks for letting me know that the incident happened today. I've captured the details of your situation.\n\nWhat's your name and how can we reach you?",
+    "toolInvocations": [
+      {
+        "state": "result",
+        "step": 0,
+        "toolCallId": "KZIsPRxRmZ4iENru",
+        "toolName": "captureLead",
+        "args": {
+          "name": null,
+          "contactEmail": null,
+          "contactPhone": null,
+          "caseType": "Criminal Defense",
+          "incidentDate": "2024-05-16",
+          "briefDescription": "Assault charges after accidentally assaulting a police officer in Pittsburgh County within the last 7 days, resulting in a doctor visit and missed work. The user was a passenger.",
+          "classification": "HOT",
+          "classificationRationale": "User is facing assault charges, incident happened today, involves a police officer, and has resulted in a doctor visit and missed work. This indicates high urgency.",
+          "urgencyFactors": [
+            "recent incident",
+            "assault charges",
+            "injury",
+            "missed work"
+          ]
+        },
+        "result": {
+          "success": true,
+          "leadId": "tPDwyFrXwOYiPaNRXrQvb",
+          "classification": "HOT"
+        }
+      }
+    ],
+    "parts": [
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "tool-invocation",
+        "toolInvocation": {
+          "state": "result",
+          "step": 0,
+          "toolCallId": "KZIsPRxRmZ4iENru",
+          "toolName": "captureLead",
+          "args": {
+            "name": null,
+            "contactEmail": null,
+            "contactPhone": null,
+            "caseType": "Criminal Defense",
+            "incidentDate": "2024-05-16",
+            "briefDescription": "Assault charges after accidentally assaulting a police officer in Pittsburgh County within the last 7 days, resulting in a doctor visit and missed work. The user was a passenger.",
+            "classification": "HOT",
+            "classificationRationale": "User is facing assault charges, incident happened today, involves a police officer, and has resulted in a doctor visit and missed work. This indicates high urgency.",
+            "urgencyFactors": [
+              "recent incident",
+              "assault charges",
+              "injury",
+              "missed work"
+            ]
+          },
+          "result": {
+            "success": true,
+            "leadId": "tPDwyFrXwOYiPaNRXrQvb",
+            "classification": "HOT"
+          }
+        }
+      },
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "text",
+        "text": "Thanks for letting me know that the incident happened today. I've captured the details of your situation.\n\nWhat's your name and how can we reach you?"
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "My name is Ayush Singh, my email is ayush.singh.96@gmail.com, my phone is 917317667999",
+    "parts": [
+      {
+        "type": "text",
+        "text": "My name is Ayush Singh, my email is ayush.singh.96@gmail.com, my phone is 917317667999"
+      }
+    ]
+  },
+  {
+    "role": "assistant",
+    "content": "",
+    "toolInvocations": [
+      {
+        "state": "result",
+        "step": 0,
+        "toolCallId": "QJuFOwNG6seH760u",
+        "toolName": "captureLead",
+        "args": {
+          "name": "Ayush Singh",
+          "contactEmail": "ayush.singh.96@gmail.com",
+          "contactPhone": "917317667999",
+          "caseType": "Criminal Defense",
+          "incidentDate": "2024-05-15",
+          "briefDescription": "Accidentally assaulted a police officer in Pittsburgh County today, resulting in a doctor visit and missed work. User was a passenger.",
+          "classification": "HOT",
+          "classificationRationale": "Incident happened today, involves assault charges against a police officer, user has missed work and had a doctor's visit, indicating imminent legal urgency.",
+          "urgencyFactors": [
+            "Recent charges/incident",
+            "Ongoing medical treatment/doctor visit",
+            "Missed work"
+          ]
+        },
+        "result": {
+          "success": true,
+          "leadId": "tPDwyFrXwOYiPaNRXrQvb",
+          "classification": "HOT"
+        }
+      },
+      {
+        "state": "call",
+        "step": 1,
+        "toolCallId": "ubKNU1SlgwhUFXGq",
+        "toolName": "analyzeAndFollowUp",
+        "args": {
+          "sop_captures": {
+            "name_contact": "Ayush Singh, ayush.singh.96@gmail.com, 917317667999",
+            "what": "i assaulted a police officer accidentally",
+            "where": "in pittsburg county",
+            "injuries": "Doctor Visit",
+            "role": "Passenger",
+            "insurance_contact": "Not Yet",
+            "when": "Today",
+            "work_affected": "Missed Work",
+            "service_area": "Yes",
+            "who": "Myself",
+            "matter": "Assault Charges",
+            "current_lawyer": "No"
+          }
+        }
+      }
+    ],
+    "parts": [
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "tool-invocation",
+        "toolInvocation": {
+          "state": "result",
+          "step": 0,
+          "toolCallId": "QJuFOwNG6seH760u",
+          "toolName": "captureLead",
+          "args": {
+            "name": "Ayush Singh",
+            "contactEmail": "ayush.singh.96@gmail.com",
+            "contactPhone": "917317667999",
+            "caseType": "Criminal Defense",
+            "incidentDate": "2024-05-15",
+            "briefDescription": "Accidentally assaulted a police officer in Pittsburgh County today, resulting in a doctor visit and missed work. User was a passenger.",
+            "classification": "HOT",
+            "classificationRationale": "Incident happened today, involves assault charges against a police officer, user has missed work and had a doctor's visit, indicating imminent legal urgency.",
+            "urgencyFactors": [
+              "Recent charges/incident",
+              "Ongoing medical treatment/doctor visit",
+              "Missed work"
+            ]
+          },
+          "result": {
+            "success": true,
+            "leadId": "tPDwyFrXwOYiPaNRXrQvb",
+            "classification": "HOT"
+          }
+        }
+      },
+      {
+        "type": "step-start"
+      },
+      {
+        "type": "tool-invocation",
+        "toolInvocation": {
+          "state": "call",
+          "step": 1,
+          "toolCallId": "ubKNU1SlgwhUFXGq",
+          "toolName": "analyzeAndFollowUp",
+          "args": {
+            "sop_captures": {
+              "name_contact": "Ayush Singh, ayush.singh.96@gmail.com, 917317667999",
+              "what": "i assaulted a police officer accidentally",
+              "where": "in pittsburg county",
+              "injuries": "Doctor Visit",
+              "role": "Passenger",
+              "insurance_contact": "Not Yet",
+              "when": "Today",
+              "work_affected": "Missed Work",
+              "service_area": "Yes",
+              "who": "Myself",
+              "matter": "Assault Charges",
+              "current_lawyer": "No"
+            }
+          }
+        }
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "thanks",
+    "parts": [
+      {
+        "type": "text",
+        "text": "thanks"
+      }
+    ]
+  }
+]

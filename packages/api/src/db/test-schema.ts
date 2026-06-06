@@ -74,6 +74,10 @@ export const leads = sqliteTable('leads', {
   geographic_qualification: text('geographic_qualification'),
   /** Spec 015 — JSON { city, state } when OUTSIDE_SERVICE_AREA. */
   geographic_qualification_details_json: text('geographic_qualification_details_json'),
+  /** Spec 016 — JSON-encoded BranchSnapshot frozen at finalization. */
+  branch_snapshot_json: text('branch_snapshot_json'),
+  /** Spec 016 — true for partial-branch leads (FR-011a / FR-011b). */
+  branch_incomplete: integer('branch_incomplete', { mode: 'boolean' }).notNull().default(false),
   created_at: text('created_at').notNull(),
 });
 
@@ -147,7 +151,10 @@ export const subTypes = sqliteTable('sub_types', {
   slug: text('slug').notNull(),
   label: text('label').notNull(),
   position: integer('position').notNull(),
-  /** Spec 015 — JSON ScoringConfig; NULL = LLM fallback. */
+  /**
+   * @deprecated Spec 016 — superseded by `branches` / `branch_versions`.
+   * Spec 015 — JSON ScoringConfig; NULL = LLM fallback.
+   */
   scoring_config_json: text('scoring_config_json'),
   created_at: text('created_at').notNull(),
 });
@@ -157,4 +164,32 @@ export const goodbyePhrases = sqliteTable('goodbye_phrases', {
   account_id: text('account_id').notNull().references(() => accounts.id),
   phrase: text('phrase').notNull(),
   created_at: text('created_at').notNull(),
+});
+
+// ---------------------------------------------------------------------------
+// Spec 016 — Multi-Branch SOP Workflow (test schema mirror)
+// ---------------------------------------------------------------------------
+
+export const branches = sqliteTable('branches', {
+  id: text('id').primaryKey(),
+  account_id: text('account_id').notNull().references(() => accounts.id),
+  case_type_slug: text('case_type_slug').notNull(),
+  sub_type_slug: text('sub_type_slug').notNull(),
+  is_active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  current_version_id: text('current_version_id'),
+  created_at: text('created_at').notNull(),
+  updated_at: text('updated_at').notNull(),
+});
+
+export const branchVersions = sqliteTable('branch_versions', {
+  id: text('id').primaryKey(),
+  branch_id: text('branch_id').notNull().references(() => branches.id),
+  version_number: integer('version_number').notNull(),
+  is_published: integer('is_published', { mode: 'boolean' }).notNull().default(false),
+  questions_json: text('questions_json').notNull(),
+  classification_thresholds_json: text('classification_thresholds_json').notNull(),
+  hard_override_toggles_json: text('hard_override_toggles_json').notNull(),
+  published_at: text('published_at'),
+  created_at: text('created_at').notNull(),
+  created_by_user_id: text('created_by_user_id').notNull(),
 });

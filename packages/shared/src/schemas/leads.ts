@@ -57,6 +57,22 @@ export const leadSchema = z.object({
    */
   geographic_qualification_details_json: z.string().nullable(),
   sop_state_snapshot: z.string().nullable(),
+  /**
+   * JSON-encoded `BranchSnapshot` (see
+   * `packages/shared/src/schemas/branch.ts`) frozen at lead
+   * finalization or at session-end abandonment per spec 016 FR-018 /
+   * FR-011a. NULL for default-only leads (no branch fired). Validated
+   * via `branchSnapshotSchema` at boundary parse time so this column
+   * stays a plain `string | null` here.
+   */
+  branch_snapshot_json: z.string().nullable(),
+  /**
+   * Sibling boolean to `branch_snapshot_json.branch_incomplete` for
+   * fast filter queries (FR-011b). `true` for partial-branch leads
+   * captured by the session-end finalizer; `false` for completed
+   * branches and for default-only leads.
+   */
+  branch_incomplete: z.boolean(),
   status: leadStatusSchema,
   follow_up_action: z.string().nullable(),
   follow_up_action_changed_at: z.string().nullable(),

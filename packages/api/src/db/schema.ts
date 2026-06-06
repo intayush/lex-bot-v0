@@ -1,4 +1,4 @@
-import { pgTable, text, integer, boolean, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, text, integer, boolean, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export const accounts = pgTable('accounts', {
   id: text('id').primaryKey(),
@@ -111,6 +111,23 @@ export const leads = pgTable('leads', {
    * `geographic_qualification = 'OUTSIDE_SERVICE_AREA'`. Spec 015 FR-015.
    */
   geographic_qualification_details_json: text('geographic_qualification_details_json'),
+  /**
+   * Spec 016 multi-branch SOP. JSON-encoded `BranchSnapshot` (see
+   * `packages/shared/src/schemas/branch.ts → branchSnapshotSchema`)
+   * frozen at lead finalization or at session-end abandonment per
+   * FR-018 / FR-011a. NULL for default-only leads (no branch fired).
+   * Validated via `branchSnapshotSchema` at every boundary so this
+   * column stays a plain `text | null` here.
+   */
+  branch_snapshot_json: text('branch_snapshot_json'),
+  /**
+   * Spec 016 multi-branch SOP. Sibling boolean for fast filter
+   * queries (FR-011b). `true` for partial-branch leads written by the
+   * session-end finalizer per FR-011a; `false` for completed-branch
+   * leads and for default-only leads. Mirrors the
+   * `branch_incomplete` field inside `branch_snapshot_json`.
+   */
+  branch_incomplete: boolean('branch_incomplete').notNull().default(false),
   created_at: text('created_at').notNull(),
 });
 
@@ -217,6 +234,13 @@ export const subTypes = pgTable('sub_types', {
   label: text('label').notNull(),
   position: integer('position').notNull(),
   /**
+   * @deprecated Spec 016 multi-branch SOP supersedes spec 015's
+   * per-sub-type scoring config. New runtime code MUST read scoring
+   * data from the `branches` / `branchVersions` tables below. This
+   * column is preserved for backwards compatibility of historical
+   * lead rendering and for migration safety; drop is a follow-up
+   * cleanup migration (research.md R2).
+   *
    * Per-sub_type lead-classification scoring configuration.
    * JSON-encoded `ScoringConfig` (see
    * `packages/shared/src/schemas/sop.ts → scoringConfigSchema` and
@@ -242,4 +266,76 @@ export const goodbyePhrases = pgTable('goodbye_phrases', {
   created_at: text('created_at').notNull(),
 }, (table) => [
   uniqueIndex('goodbye_phrases_account_phrase_unique').on(table.account_id, table.phrase),
+]);
+
+// ---------------------------------------------------------------------------
+// Spec 016 — Multi-Branch SOP Workflow
+// ---------------------------------------------------------------------------
+
+/**
+ * A configurable per-(case_type_slug, sub_type_slug) workflow that
+ * fires AFTER the default SOP's Step 6 (contact) satisfies. At most
+ * one ACTIVE branch may exist per pair (FR-009).
+ *
+ * Per-account scoping uses `account_id` (consistent with `case_types`
+ * and `sub_types`); the slug-pair lookup is by string match — not a
+ * hard FK to those rows — so admins can rename slugs without
+ * cascading branch deletions. The runtime resolves slugs to live
+ * `case_types` / `sub_types` rows at lookup time.
+ *
+ * `current_version_id` points at the published `branch_versions` row
+ * in effect for new conversations. NULL when only drafts exist.
+ * In-flight conversations pin to the version ID resolved at branch
+ * activation (FR-031, research.md R7).
+ */
+export const branches = pgTable('branches', {
+  id: text('id').primaryKey(),
+  account_id: text('account_id').notNull().references(() => accounts.id),
+  case_type_slug: text('case_type_slug').notNull(),
+  sub_type_slug: text('sub_type_slug').notNull(),
+  is_active: boolean('is_active').notNull().default(true),
+  /**
+   * FK is declared as a plain text column without a hard reference
+   * to `branch_versions.id` to break the circular dependency
+   * (branches → branch_versions → branches). The migration's data
+   * copy and the application code maintain referential integrity.
+   */
+  current_version_id: text('current_version_id'),
+  created_at: text('created_at').notNull(),
+  updated_at: text('updated_at').notNull(),
+}, (table) => [
+  uniqueIndex('branches_account_pair_unique').on(
+    table.account_id,
+    table.case_type_slug,
+    table.sub_type_slug,
+  ),
+  index('branches_account_idx').on(table.account_id),
+]);
+
+/**
+ * Immutable snapshot of a Branch's full configuration. Each Save
+ * creates a new row; Publish flips one row's `is_published` to true
+ * (and the parent's `current_version_id`). All other fields are
+ * write-once. In-flight conversations load the row by id (R7).
+ */
+export const branchVersions = pgTable('branch_versions', {
+  id: text('id').primaryKey(),
+  branch_id: text('branch_id').notNull().references(() => branches.id, { onDelete: 'cascade' }),
+  version_number: integer('version_number').notNull(),
+  is_published: boolean('is_published').notNull().default(false),
+  /** JSON-encoded `BranchQuestion[]`; validated via `branchQuestionSchema[]`. */
+  questions_json: text('questions_json').notNull(),
+  /** JSON-encoded `{ self, family_friend }`; validated via threshold schemas. */
+  classification_thresholds_json: text('classification_thresholds_json').notNull(),
+  /** JSON-encoded `HardOverridesEnabled`. */
+  hard_override_toggles_json: text('hard_override_toggles_json').notNull(),
+  published_at: text('published_at'),
+  created_at: text('created_at').notNull(),
+  created_by_user_id: text('created_by_user_id').notNull(),
+}, (table) => [
+  uniqueIndex('branch_versions_branch_version_unique').on(
+    table.branch_id,
+    table.version_number,
+  ),
+  index('branch_versions_branch_idx').on(table.branch_id),
 ]);

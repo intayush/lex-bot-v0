@@ -421,6 +421,16 @@ export const hardOverridesEnabledSchema = z.object({
   fake_info: z.boolean(),
 });
 
+/**
+ * @deprecated Spec 016 multi-branch SOP supersedes spec 015's
+ * per-sub-type scoring config. New code MUST read scoring data from
+ * the `Branch` / `BranchVersion` model in
+ * `packages/shared/src/schemas/branch.ts`. The
+ * `sub_types.scoring_config_json` column is preserved at the schema
+ * level for backwards compatibility of historical lead rendering, but
+ * the runtime MUST NOT read from it. Drop is a follow-up cleanup
+ * migration (research.md R2). See spec 016 FR-029.
+ */
 export const scoringConfigSchema = z.object({
   schema_version: z.literal(1, {
     errorMap: () => ({
