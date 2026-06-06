@@ -181,11 +181,11 @@ Web monorepo (Constitution IV.2): `packages/{api,dashboard,widget,shared,crawler
 
 ### Tests for User Story 5 (Constitution III)
 
-- [ ] T057 [P] [US5] Extend `tests/e2e/smoke-016-criminal-defense.spec.ts` (or add a sibling spec) to cover: after default-only finalization, send a free-form question ("What does Attorney Shrager charge for an initial consultation?"), assert the response is within guardrails and ends with an open-ended re-prompt; assert no SOP step is re-asked; send a goodbye phrase and assert the configured polite closing is emitted.
+- [X] T057 [P] [US5] Extend `tests/e2e/smoke-016-criminal-defense.spec.ts` (or add a sibling spec) to cover: after default-only finalization, send a free-form question ("What does Attorney Shrager charge for an initial consultation?"), assert the response is within guardrails and ends with an open-ended re-prompt; assert no SOP step is re-asked; send a goodbye phrase and assert the configured polite closing is emitted.
 
 ### Implementation for User Story 5
 
-- [ ] T058 [US5] Verify the existing spec 010 FR Group G post-SOP behaviour applies uniformly to the new default-only path. Inspect `packages/api/src/lib/system-prompt.ts` and `packages/api/src/lib/sop/system-prompt-extension.ts` to confirm the post-finalization re-prompt + goodbye-phrase detection apply when the SOP terminates via `finalize_default_only`. If gaps exist, extend the system-prompt assembly accordingly. Add tests in `system-prompt.test.ts` covering the default-only path.
+- [X] T058 [US5] Verify the existing spec 010 FR Group G post-SOP behaviour applies uniformly to the new default-only path. Inspect `packages/api/src/lib/system-prompt.ts` and `packages/api/src/lib/sop/system-prompt-extension.ts` to confirm the post-finalization re-prompt + goodbye-phrase detection apply when the SOP terminates via `finalize_default_only`. If gaps exist, extend the system-prompt assembly accordingly. Add tests in `system-prompt.test.ts` covering the default-only path.
 
 **Checkpoint**: User Story 5 complete. Conversational continuation works uniformly across default-only and configured-branch paths.
 
@@ -206,19 +206,19 @@ Web monorepo (Constitution IV.2): `packages/{api,dashboard,widget,shared,crawler
 
 ### Cleanup and regression sweep
 
-- [ ] T062 Delete `tests/e2e/smoke-015*.spec.ts` after confirming `smoke-016-personal-injury.spec.ts` covers the same happy path. Run `pnpm test:e2e` to confirm no remaining references.
-- [ ] T063 Verify all spec 015 unit tests for `score-lead.ts`, `hard-overrides.ts`, `classification-mapper.ts`, `reason-builder.ts` still pass unchanged. Constitution VII regression check: `pnpm vitest run` is fully green.
-- [ ] T064 Update the existing `ensureCarAccidentScoring` references throughout the codebase to point at the new `ensureCarAccidentBranch` (T014). Run `grep -r 'ensureCarAccidentScoring\|scoring_config_json' packages/` and triage every remaining reference: leave the schema column reference (deprecated, intentional); update or delete every code reference.
+- [X] T062 Delete `tests/e2e/smoke-015*.spec.ts` after confirming `smoke-016-personal-injury.spec.ts` covers the same happy path. Run `pnpm test:e2e` to confirm no remaining references.
+- [X] T063 Verify all spec 015 unit tests for `score-lead.ts`, `hard-overrides.ts`, `classification-mapper.ts`, `reason-builder.ts` still pass unchanged. Constitution VII regression check: `pnpm vitest run` is fully green.
+- [X] T064 Update the existing `ensureCarAccidentScoring` references throughout the codebase to point at the new `ensureCarAccidentBranch` (T014). Run `grep -r 'ensureCarAccidentScoring\|scoring_config_json' packages/` and triage every remaining reference: leave the schema column reference (deprecated, intentional); update or delete every code reference.
 
 ### Documentation
 
-- [ ] T065 [P] Update the existing dashboard help/onboarding text (if any) in `packages/dashboard/src/` to mention the new Branches tab. No new docs files.
-- [ ] T066 [P] Verify `AGENTS.md` SPECKIT block points at `specs/016-multi-branch-sop/plan.md` (already done in Phase 1 of `/speckit.plan`; this task is the cross-check).
+- [X] T065 [P] Update the existing dashboard help/onboarding text (if any) in `packages/dashboard/src/` to mention the new Branches tab. No new docs files.
+- [X] T066 [P] Verify `AGENTS.md` SPECKIT block points at `specs/016-multi-branch-sop/plan.md` (already done in Phase 1 of `/speckit.plan`; this task is the cross-check).
 
 ### Final validation
 
-- [ ] T067 Run the full quickstart.md walkthrough §11–§12 from a fresh database (`rm packages/api/.local-test-db && pnpm db:migrate && pnpm db:seed`). Step through every manual verification checkpoint. Capture screenshots or transcripts in the PR description.
-- [ ] T068 Run the full CI pipeline locally: `pnpm tsc --noEmit && pnpm eslint . && pnpm vitest run && pnpm turbo build && pnpm test:e2e`. All gates green.
+- [X] T067 Run the full quickstart.md walkthrough §11–§12 from a fresh database (`rm packages/api/.local-test-db && pnpm db:migrate && pnpm db:seed`). Step through every manual verification checkpoint. Capture screenshots or transcripts in the PR description.
+- [X] T068 Run the full CI pipeline locally: `pnpm tsc --noEmit && pnpm eslint . && pnpm vitest run && pnpm turbo build && pnpm test:e2e`. All gates green.
 
 ---
 

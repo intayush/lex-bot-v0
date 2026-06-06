@@ -80,7 +80,8 @@ export default async function SopPage() {
         </div>
         <p className="text-sm text-[#737373] mt-1.5">
           Define the intake flow your chatbot follows to qualify leads. Reorder
-          steps, customize case types, and configure when the bot ends conversations.
+          steps, customize case types, configure per-(case type, sub-type)
+          scoring branches, and pick when the bot ends conversations.
           Use the preview pane on the right to test your draft before publishing.
         </p>
       </div>

@@ -378,3 +378,69 @@ describe('composeSopBlock — {case_type} interpolation (014)', () => {
     expect(block).not.toContain('{case_type}');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Spec 016 US5 (T058) — open-ended continuation works for the default-only
+// finalize path (branch_state stays null)
+// ---------------------------------------------------------------------------
+
+describe('composeSopBlock — spec 016 US5 default-only continuation', () => {
+  function finalizedDefaultOnlyState() {
+    const sopConfig = buildSOPConfig();
+    let state = initSOPState(sopConfig, ANCHOR);
+    for (const step of state.steps) {
+      state = advanceSOP(
+        state,
+        { type: 'capture_step', step_id: step.step_id, value: 'x', capturedAt: T1 },
+        sopConfig,
+      );
+    }
+    state = advanceSOP(state, { type: 'finalize' }, sopConfig);
+    // Per spec 016, default-only finalization leaves branch_state null.
+    return { sopConfig, state: { ...state, branch_state: null } };
+  }
+
+  it('emits the SOP-complete continuation directive (open re-prompt)', () => {
+    const { sopConfig, state } = finalizedDefaultOnlyState();
+    const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES);
+    expect(block).toContain('SOP complete');
+    expect(block).toMatch(/Is there anything else I can help you with/);
+  });
+
+  it('does NOT emit the analyzeAndFollowUp directive (FR-035 superseded)', () => {
+    const { sopConfig, state } = finalizedDefaultOnlyState();
+    const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES);
+    expect(block).not.toContain('analyzeAndFollowUp');
+  });
+
+  it('does NOT volunteer a goodbye unless the visitor uses one', () => {
+    const { sopConfig, state } = finalizedDefaultOnlyState();
+    const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES);
+    // The goodbye-rule section instructs the agent to wait for visitor
+    // intent — it should NOT proactively close the conversation.
+    expect(block).toMatch(/goodbye/i);
+    // Spec 010 FR-029 / FR-031: open re-prompt every turn until the
+    // visitor uses a goodbye phrase.
+    expect(block).toMatch(/unless the visitor explicitly says goodbye/);
+  });
+
+  it('omits the SOP step checklist (visitor sees free-form continuation)', () => {
+    const { sopConfig, state } = finalizedDefaultOnlyState();
+    const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES);
+    expect(block).not.toMatch(/\[✓\]/);
+    expect(block).not.toMatch(/\[\s\]/);
+  });
+
+  it('the branch-in-flight skip path does NOT trigger when branch_state is null', () => {
+    // Sanity-check the spec 016 routing: branch_state=null means
+    // composeSopBlock follows the spec-010 finalized branch (with
+    // continuation). The branch-in-flight path is exercised separately
+    // by the orchestrator + chat-route integration.
+    const { sopConfig, state } = finalizedDefaultOnlyState();
+    expect(state.is_finalized).toBe(true);
+    expect(state.branch_state).toBeNull();
+
+    const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES);
+    expect(block).toContain('SOP complete');
+  });
+});
