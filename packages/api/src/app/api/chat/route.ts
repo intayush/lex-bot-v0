@@ -18,6 +18,13 @@ import { checkRateLimit } from '../../../lib/rate-limit';
 import { initSOPState } from '../../../lib/sop/state-machine';
 import { advanceForVisitorMessage } from '../../../lib/sop/advancer';
 import { isOffTopic } from '../../../lib/sop/off-sop-detour';
+import {
+  runBranchOrchestrator,
+  type BranchOrchestratorDeps,
+} from '../../../lib/sop/branch-orchestrator';
+import { lookupBranch } from '../../../lib/sop/branch-lookup';
+import { db, schema } from '../../../db';
+import { eq } from 'drizzle-orm';
 import { captureLeadToolParams } from './tool-params';
 import { buildSOPStateHeader } from '../../../lib/sop/build-sop-state-header';
 import { corsHeaders } from './cors';
@@ -25,6 +32,12 @@ import type { Manifest, SOPState } from '@legal-chatbot/shared';
 
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: corsHeaders });
+}
+
+/** Read a captured value from SOP state by step slug. Returns null when unset. */
+function captureSlugFromState(state: SOPState, slug: string): string | null {
+  const step = state.steps.find((s) => s.slug === slug);
+  return step?.captured_value ?? null;
 }
 
 const manifestCache = new Map<string, { manifest: Manifest; fetchedAt: number }>();
@@ -142,15 +155,96 @@ export async function POST(req: Request) {
     }
   }
 
-  const systemPrompt = composeSystemPrompt(
-    config,
-    undefined, // guardrailsMarkdown (unused today)
-    sopState ?? undefined,
-    sopBundle.sop ?? undefined,
-    sopBundle.goodbyePhrases.length > 0 ? sopBundle.goodbyePhrases : undefined,
-    isOffTopicNow,
-    sopBundle.caseTypes.length > 0 ? sopBundle.caseTypes : undefined,
-  );
+  // Spec 016 US2 — Branch orchestrator dispatch (T039).
+  // After the default 6-step SOP finalizes, route to the configured
+  // Branch (FR-008) when one exists for the captured (case_type,
+  // sub_type) pair. The orchestrator is idempotent — it noops when
+  // the SOP isn't yet finalized or no active branch is configured
+  // (FR-007 default-only path).
+  let branchPromptDirective: string | null = null;
+  let branchFinalizationPayload: {
+    snapshot: import('@legal-chatbot/shared').BranchSnapshot;
+    score: number | null;
+    classification: import('@legal-chatbot/shared').LeadClassification;
+    reasons: string[];
+  } | null = null;
+  if (sopState) {
+    const branchDeps: BranchOrchestratorDeps = {
+      lookupBranch: ({ accountId, caseTypeSlug, subTypeSlug }) =>
+        lookupBranch({ accountId, caseTypeSlug, subTypeSlug }),
+      getVersionById: async (versionId) => {
+        const rows = await db
+          .select()
+          .from(schema.branchVersions)
+          .where(eq(schema.branchVersions.id, versionId))
+          .limit(1);
+        const row = rows[0];
+        if (!row) return null;
+        return {
+          id: row.id,
+          branch_id: row.branch_id,
+          version_number: row.version_number,
+          is_published: row.is_published,
+          questions: JSON.parse(row.questions_json),
+          classification_thresholds: JSON.parse(row.classification_thresholds_json),
+          hard_override_toggles: JSON.parse(row.hard_override_toggles_json),
+          published_at: row.published_at === null ? null : Number(new Date(row.published_at)),
+          created_at: Number(new Date(row.created_at)),
+          created_by_user_id: row.created_by_user_id,
+        };
+      },
+      now: () => Date.now(),
+    };
+    const userText =
+      typeof newUserMessage?.content === 'string' ? newUserMessage.content : '';
+    const orchestrated = await runBranchOrchestrator({
+      accountId: auth.accountId,
+      sopState,
+      userMessage: userText,
+      deps: branchDeps,
+    });
+    if (orchestrated.action === 'present_question') {
+      sopState = orchestrated.updatedSopState;
+      const q = orchestrated.question;
+      branchPromptDirective =
+        `### Branch in flight\n\nThe visitor has completed the default SOP and is now answering ` +
+        `a configured branch question for (${captureSlugFromState(sopState, 'case_type')}, ` +
+        `${captureSlugFromState(sopState, 'sub_type')}). Ask: "${q.text}"\n\n` +
+        (q.chips.length > 0
+          ? `Chips will be rendered by the widget; ${q.free_text_allowed ? 'free-text is also accepted' : 'this question accepts chip selection only'}.\n`
+          : `This question accepts free-text only.\n`);
+    } else if (orchestrated.action === 'awaiting_clarification') {
+      sopState = orchestrated.updatedSopState;
+      branchPromptDirective =
+        `### Branch clarification\n\n${orchestrated.clarificationText}\n` +
+        `Re-ask the same branch question politely.\n`;
+    } else if (orchestrated.action === 'finalize_with_branch') {
+      sopState = orchestrated.updatedSopState;
+      branchFinalizationPayload = {
+        snapshot: orchestrated.snapshot,
+        score: orchestrated.score.score,
+        classification: orchestrated.score.classification,
+        reasons: orchestrated.score.reasons,
+      };
+      branchPromptDirective =
+        `### Branch finalized\n\nThe configured branch has finished. The lead has been ` +
+        `scored and classified as ${orchestrated.score.classification} (score ${orchestrated.score.score}). ` +
+        `Thank the visitor briefly and confirm someone from the firm will reach out. ` +
+        `Do NOT ask any further intake questions.\n`;
+    }
+  }
+
+  const systemPrompt =
+    composeSystemPrompt(
+      config,
+      undefined, // guardrailsMarkdown (unused today)
+      sopState ?? undefined,
+      sopBundle.sop ?? undefined,
+      sopBundle.goodbyePhrases.length > 0 ? sopBundle.goodbyePhrases : undefined,
+      isOffTopicNow,
+      sopBundle.caseTypes.length > 0 ? sopBundle.caseTypes : undefined,
+    ) +
+    (branchPromptDirective ? `\n\n${branchPromptDirective}` : '');
   const contextStoreUrl = auth.contextStoreUrl;
 
   // Build the tools map. Per spec 016 FR-035 the agent has exactly two
@@ -237,6 +331,25 @@ export async function POST(req: Request) {
       // conversation before the when-step ISO date was captured. No-ops
       // when no lead exists for the session yet.
       await updateLeadSOPState(sessionId!, sopState);
+
+      // Spec 016 US2 — When the branch orchestrator finalized the
+      // configured-branch flow this turn, write the snapshot + score
+      // onto the existing lead row (the agent's earlier captureLead
+      // call already created the row; we update it with branch data).
+      // No-op when this turn didn't finalize a branch.
+      if (branchFinalizationPayload) {
+        const reasonsJson = JSON.stringify(branchFinalizationPayload.reasons);
+        await db
+          .update(schema.leads)
+          .set({
+            branch_snapshot_json: JSON.stringify(branchFinalizationPayload.snapshot),
+            branch_incomplete: false,
+            lead_score: branchFinalizationPayload.score,
+            classification: branchFinalizationPayload.classification,
+            score_reasons_json: reasonsJson,
+          })
+          .where(eq(schema.leads.session_id, sessionId!));
+      }
 
       // Extract and save partial lead data from the conversation so that
       // information shared before an abandoned session is not lost.

@@ -246,6 +246,41 @@ export const sopStateSchema = z.object({
   current_progress: z.number().int().nonnegative(),
   is_finalized: z.boolean(),
   out_of_scope_termination: z.boolean(),
+  /**
+   * Spec 016 US2 — runtime state for an in-flight Branch (FR-008).
+   * Null when:
+   *   - SOP hasn't reached Step 6 yet, OR
+   *   - Step 6 satisfied but no active Branch is configured for the
+   *     captured (case_type, sub_type) pair, OR
+   *   - The branch has finalized (capturedChips frozen onto the lead row).
+   *
+   * When non-null:
+   *   - `branch_id` and `branch_version_id` pin the in-flight session
+   *     to a specific BranchVersion (FR-031, research.md R7).
+   *   - `current_question_index` is the next question to ask.
+   *   - `captured_chips` and `captured_free_text` accumulate as
+   *     the visitor answers each branch question.
+   */
+  branch_state: z
+    .object({
+      branch_id: z.string().min(1),
+      branch_version_id: z.string().min(1),
+      current_question_index: z.number().int().nonnegative(),
+      captured_chips: z.array(
+        z.object({
+          question_id: z.string().min(1),
+          chip_slugs: z.array(z.string()),
+        }),
+      ),
+      captured_free_text: z.array(
+        z.object({
+          question_id: z.string().min(1),
+          text: z.string(),
+        }),
+      ),
+    })
+    .nullable()
+    .optional(),
 });
 export type SOPState = z.infer<typeof sopStateSchema>;
 

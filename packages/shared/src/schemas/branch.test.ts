@@ -246,7 +246,7 @@ describe('branchVersionSchema', () => {
 describe('branchSchema', () => {
   const valid = {
     id: 'br_abc',
-    firm_id: 'firm_001',
+    account_id: 'firm_001',
     case_type_slug: 'personal_injury',
     sub_type_slug: 'car_accident',
     is_active: true,

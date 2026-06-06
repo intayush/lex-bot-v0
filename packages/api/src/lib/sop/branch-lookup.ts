@@ -16,7 +16,8 @@
 
 import { and, eq } from 'drizzle-orm';
 
-import { db, schema } from '../../db/index.js';
+import { db, schema } from '../../db';
+import type { Branch, BranchVersion } from '@legal-chatbot/shared';
 
 export interface BranchLookupArgs {
   accountId: string;
@@ -24,27 +25,8 @@ export interface BranchLookupArgs {
   subTypeSlug: string;
 }
 
-export interface ResolvedBranch {
-  id: string;
-  account_id: string;
-  case_type_slug: string;
-  sub_type_slug: string;
-  is_active: boolean;
-  current_version_id: string;
-}
-
-export interface ResolvedBranchVersion {
-  id: string;
-  branch_id: string;
-  version_number: number;
-  is_published: boolean;
-  questions_json: string;
-  classification_thresholds_json: string;
-  hard_override_toggles_json: string;
-}
-
 export type BranchLookupResult =
-  | { branch: ResolvedBranch; version: ResolvedBranchVersion }
+  | { branch: Branch; version: BranchVersion }
   | { branch: null; version?: undefined };
 
 /**
@@ -72,6 +54,8 @@ export async function lookupBranch(
       branch_sub_type_slug: schema.branches.sub_type_slug,
       branch_is_active: schema.branches.is_active,
       branch_current_version_id: schema.branches.current_version_id,
+      branch_created_at: schema.branches.created_at,
+      branch_updated_at: schema.branches.updated_at,
       version_id: schema.branchVersions.id,
       version_branch_id: schema.branchVersions.branch_id,
       version_number: schema.branchVersions.version_number,
@@ -79,6 +63,9 @@ export async function lookupBranch(
       version_questions_json: schema.branchVersions.questions_json,
       version_thresholds_json: schema.branchVersions.classification_thresholds_json,
       version_overrides_json: schema.branchVersions.hard_override_toggles_json,
+      version_published_at: schema.branchVersions.published_at,
+      version_created_at: schema.branchVersions.created_at,
+      version_created_by: schema.branchVersions.created_by_user_id,
     })
     .from(schema.branches)
     .innerJoin(
@@ -119,15 +106,28 @@ export async function lookupBranch(
       sub_type_slug: row.branch_sub_type_slug,
       is_active: row.branch_is_active,
       current_version_id: row.branch_current_version_id,
+      created_at: Number(new Date(row.branch_created_at)),
+      updated_at: Number(new Date(row.branch_updated_at)),
     },
     version: {
       id: row.version_id,
       branch_id: row.version_branch_id,
       version_number: row.version_number,
       is_published: row.version_is_published,
-      questions_json: row.version_questions_json,
-      classification_thresholds_json: row.version_thresholds_json,
-      hard_override_toggles_json: row.version_overrides_json,
+      questions: questions as BranchVersion['questions'],
+      classification_thresholds: JSON.parse(
+        row.version_thresholds_json,
+      ) as BranchVersion['classification_thresholds'],
+      hard_override_toggles: JSON.parse(
+        row.version_overrides_json,
+      ) as BranchVersion['hard_override_toggles'],
+      published_at:
+        row.version_published_at === null
+          ? null
+          : Number(new Date(row.version_published_at)),
+      created_at: Number(new Date(row.version_created_at)),
+      created_by_user_id: row.version_created_by,
     },
   };
 }
+

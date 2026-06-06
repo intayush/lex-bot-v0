@@ -139,12 +139,12 @@ export const branchVersionSchema = z.object({
 export type BranchVersion = z.infer<typeof branchVersionSchema>;
 
 // ---------------------------------------------------------------------------
-// Branch — the parent record per (firm_id, case_type_slug, sub_type_slug)
+// Branch — the parent record per (account_id, case_type_slug, sub_type_slug)
 // ---------------------------------------------------------------------------
 
 export const branchSchema = z.object({
   id: z.string().min(1),
-  firm_id: z.string().min(1),
+  account_id: z.string().min(1),
   case_type_slug: branchSlugSchema,
   sub_type_slug: branchSlugSchema,
   is_active: z.boolean(),
