@@ -29,7 +29,7 @@ import type {
   SOPState,
 } from '@legal-chatbot/shared';
 
-import type { HardOverrideName } from './reason-builder.js';
+import type { HardOverrideName } from './reason-builder';
 
 // ---------------------------------------------------------------------------
 // Predicates

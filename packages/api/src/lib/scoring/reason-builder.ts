@@ -17,7 +17,7 @@
  * - Determining which hard-overrides fired (see ./hard-overrides.ts).
  * - Persisting the resulting array to `leads.score_reasons_json`.
  */
-import type { CapturedScoringChip } from './score-lead.js';
+import type { CapturedScoringChip } from './score-lead';
 
 export type HardOverrideName =
   | 'missing_contact'

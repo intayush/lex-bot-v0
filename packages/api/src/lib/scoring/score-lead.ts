@@ -28,7 +28,7 @@ import type {
   SOPState,
 } from '@legal-chatbot/shared';
 
-import { scoreToClassification } from './classification-mapper.js';
+import { scoreToClassification } from './classification-mapper';
 
 /**
  * Chip captures eligible for inclusion in the reasons array. Carries
