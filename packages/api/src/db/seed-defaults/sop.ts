@@ -34,6 +34,7 @@ const _RAW_DEFAULT_SOP_STEPS: SOPStepInput[] = [
     counts_toward_threshold: true,
     is_default: true,
     skip_condition_json: null,
+    applies_when_sub_type_slug: null,
   },
   {
     slug: 'sub_type',
@@ -46,6 +47,7 @@ const _RAW_DEFAULT_SOP_STEPS: SOPStepInput[] = [
     counts_toward_threshold: true,
     is_default: true,
     skip_condition_json: null,
+    applies_when_sub_type_slug: null,
   },
   {
     slug: 'where',
@@ -58,6 +60,7 @@ const _RAW_DEFAULT_SOP_STEPS: SOPStepInput[] = [
     counts_toward_threshold: true,
     is_default: true,
     skip_condition_json: null,
+    applies_when_sub_type_slug: null,
   },
   {
     slug: 'what',
@@ -70,6 +73,7 @@ const _RAW_DEFAULT_SOP_STEPS: SOPStepInput[] = [
     counts_toward_threshold: true,
     is_default: true,
     skip_condition_json: null,
+    applies_when_sub_type_slug: null,
   },
   {
     slug: 'when',
@@ -90,6 +94,7 @@ const _RAW_DEFAULT_SOP_STEPS: SOPStepInput[] = [
     counts_toward_threshold: true,
     is_default: true,
     skip_condition_json: null,
+    applies_when_sub_type_slug: null,
   },
   {
     slug: 'contact',
@@ -105,6 +110,7 @@ const _RAW_DEFAULT_SOP_STEPS: SOPStepInput[] = [
     counts_toward_threshold: true,
     is_default: true,
     skip_condition_json: null,
+    applies_when_sub_type_slug: null,
   },
 ];
 
@@ -124,10 +130,10 @@ const _RAW_DEFAULT_CASE_TYPES: CaseTypeInput[] = [
     position: 1,
     is_in_scope: true,
     sub_types: [
-      { slug: 'first_offense', label: 'First Offense', position: 1 },
-      { slug: 'repeat_offense', label: 'Repeat Offense', position: 2 },
-      { slug: 'dui_with_injury', label: 'DUI with Injury', position: 3 },
-      { slug: 'dui_with_property', label: 'DUI with Property Damage', position: 4 },
+      { slug: 'first_offense', label: 'First Offense', position: 1, scoring_config_json: null },
+      { slug: 'repeat_offense', label: 'Repeat Offense', position: 2, scoring_config_json: null },
+      { slug: 'dui_with_injury', label: 'DUI with Injury', position: 3, scoring_config_json: null },
+      { slug: 'dui_with_property', label: 'DUI with Property Damage', position: 4, scoring_config_json: null },
     ],
   },
   {
@@ -136,10 +142,10 @@ const _RAW_DEFAULT_CASE_TYPES: CaseTypeInput[] = [
     position: 2,
     is_in_scope: true,
     sub_types: [
-      { slug: 'theft', label: 'Theft', position: 1 },
-      { slug: 'assault', label: 'Assault', position: 2 },
-      { slug: 'fraud', label: 'Fraud', position: 3 },
-      { slug: 'gun_charge', label: 'Gun Charge', position: 4 },
+      { slug: 'theft', label: 'Theft', position: 1, scoring_config_json: null },
+      { slug: 'assault', label: 'Assault', position: 2, scoring_config_json: null },
+      { slug: 'fraud', label: 'Fraud', position: 3, scoring_config_json: null },
+      { slug: 'gun_charge', label: 'Gun Charge', position: 4, scoring_config_json: null },
     ],
   },
   {
@@ -148,10 +154,10 @@ const _RAW_DEFAULT_CASE_TYPES: CaseTypeInput[] = [
     position: 3,
     is_in_scope: true,
     sub_types: [
-      { slug: 'car_accident', label: 'Car Accident', position: 1 },
-      { slug: 'slip_fall', label: 'Slip and Fall', position: 2 },
-      { slug: 'medical_malpractice', label: 'Medical Malpractice', position: 3 },
-      { slug: 'dog_bite', label: 'Dog Bite', position: 4 },
+      { slug: 'car_accident', label: 'Car Accident', position: 1, scoring_config_json: null },
+      { slug: 'slip_fall', label: 'Slip and Fall', position: 2, scoring_config_json: null },
+      { slug: 'medical_malpractice', label: 'Medical Malpractice', position: 3, scoring_config_json: null },
+      { slug: 'dog_bite', label: 'Dog Bite', position: 4, scoring_config_json: null },
     ],
   },
   {
@@ -160,9 +166,9 @@ const _RAW_DEFAULT_CASE_TYPES: CaseTypeInput[] = [
     position: 4,
     is_in_scope: true,
     sub_types: [
-      { slug: 'divorce', label: 'Divorce', position: 1 },
-      { slug: 'custody', label: 'Custody', position: 2 },
-      { slug: 'adoption', label: 'Adoption', position: 3 },
+      { slug: 'divorce', label: 'Divorce', position: 1, scoring_config_json: null },
+      { slug: 'custody', label: 'Custody', position: 2, scoring_config_json: null },
+      { slug: 'adoption', label: 'Adoption', position: 3, scoring_config_json: null },
     ],
   },
   {
@@ -171,9 +177,9 @@ const _RAW_DEFAULT_CASE_TYPES: CaseTypeInput[] = [
     position: 5,
     is_in_scope: true,
     sub_types: [
-      { slug: 'possession', label: 'Possession', position: 1 },
-      { slug: 'distribution', label: 'Distribution', position: 2 },
-      { slug: 'trafficking', label: 'Trafficking', position: 3 },
+      { slug: 'possession', label: 'Possession', position: 1, scoring_config_json: null },
+      { slug: 'distribution', label: 'Distribution', position: 2, scoring_config_json: null },
+      { slug: 'trafficking', label: 'Trafficking', position: 3, scoring_config_json: null },
     ],
   },
   {
@@ -182,9 +188,9 @@ const _RAW_DEFAULT_CASE_TYPES: CaseTypeInput[] = [
     position: 6,
     is_in_scope: true,
     sub_types: [
-      { slug: 'will', label: 'Will', position: 1 },
-      { slug: 'trust', label: 'Trust', position: 2 },
-      { slug: 'probate', label: 'Probate', position: 3 },
+      { slug: 'will', label: 'Will', position: 1, scoring_config_json: null },
+      { slug: 'trust', label: 'Trust', position: 2, scoring_config_json: null },
+      { slug: 'probate', label: 'Probate', position: 3, scoring_config_json: null },
     ],
   },
 ];

@@ -63,6 +63,17 @@ export const leads = sqliteTable('leads', {
   follow_up_action: text('follow_up_action'),
   /** ISO 8601 timestamp of the most recent follow_up_action change. */
   follow_up_action_changed_at: text('follow_up_action_changed_at'),
+  /** Spec 015 — numeric lead score in [0, 100] when scored; NULL on
+   * fallback / legacy / scoring-error paths. */
+  lead_score: integer('lead_score'),
+  /** Spec 015 — JSON array of phrase strings explaining the score. */
+  score_reasons_json: text('score_reasons_json'),
+  /** Spec 015 — 'SELF' | 'FRIEND_FAMILY' metadata. */
+  request_type: text('request_type'),
+  /** Spec 015 — 'IN_SERVICE_AREA' | 'OUTSIDE_SERVICE_AREA' metadata. */
+  geographic_qualification: text('geographic_qualification'),
+  /** Spec 015 — JSON { city, state } when OUTSIDE_SERVICE_AREA. */
+  geographic_qualification_details_json: text('geographic_qualification_details_json'),
   created_at: text('created_at').notNull(),
 });
 
@@ -116,6 +127,8 @@ export const sopSteps = sqliteTable('sop_steps', {
   counts_toward_threshold: integer('counts_toward_threshold', { mode: 'boolean' }).notNull().default(true),
   is_default: integer('is_default', { mode: 'boolean' }).notNull().default(false),
   skip_condition_json: text('skip_condition_json'),
+  /** Spec 015 — sub_type-scoped step filter. NULL = always fires. */
+  applies_when_sub_type_slug: text('applies_when_sub_type_slug'),
 });
 
 export const caseTypes = sqliteTable('case_types', {
@@ -134,6 +147,8 @@ export const subTypes = sqliteTable('sub_types', {
   slug: text('slug').notNull(),
   label: text('label').notNull(),
   position: integer('position').notNull(),
+  /** Spec 015 — JSON ScoringConfig; NULL = LLM fallback. */
+  scoring_config_json: text('scoring_config_json'),
   created_at: text('created_at').notNull(),
 });
 

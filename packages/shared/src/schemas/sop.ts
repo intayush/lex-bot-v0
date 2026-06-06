@@ -111,6 +111,14 @@ export const sopStepSchema = z.object({
   is_default: z.boolean(),
   /** Reserved for advanced skip rules (post-MVP). MVP stores `null`. */
   skip_condition_json: z.string().nullable(),
+  /**
+   * Spec 015 — when set, this step only fires for visitors whose
+   * captured `sub_type` slug matches this value. NULL means "always
+   * fires" (the default for the existing 6 default steps). Used by
+   * the 9 new car-accident scoring steps to limit their scope.
+   * Filtered at runtime in `nextPendingStep` per research.md §R2.
+   */
+  applies_when_sub_type_slug: z.string().nullable().optional().default(null),
 });
 export type SOPStep = z.infer<typeof sopStepSchema>;
 
@@ -147,6 +155,16 @@ export const subTypeSchema = z.object({
   slug: slugSchema,
   label: z.string().min(1).max(100),
   position: positionSchema,
+  /**
+   * Spec 015 — per-sub_type lead-classification scoring configuration.
+   * JSON-encoded `ScoringConfig` (see `scoringConfigSchema` below and
+   * `specs/015-lead-classification-revamp/contracts/scoring-config.md`).
+   * NULL means "no scoring configuration; fall through to the LLM
+   * classifier" (FR-022). Stored as a string here; callers decode +
+   * validate via `scoringConfigSchema` at boundary parse time so this
+   * schema doesn't impose a JSON parse on every read.
+   */
+  scoring_config_json: z.string().nullable().optional().default(null),
   created_at: z.string(),
 });
 export type SubType = z.infer<typeof subTypeSchema>;

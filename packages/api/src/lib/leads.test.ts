@@ -71,6 +71,11 @@ CREATE TABLE \`leads\` (
   \`status\` text DEFAULT 'new' NOT NULL,
   \`follow_up_action\` text,
   \`follow_up_action_changed_at\` text,
+  \`lead_score\` integer,
+  \`score_reasons_json\` text,
+  \`request_type\` text,
+  \`geographic_qualification\` text,
+  \`geographic_qualification_details_json\` text,
   \`created_at\` text NOT NULL,
   FOREIGN KEY (\`account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE no action,
   FOREIGN KEY (\`session_id\`) REFERENCES \`sessions\`(\`id\`) ON UPDATE no action ON DELETE no action

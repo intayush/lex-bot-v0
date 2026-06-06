@@ -41,6 +41,7 @@ function hydrateSOP(cfgRow: SopConfigurationRow, stepRows: SopStepRow[]): SOPCon
       counts_toward_threshold: s.counts_toward_threshold,
       is_default: s.is_default,
       skip_condition_json: s.skip_condition_json,
+      applies_when_sub_type_slug: s.applies_when_sub_type_slug ?? null,
     })),
   };
 }
@@ -132,6 +133,7 @@ export async function getCaseTypes(accountId: string): Promise<CaseType[]> {
         slug: st.slug,
         label: st.label,
         position: st.position,
+        scoring_config_json: st.scoring_config_json ?? null,
         created_at: st.created_at,
       })),
   }));
