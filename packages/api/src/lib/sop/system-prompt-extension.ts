@@ -116,13 +116,21 @@ export function composeSopBlock(
   // ---- Current pending step OR all-complete signal ----
   const earliestPending = findEarliestPending(sopState, orderedConfigSteps);
   if (earliestPending === null) {
-    // All steps complete (or skipped) but not finalized → tool prompt.
+    // All steps complete (or skipped) but not finalized.
+    // Spec 016 FR-035: the previous AI follow-up tool has been removed.
+    // The agent should call `captureLead` directly with the captured
+    // SOP values; per FR-007, default-only flows finalize here, and
+    // configured-branch flows are dispatched by the SOP advancer
+    // (server-side state-machine transition) rather than via an
+    // agent-tool indirection.
     lines.push('### Next action');
     lines.push('');
     lines.push(
-      'All SOP steps are complete. Call the `analyzeAndFollowUp` tool ' +
-      'to either generate 2-5 follow-up questions tailored to the matter ' +
-      'or signal that the lead is ready to finalize.',
+      'All SOP steps are complete. Call the `captureLead` tool with ' +
+      'the captured SOP values (case type, contact info, brief ' +
+      'description from the where/what/when fields, and your best ' +
+      'classification estimate). The server will route to the ' +
+      'configured branch (if any) or finalize the lead directly.',
     );
     lines.push('');
   } else {

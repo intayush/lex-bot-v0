@@ -18,7 +18,6 @@ import { checkRateLimit } from '../../../lib/rate-limit';
 import { initSOPState } from '../../../lib/sop/state-machine';
 import { advanceForVisitorMessage } from '../../../lib/sop/advancer';
 import { isOffTopic } from '../../../lib/sop/off-sop-detour';
-import { analyzeAndFollowUpTool } from '../../../lib/sop/follow-up-tool';
 import { captureLeadToolParams } from './tool-params';
 import { buildSOPStateHeader } from '../../../lib/sop/build-sop-state-header';
 import { corsHeaders } from './cors';
@@ -154,8 +153,14 @@ export async function POST(req: Request) {
   );
   const contextStoreUrl = auth.contextStoreUrl;
 
-  // Build the tools map. analyzeAndFollowUp is registered ONLY when SOP
-  // is in use (no point exposing it to legacy accounts).
+  // Build the tools map. Per spec 016 FR-035 the agent has exactly two
+  // tools in MVP: searchContext and captureLead. The previously
+  // conditionally-registered AI follow-up tool was the root-cause of
+  // the regression captured in negative-sop-flow.json (it was
+  // generating car-accident-specific follow-up questions for arbitrary
+  // case types). The branch model in spec 016 supersedes its
+  // dynamic-question behaviour with deterministic per-branch dispatch
+  // driven by the SOP advancer.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tools: Record<string, any> = {
     searchContext: tool({
@@ -204,10 +209,6 @@ export async function POST(req: Request) {
       },
     }),
   };
-
-  if (sopState && sopBundle.sop) {
-    tools.analyzeAndFollowUp = analyzeAndFollowUpTool;
-  }
 
   const result = streamText({
     model: google('gemini-2.5-flash'),

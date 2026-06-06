@@ -173,7 +173,7 @@ describe('composeSopBlock — mid-flow', () => {
 // ---------------------------------------------------------------------------
 
 describe('composeSopBlock — all steps complete, not yet finalized', () => {
-  it('instructs the agent to call the analyzeAndFollowUp tool', () => {
+  it('instructs the agent to call captureLead directly (spec 016 FR-035)', () => {
     const sopConfig = buildSOPConfig();
     let state = initSOPState(sopConfig, ANCHOR);
     for (const step of state.steps) {
@@ -184,7 +184,10 @@ describe('composeSopBlock — all steps complete, not yet finalized', () => {
       );
     }
     const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES);
-    expect(block).toContain('analyzeAndFollowUp');
+    // Spec 016 FR-035: the analyzeAndFollowUp tool has been removed;
+    // the prompt now points the agent at captureLead instead.
+    expect(block).not.toContain('analyzeAndFollowUp');
+    expect(block).toContain('captureLead');
   });
 });
 
