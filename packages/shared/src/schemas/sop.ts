@@ -262,3 +262,161 @@ export const sopStateHeaderPayloadSchema = z.object({
   captured_case_type_label: z.string().nullable().optional().default(null),
 });
 export type SOPStateHeaderPayload = z.infer<typeof sopStateHeaderPayloadSchema>;
+
+// ---------------------------------------------------------------------------
+// Scoring configuration (spec 015) — `sub_types.scoring_config_json` shape
+// ---------------------------------------------------------------------------
+// Validated by Zod at every boundary read or write. See
+// `contracts/scoring-config.md` for full semantics. The schema_version
+// literal forward-compats the deferred Case Value / Urgency Score
+// decomposition (post-MVP); MVP runtime rejects unknown versions.
+//
+// Stable `params.code` values surface on validation failures so the
+// dashboard can render actionable inline errors per FR-021:
+//   - SCHEMA_VERSION_UNSUPPORTED — schema_version is not 1
+//   - THRESHOLDS_GAP            — buckets do not cover [0,100] contiguously
+//   - THRESHOLDS_OVERLAP        — two or more buckets share at least one point
+
+const classificationBoundsSchema = z
+  .tuple([
+    z.number().int().min(0).max(100),
+    z.number().int().min(0).max(100),
+  ])
+  .refine(([lo, hi]) => lo <= hi, {
+    message: 'Lower bound must be ≤ upper bound',
+    params: { code: 'THRESHOLDS_INVALID_BOUND' },
+  });
+
+type Bounds = readonly [number, number];
+
+/**
+ * Asserts the supplied buckets form a contiguous partition of `[0, 100]`
+ * with no gaps and no overlaps. Returns one of:
+ *   - { ok: true } — coverage is correct
+ *   - { ok: false, code: 'THRESHOLDS_OVERLAP', message }
+ *   - { ok: false, code: 'THRESHOLDS_GAP', message }
+ */
+function checkCoverage(
+  buckets: Record<string, Bounds>,
+): { ok: true } | { ok: false; code: 'THRESHOLDS_OVERLAP' | 'THRESHOLDS_GAP'; message: string } {
+  const sorted = Object.entries(buckets)
+    .map(([name, range]) => ({ name, lo: range[0], hi: range[1] }))
+    .sort((a, b) => a.lo - b.lo);
+
+  if (sorted.length === 0) {
+    return {
+      ok: false,
+      code: 'THRESHOLDS_GAP',
+      message: 'No threshold buckets defined',
+    };
+  }
+
+  // Must start at 0
+  if (sorted[0].lo !== 0) {
+    return {
+      ok: false,
+      code: 'THRESHOLDS_GAP',
+      message: `Threshold coverage must start at 0; first bucket starts at ${sorted[0].lo}`,
+    };
+  }
+
+  // Must end at 100
+  if (sorted[sorted.length - 1].hi !== 100) {
+    return {
+      ok: false,
+      code: 'THRESHOLDS_GAP',
+      message: `Threshold coverage must end at 100; last bucket ends at ${sorted[sorted.length - 1].hi}`,
+    };
+  }
+
+  // Check overlap and contiguity between adjacent buckets
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1];
+    const curr = sorted[i];
+    if (curr.lo <= prev.hi) {
+      return {
+        ok: false,
+        code: 'THRESHOLDS_OVERLAP',
+        message: `Bucket "${curr.name}" [${curr.lo},${curr.hi}] overlaps "${prev.name}" [${prev.lo},${prev.hi}]`,
+      };
+    }
+    if (curr.lo !== prev.hi + 1) {
+      return {
+        ok: false,
+        code: 'THRESHOLDS_GAP',
+        message: `Gap between "${prev.name}" ending at ${prev.hi} and "${curr.name}" starting at ${curr.lo}`,
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
+export const thresholdsSelfSchema = z
+  .object({
+    hot: classificationBoundsSchema,
+    warm: classificationBoundsSchema,
+    cold: classificationBoundsSchema,
+    spam: classificationBoundsSchema,
+  })
+  .superRefine((value, ctx) => {
+    const result = checkCoverage({
+      hot: value.hot,
+      warm: value.warm,
+      cold: value.cold,
+      spam: value.spam,
+    });
+    if (!result.ok) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: result.message,
+        params: { code: result.code },
+      });
+    }
+  });
+
+export const thresholdsFamilyFriendSchema = z
+  .object({
+    hot: classificationBoundsSchema,
+    warm: classificationBoundsSchema,
+    spam: classificationBoundsSchema,
+  })
+  .superRefine((value, ctx) => {
+    const result = checkCoverage({
+      hot: value.hot,
+      warm: value.warm,
+      spam: value.spam,
+    });
+    if (!result.ok) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: result.message,
+        params: { code: result.code },
+      });
+    }
+  });
+
+export const hardOverridesEnabledSchema = z.object({
+  missing_contact: z.boolean(),
+  out_of_scope: z.boolean(),
+  no_injury_no_treatment: z.boolean(),
+  fake_info: z.boolean(),
+});
+
+export const scoringConfigSchema = z.object({
+  schema_version: z.literal(1, {
+    errorMap: () => ({
+      message: 'Unsupported scoring_config schema_version (MVP supports 1)',
+      params: { code: 'SCHEMA_VERSION_UNSUPPORTED' },
+    }),
+  }),
+  thresholds_self: thresholdsSelfSchema,
+  thresholds_family_friend: thresholdsFamilyFriendSchema,
+  hard_overrides_enabled: hardOverridesEnabledSchema,
+});
+
+export type ClassificationBounds = z.infer<typeof classificationBoundsSchema>;
+export type ThresholdsSelf = z.infer<typeof thresholdsSelfSchema>;
+export type ThresholdsFamilyFriend = z.infer<typeof thresholdsFamilyFriendSchema>;
+export type HardOverridesEnabled = z.infer<typeof hardOverridesEnabledSchema>;
+export type ScoringConfig = z.infer<typeof scoringConfigSchema>;
