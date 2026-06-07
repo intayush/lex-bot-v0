@@ -340,3 +340,116 @@ describe('ChatPanel — embedded mode + extraHeaders (dashboard preview parity)'
   });
 });
 
+describe('ChatPanel — greeting flash regression', () => {
+  // Pre-fix bug: ChatPanel rendered the greeting block (with a hardcoded
+  // fallback message "Hi! I'm LexBot, a virtual assistant. How can I
+  // help you today?") immediately on mount, before /api/config resolved.
+  // Once the fetch landed ~100-300ms later the configured greeting +
+  // practice-area chips replaced the placeholder. Visitors saw the
+  // fallback flash for the duration of the round-trip on every open.
+  //
+  // Fix mirrors the spec-016 chip-list-flash fix in QuickReplies.tsx:
+  // gate the entire greeting node on widgetConfig being non-null. While
+  // the config is still loading the greeting slot is empty (undefined);
+  // the configured greeting + chips appear in a single paint once the
+  // config arrives.
+
+  it('does not render the hardcoded fallback greeting before /api/config resolves', async () => {
+    // Build a fetch that we control — never resolves during this test
+    // so we can observe the loading-state DOM exclusively.
+    let resolveConfig: (value: Response) => void = () => {};
+    const configPromise = new Promise<Response>((resolve) => {
+      resolveConfig = resolve;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockReturnValue(configPromise),
+    );
+
+    const { ChatPanel } = await import('./ChatPanel');
+    render(
+      <ChatPanel
+        apiKey="test"
+        apiUrl="http://localhost/api/chat"
+        onCloseRequest={() => {}}
+        onClosed={() => {}}
+      />,
+    );
+
+    // Before /api/config resolves, the greeting slot must be empty —
+    // no fallback text, no QuickReplies, no greeting card.
+    expect(
+      screen.queryByText(/Hi! I'm LexBot, a virtual assistant/i),
+    ).toBeNull();
+    expect(
+      screen.queryByText(/how can I help you today/i),
+    ).toBeNull();
+
+    // Resolve the config so React's cleanup phase doesn't warn about
+    // an unresolved promise touching state after unmount.
+    resolveConfig({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          chatbot_name: 'LexBot',
+          greeting_message: 'Configured greeting',
+          practice_areas: ['Personal Injury'],
+          phone: '(555) 000-0000',
+          sop: null,
+          case_types: [],
+        }),
+      headers: new Headers(),
+    } as Response);
+    await act(async () => {
+      await Promise.resolve();
+    });
+  });
+
+  it('renders the configured greeting + chips once /api/config resolves', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            chatbot_name: 'LexBot',
+            greeting_message: 'Configured greeting from /api/config',
+            practice_areas: ['Personal Injury', 'Family Law'],
+            phone: '(555) 000-0000',
+            sop: null,
+            case_types: [],
+          }),
+        headers: new Headers(),
+      } as Response),
+    );
+
+    const { ChatPanel } = await import('./ChatPanel');
+    render(
+      <ChatPanel
+        apiKey="test"
+        apiUrl="http://localhost/api/chat"
+        onCloseRequest={() => {}}
+        onClosed={() => {}}
+      />,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // The configured greeting must appear; the hardcoded fallback must NOT.
+    expect(
+      screen.getByText(/Configured greeting from \/api\/config/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Hi! I'm LexBot, a virtual assistant/i),
+    ).toBeNull();
+
+    // QuickReplies must render the configured practice areas (plus the
+    // appended "Schedule a Consultation" tail per QuickReplies.tsx).
+    expect(screen.getByText('Personal Injury')).toBeInTheDocument();
+    expect(screen.getByText('Family Law')).toBeInTheDocument();
+    expect(screen.getByText('Schedule a Consultation')).toBeInTheDocument();
+  });
+});
+

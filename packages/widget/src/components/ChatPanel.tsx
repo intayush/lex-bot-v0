@@ -223,7 +223,16 @@ export function ChatPanel({
   // Hide composer's own chip row — we use the trailing slot for SOP chips.
   const composerChips = null;
 
-  const greetingNode = (
+  // Greeting node — render only after `/api/config` resolves so we
+  // don't briefly flash the hardcoded fallback message before the
+  // firm-configured `greeting_message` + practice-area chips arrive.
+  // Mirrors the spec-016 chip-list-flash fix in `QuickReplies.tsx`,
+  // which gates the chip row on `options` being defined for the same
+  // reason. When widgetConfig is null the greeting slot stays empty;
+  // MessageList renders an empty conversation area, then re-renders
+  // with the full greeting once the config payload lands (single paint,
+  // no transient fallback).
+  const greetingNode = widgetConfig ? (
     <>
       <div
         className="lc-message"
@@ -239,7 +248,7 @@ export function ChatPanel({
           border: '1px solid var(--lc-border-subtle, rgba(31,27,22,0.06))',
         }}
       >
-        {widgetConfig?.greeting_message ?? "Hi! I'm LexBot, a virtual assistant. How can I help you today?"}
+        {widgetConfig.greeting_message}
       </div>
       <QuickReplies
         onSelect={(text) => {
@@ -247,10 +256,10 @@ export function ChatPanel({
           startPreflight(message, sopState?.pending_step_slug ?? null);
           append({ role: 'user', content: message });
         }}
-        options={widgetConfig?.practice_areas}
+        options={widgetConfig.practice_areas}
       />
     </>
-  );
+  ) : undefined;
 
   const errorBanner = error ? (
     <div
