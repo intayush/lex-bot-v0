@@ -288,25 +288,16 @@ function bucketRangeForRequestType(
 }
 
 /**
- * Build the set of chip slugs that are SAFE to use under the
- * scoreBranch slug-collision bug. A slug is safe iff it appears in
- * exactly one question OR all of its occurrences carry the same weight.
+ * Historical note: prior versions of this planner included a
+ * `safeSlugSet()` helper that filtered out chips whose slug appeared
+ * with different weights elsewhere in the same branch. That filter
+ * was a workaround for `scoreBranch`'s flat-Map slug lookup, which
+ * silently overwrote collisions and miscalculated scores when the
+ * same slug appeared in multiple questions. The scorer was fixed
+ * (it now keys lookups by `(question_id, slug)`), so the filter is
+ * no longer necessary and the planner now enumerates every chip in
+ * every scored question.
  */
-function safeSlugSet(branch: BranchPayload): Set<string> {
-  const occurrences = new Map<string, number[]>();
-  for (const q of branch.questions) {
-    for (const c of q.chips) {
-      const arr = occurrences.get(c.slug) ?? [];
-      arr.push(c.score_weight);
-      occurrences.set(c.slug, arr);
-    }
-  }
-  const safe = new Set<string>();
-  for (const [slug, weights] of occurrences) {
-    if (weights.length === 1 || new Set(weights).size === 1) safe.add(slug);
-  }
-  return safe;
-}
 
 function midpoint(range: [number, number]): number {
   return (range[0] + range[1]) / 2;
@@ -316,10 +307,16 @@ function midpoint(range: [number, number]): number {
  * Brute-force search: pick one chip per scored question; minimise
  * |sum + bonus - bucket_midpoint| subject to landing inside the
  * bucket range. Returns null if no valid combination exists.
+ *
+ * Slug-collision history: prior to scoreBranch's (question_id, slug)
+ * fix, the planner had to filter out chips whose slug appeared with
+ * different weights elsewhere in the branch (otherwise the scorer
+ * would silently overwrite the captured weight). That filter is no
+ * longer needed; we enumerate over every chip in every scored
+ * question.
  */
 function planScoredChips(
   scoredQuestions: BranchQuestion[],
-  safe: Set<string>,
   contactBonus: number,
   whenBonus: number,
   range: [number, number],
@@ -327,14 +324,12 @@ function planScoredChips(
   const target = midpoint(range);
   const [lo, hi] = range;
 
-  // Pre-filter chips per question to safe slugs only. Multi-select
-  // questions: we still pick exactly one chip (single-slug capture)
-  // because that's what the multi-turn HTTP harness sends per turn.
-  const choices: BranchChip[][] = scoredQuestions.map((q) =>
-    q.chips.filter((c) => safe.has(c.slug)),
-  );
+  // Multi-select questions: we still pick exactly one chip
+  // (single-slug capture) because that's what the multi-turn HTTP
+  // harness sends per turn.
+  const choices: BranchChip[][] = scoredQuestions.map((q) => q.chips);
 
-  // If any question has no safe chips, we can't plan it.
+  // If any question has no chips at all, we can't plan it.
   for (let i = 0; i < choices.length; i++) {
     if (choices[i].length === 0) return null;
   }
@@ -399,14 +394,13 @@ function planBranchBucket(
 ): BranchPlan | null {
   const range = bucketRangeForRequestType(branch, bucket, rt);
   if (!range) return null;
-  const safe = safeSlugSet(branch);
 
   // Scored questions = positions ≥ 2 (skip Q0 request_type, Q1 geo).
   const scored = branch.questions
     .filter((q) => q.position >= 2)
     .sort((a, b) => a.position - b.position);
 
-  const planned = planScoredChips(scored, safe, CONTACT_BONUS, WHEN_CHIP_BONUS, range);
+  const planned = planScoredChips(scored, CONTACT_BONUS, WHEN_CHIP_BONUS, range);
   if (!planned) return null;
 
   // Compose the full per-question plan including unscored Q0/Q1.
@@ -473,7 +467,7 @@ function buildPlanMatrix(): PlanMatrix {
             bucket,
             rt,
             reason:
-              'no chip combination produces an in-range score under safe-slug constraint',
+              'no chip combination produces an in-range score for this bucket',
           });
           continue;
         }
