@@ -87,6 +87,11 @@ describe('PanelShell — foundational contract', () => {
   });
 
   it('close-then-onClosed sequence: isOpen=false → exiting → onClosed on animationend', () => {
+    // Animationend → onClosed is the MOBILE close path. On tablet /
+    // desktop the panel has no slide-down keyframe so onClosed fires
+    // synchronously the moment isOpen flips false (verified by the
+    // "close on non-mobile breakpoints" describe block below).
+    setLayout('mobile');
     setReducedMotion(false);
     const onClosed = vi.fn();
 
@@ -278,3 +283,90 @@ describe('PanelShell — slide animation (T013)', () => {
   });
 });
 
+describe('PanelShell — close on non-mobile breakpoints (regression)', () => {
+  // Regression: on tablet / desktop the panel has no slide animation
+  // attached, so `animationend` never fires. The close-button click
+  // path therefore needs to fire onClosed synchronously on these
+  // breakpoints — otherwise the panel stays mounted forever.
+  // (Pre-fix: clicking the X on desktop did nothing visible.)
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('desktop: setting isOpen=false fires onClosed without waiting for animationend', () => {
+    setLayout('desktop');
+    setReducedMotion(false);
+    const onClosed = vi.fn();
+    const { rerender } = render(
+      <PanelShell isOpen onClosed={onClosed} onCloseRequest={() => {}}>
+        <div>x</div>
+      </PanelShell>,
+    );
+    rerender(
+      <PanelShell isOpen={false} onClosed={onClosed} onCloseRequest={() => {}}>
+        <div>x</div>
+      </PanelShell>,
+    );
+    // No animationend — desktop has no keyframe attached. onClosed
+    // MUST have fired synchronously from the effect.
+    expect(onClosed).toHaveBeenCalledTimes(1);
+  });
+
+  it('tablet: setting isOpen=false fires onClosed without waiting for animationend', () => {
+    setLayout('tablet');
+    setReducedMotion(false);
+    const onClosed = vi.fn();
+    const { rerender } = render(
+      <PanelShell isOpen onClosed={onClosed} onCloseRequest={() => {}}>
+        <div>x</div>
+      </PanelShell>,
+    );
+    rerender(
+      <PanelShell isOpen={false} onClosed={onClosed} onCloseRequest={() => {}}>
+        <div>x</div>
+      </PanelShell>,
+    );
+    expect(onClosed).toHaveBeenCalledTimes(1);
+  });
+
+  it('desktop-clamped: setting isOpen=false fires onClosed synchronously', () => {
+    setLayout('desktop-clamped');
+    setReducedMotion(false);
+    const onClosed = vi.fn();
+    const { rerender } = render(
+      <PanelShell isOpen onClosed={onClosed} onCloseRequest={() => {}}>
+        <div>x</div>
+      </PanelShell>,
+    );
+    rerender(
+      <PanelShell isOpen={false} onClosed={onClosed} onCloseRequest={() => {}}>
+        <div>x</div>
+      </PanelShell>,
+    );
+    expect(onClosed).toHaveBeenCalledTimes(1);
+  });
+
+  it('mobile (with motion): still waits for animationend before firing onClosed', () => {
+    setLayout('mobile');
+    setReducedMotion(false);
+    const onClosed = vi.fn();
+    const { rerender } = render(
+      <PanelShell isOpen onClosed={onClosed} onCloseRequest={() => {}}>
+        <div>x</div>
+      </PanelShell>,
+    );
+    const root = screen.getByRole('dialog');
+    act(() => fireEvent.animationEnd(root)); // entering → open
+    rerender(
+      <PanelShell isOpen={false} onClosed={onClosed} onCloseRequest={() => {}}>
+        <div>x</div>
+      </PanelShell>,
+    );
+    // Mobile DOES animate; onClosed must NOT fire yet.
+    expect(onClosed).not.toHaveBeenCalled();
+    // Slide-down completes → onClosed fires.
+    act(() => fireEvent.animationEnd(root));
+    expect(onClosed).toHaveBeenCalledTimes(1);
+  });
+});

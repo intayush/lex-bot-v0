@@ -80,19 +80,26 @@ export function PanelShell({
   // in 'entering' and advances on animationend.
   const [phase, setPhase] = useState<Phase>(reducedMotion ? 'open' : 'entering');
 
-  // When isOpen flips false, transition to 'exiting'. The animationend
-  // handler then fires onClosed.
+  // When isOpen flips false, transition to 'exiting'. Fire onClosed
+  // immediately when there is no exit animation to wait for:
+  //
+  //   - reduced motion: animation duration is 0ms by CSS rule
+  //   - non-mobile breakpoints: panel.css does NOT attach a slide-down
+  //     keyframe to tablet/desktop/desktop-clamped, so `animationend`
+  //     would never fire. Without this guard the close X button does
+  //     nothing on desktop (the panel stays mounted forever).
+  //
+  // On mobile with motion, the slide-down keyframe runs and the
+  // animationend handler below fires onClosed.
   useEffect(() => {
     if (!isOpen) {
-      if (reducedMotion) {
-        // No animation to wait for — close immediately.
-        setPhase('exiting');
+      setPhase('exiting');
+      const noAnimation = reducedMotion || layout !== 'mobile';
+      if (noAnimation) {
         onClosed();
-      } else {
-        setPhase('exiting');
       }
     }
-  }, [isOpen, reducedMotion, onClosed]);
+  }, [isOpen, reducedMotion, layout, onClosed]);
 
   // Engage scroll-lock only when (a) we're on mobile AND (b) the panel
   // is mounted (any phase). The hook handles snapshot/restore. Keep
