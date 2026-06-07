@@ -12,13 +12,39 @@ interface ChatWidgetProps {
 // SWC) don't expose `import.meta.env`; accessing it unconditionally
 // would crash the build. We probe via `as any` so both type contexts
 // (widget's vite types + api's Next.js types) accept the call.
+//
+// IMPORTANT: Vite only statically replaces *direct* property accesses
+// of `import.meta.env.VAR_NAME`. Indirect access (`meta.env[name]`,
+// `meta.env?.VAR`, destructuring) is NOT replaced and reads as
+// `undefined` at runtime in production bundles. So we must use the
+// direct-access pattern below — guarded with try/catch for the Next
+// SWC compile path that doesn't know about import.meta.env.
+//
+// Production guardrail: if Vite is building for production AND no
+// VITE_API_URL is set, we still also fail at vite.config.ts level so
+// the build never produces a localhost-defaulted bundle.
 function readDefaultApiUrl(): string {
   try {
-    const meta = import.meta as { env?: { VITE_API_URL?: string } };
-    const value = meta.env?.VITE_API_URL;
+    // Direct access — Vite's static replacement requires this exact
+    // shape. Wrapped in IIFE so the typecast is local; the cast
+    // satisfies both Vite's ImportMeta and Next's (which lacks env).
+    const value = (import.meta as unknown as { env: { VITE_API_URL?: string } }).env.VITE_API_URL;
     if (typeof value === 'string' && value.length > 0) return value;
-  } catch {
-    // import.meta.env access threw — fall through to the default.
+    const isProd = (import.meta as unknown as { env: { PROD?: boolean } }).env.PROD === true;
+    if (isProd) {
+      throw new Error(
+        'VITE_API_URL is required for production widget builds. ' +
+          'Set it in your Netlify (or other host) environment variables, ' +
+          'e.g. VITE_API_URL=https://<api-site>.netlify.app/api/chat. ' +
+          'See packages/widget/README.md.',
+      );
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('VITE_API_URL is required')) {
+      throw err;
+    }
+    // import.meta.env access threw — fall through to the localhost default
+    // (Next.js SWC compile path; never reaches a browser via Vite).
   }
   return 'http://localhost:3000/api/chat';
 }
