@@ -838,7 +838,24 @@ async function main() {
   fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
   fs.writeFileSync(OUT_PATH, html, 'utf8');
 
-  console.log(`Wrote report: ${OUT_PATH}`);
+  // Also publish a stable-named copy under the Next.js `public/`
+  // directory so it ships as a static asset under
+  // `/reports/lead-matrix-latest.html`. The leads dashboard page
+  // links to this URL via a "View test report" button. Re-running
+  // the generator overwrites this file, so the published report
+  // always reflects the latest run.
+  const PUBLIC_REPORT_PATH = path.resolve(
+    path.dirname(new URL(import.meta.url).pathname),
+    '..',
+    'public',
+    'reports',
+    'lead-matrix-latest.html',
+  );
+  fs.mkdirSync(path.dirname(PUBLIC_REPORT_PATH), { recursive: true });
+  fs.writeFileSync(PUBLIC_REPORT_PATH, html, 'utf8');
+
+  console.log(`Wrote report:    ${OUT_PATH}`);
+  console.log(`Published copy:  ${PUBLIC_REPORT_PATH}`);
   console.log(`  conversations:  ${stats.total}`);
   console.log(`  matched:        ${stats.matched}`);
   console.log(`  mismatched:     ${stats.mismatched}`);

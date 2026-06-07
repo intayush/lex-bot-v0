@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lead Classification Test Matrix · 2026-06-07T09:14:05.587Z</title>
+  <style>
+:root {
+  --bg: #fafafa;
+  --bg-card: #ffffff;
+  --border: #e5e5e5;
+  --border-soft: #f0f0f0;
+  --text: #171717;
+  --text-muted: #737373;
+  --text-dim: #a3a3a3;
+  --green: #059669;
+  --green-bg: #ecfdf5;
+  --amber: #d97706;
+  --amber-bg: #fffbeb;
+  --red: #dc2626;
+  --red-bg: #fef2f2;
+  --blue: #2563eb;
+  --blue-bg: #eff6ff;
+  --gray-bg: #f5f5f5;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Inter, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  margin: 0;
+  padding: 0;
+}
+
+main { max-width: 1280px; margin: 0 auto; padding: 24px; }
+
+header.page-header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 8px; }
+header.page-header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+header.page-header .meta { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.subtitle { color: var(--text-muted); margin: 0 0 24px 0; font-size: 13px; }
+
+.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px; }
+@media (max-width: 720px) { .kpi-row { grid-template-columns: repeat(2, 1fr); } }
+.kpi { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
+.kpi .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 6px; }
+.kpi .value { font-size: 26px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.kpi .sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.kpi.success .value { color: var(--green); }
+.kpi.warn .value { color: var(--amber); }
+.kpi.danger .value { color: var(--red); }
+.kpi.info .value { color: var(--blue); }
+
+section { margin-bottom: 32px; }
+section h2 { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin: 0 0 12px 0; }
+
+.matrix-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+.matrix-card .scroll { overflow-x: auto; }
+table.matrix { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.matrix th, table.matrix td { padding: 8px 10px; border-bottom: 1px solid var(--border-soft); text-align: center; vertical-align: middle; font-variant-numeric: tabular-nums; }
+table.matrix th { font-weight: 600; color: var(--text-muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; background: var(--gray-bg); white-space: nowrap; }
+table.matrix td.branch-name { text-align: left; font-weight: 500; white-space: nowrap; }
+table.matrix td.case-type-tag { text-align: left; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500; }
+table.matrix tr:hover td { background: var(--bg); }
+
+.cell { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; min-width: 64px; padding: 6px 8px; border-radius: 6px; cursor: pointer; transition: transform 0.1s ease; user-select: none; }
+.cell:hover { transform: translateY(-1px); }
+.cell.match { background: var(--green-bg); color: var(--green); }
+.cell.mismatch { background: var(--red-bg); color: var(--red); }
+.cell.fail { background: var(--amber-bg); color: var(--amber); }
+.cell.empty { background: transparent; color: var(--text-dim); cursor: default; }
+.cell.empty:hover { transform: none; }
+.cell .top { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; }
+.cell .bot { font-size: 10px; opacity: 0.85; }
+.cell .scoring-badge { display: inline-block; font-size: 9px; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; padding: 1px 5px; border-radius: 3px; background: rgba(0, 0, 0, 0.06); color: rgba(0, 0, 0, 0.55); }
+.cell.llm .scoring-badge { background: var(--blue-bg); color: var(--blue); }
+
+.row-summary { display: inline-flex; gap: 4px; font-size: 10px; }
+.pill { padding: 2px 6px; border-radius: 10px; font-weight: 500; background: var(--gray-bg); color: var(--text-muted); }
+.pill.success { background: var(--green-bg); color: var(--green); }
+.pill.danger { background: var(--red-bg); color: var(--red); }
+.pill.info { background: var(--blue-bg); color: var(--blue); }
+
+table.mismatches { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+table.mismatches th, table.mismatches td { padding: 10px 14px; border-bottom: 1px solid var(--border-soft); text-align: left; vertical-align: top; }
+table.mismatches th { background: var(--gray-bg); font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.04em; color: var(--text-muted); }
+table.mismatches tr:last-child td { border-bottom: 0; }
+table.mismatches td.branch-cell { font-weight: 500; white-space: nowrap; }
+table.mismatches td.delta-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
+table.mismatches td.brief-cell { color: var(--text-muted); font-size: 12px; max-width: 320px; }
+
+.tag { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 11px; font-weight: 500; letter-spacing: 0.02em; }
+.tag.HOT { background: var(--red-bg); color: var(--red); }
+.tag.WARM { background: var(--amber-bg); color: var(--amber); }
+.tag.COLD { background: var(--blue-bg); color: var(--blue); }
+.tag.SPAM { background: var(--gray-bg); color: var(--text-muted); }
+.tag.LLM { background: var(--blue-bg); color: var(--blue); font-size: 10px; }
+
+.insights { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; box-shadow: var(--shadow); }
+.insights ul { margin: 8px 0 0 0; padding-left: 20px; }
+.insights li { margin-bottom: 6px; }
+.insights .lead-id { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 12px; color: var(--text-muted); }
+.insight-block { margin-bottom: 18px; }
+.insight-block:last-child { margin-bottom: 0; }
+.insight-block h3 { font-size: 13px; font-weight: 600; margin: 0 0 6px 0; color: var(--text); }
+.insight-block p { margin: 0; color: var(--text-muted); font-size: 13px; }
+
+.detail-dialog { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.36); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+.detail-dialog.open { display: flex; }
+.detail-dialog .panel { background: var(--bg-card); border-radius: var(--radius); width: min(640px, 100%); max-height: 80vh; overflow-y: auto; box-shadow: var(--shadow-lg); padding: 24px; }
+.detail-dialog h3 { margin: 0 0 8px 0; font-size: 16px; letter-spacing: -0.01em; }
+.detail-dialog .close-btn { float: right; background: transparent; border: 0; font-size: 18px; cursor: pointer; color: var(--text-muted); }
+.detail-dialog dl { margin: 12px 0 0 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; }
+.detail-dialog dt { color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+.detail-dialog dd { margin: 0; font-size: 13px; word-break: break-word; }
+.detail-dialog code { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 12px; color: var(--text); background: var(--gray-bg); padding: 1px 4px; border-radius: 3px; }
+.detail-dialog ul.reasons { margin: 4px 0; padding-left: 20px; font-size: 13px; }
+.detail-dialog .footer-note { font-size: 12px; color: var(--text-muted); margin-top: 16px; }
+</style>
+</head>
+<body>
+  <main>
+    
+    <header class="page-header">
+      <h1>Lead Classification Test Matrix</h1>
+      <div class="meta">Generated 2026-06-07T09:14:05.587Z</div>
+    </header>
+    <p class="subtitle">
+      One synthetic conversation per (branch × bucket × request_type) tuple
+      driven against the live <code>/api/chat</code> endpoint. Predicted bucket
+      comes from the harness's chip-targeting plan; actual bucket comes from
+      the lead row written by the server.
+    </p>
+  
+    
+    <section class="kpi-row">
+      <div class="kpi info">
+        <div class="label">Conversations</div>
+        <div class="value">96</div>
+        <div class="sub">96 plannable buckets · 9 unplannable per branch design</div>
+      </div>
+      <div class="kpi success">
+        <div class="label">Predicted = Actual</div>
+        <div class="value">80 / 96</div>
+        <div class="sub">83% overall match rate</div>
+      </div>
+      <div class="kpi danger">
+        <div class="label">Mismatches</div>
+        <div class="value">16</div>
+        <div class="sub">0 hard failures · see table below</div>
+      </div>
+      <div class="kpi warn">
+        <div class="label">Branch Scorer Hit Rate</div>
+        <div class="value">33 / 96</div>
+        <div class="sub">Rule-scored = 100% perfect; LLM-fallback = 63 (where step blocked SOP finalization)</div>
+      </div>
+    </section>
+  
+    
+    <section>
+      <h2>Coverage matrix</h2>
+      <div class="matrix-card">
+        <div class="scroll">
+          <table class="matrix">
+            <thead>
+              <tr>
+                <th>Case type</th>
+                <th>Sub-type</th>
+                <th>HOT · S</th><th>HOT · FF</th><th>WARM · S</th><th>WARM · FF</th><th>COLD · S</th><th>SPAM · S</th><th>SPAM · FF</th>
+                <th>Summary</th>
+              </tr>
+            </thead>
+            <tbody>
+        <tr>
+          <td class="case-type-tag">criminal_defense</td>
+          <td class="branch-name">assault</td>
+          <td><div class="cell match llm" data-idx="43" data-lead-id="lJCYZqKfeMZKsWbOS2L64" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="44" data-lead-id="vXpBJ9MZ8RGr6P7Ywrs6u" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="45" data-lead-id="lrECYwtrB9oqZWdXM2y0y" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">pred 63</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell mismatch llm" data-idx="46" data-lead-id="jj3K0jXzkAohClgtbhhDP" role="button" tabindex="0"><span class="top">SPAM</span><span class="bot">predicted WARM</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="48" data-lead-id="4Mq1rMWkJY0tQFBqjTi-T" role="button" tabindex="0"><span class="top">COLD</span><span class="bot">pred 38</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell empty" title="No plan for this bucket — chip-weight range can't reach this band">—</div></td><td><div class="cell empty" title="No plan for this bucket — chip-weight range can't reach this band">—</div></td>
+          <td><span class="row-summary"><span class="pill ">4/5</span><span class="pill info">0 branched</span></span></td>
+        </tr>
+      
+        <tr>
+          <td class="case-type-tag">criminal_defense</td>
+          <td class="branch-name">fraud</td>
+          <td><div class="cell match llm" data-idx="47" data-lead-id="ZzGAN4u9hFQEgjwRv8X-Q" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="49" data-lead-id="sDzI1DzSaC_GezdAMkRQ2" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="50" data-lead-id="1ucNsDBfjZB5s9qmT0w5v" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">pred 63</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="51" data-lead-id="BZH1ltLR_lvzAGw85PR2Y" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">pred 50</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="52" data-lead-id="P5m1P8tRU8x5CgU5uWAIN" role="button" tabindex="0"><span class="top">COLD</span><span class="bot">pred 38</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell mismatch llm" data-idx="53" data-lead-id="nAvU191--p0cbsUWY0nPn" role="button" tabindex="0"><span class="top">COLD</span><span class="bot">predicted SPAM</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell mismatch llm" data-idx="54" data-lead-id="fXTQGBNHBR9GYFf04c7Ob" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">predicted SPAM</span><span class="scoring-badge">LLM</span></div></td>
+          <td><span class="row-summary"><span class="pill ">5/7</span><span class="pill info">0 branched</span></span></td>
+        </tr>
+      
+        <tr>
+          <td class="case-type-tag">criminal_defense</td>
+          <td class="branch-name">gun_charge</td>
+          <td><div class="cell match llm" data-idx="55" data-lead-id="xEI0jHI0tD0_SvWMc4vLe" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="57" data-lead-id="1i7p8DvhxgM0tIV7Jutwr" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="56" data-lead-id="2DwTxZCfiBZ2lsB7dOLZc" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">pred 63</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="59" data-lead-id="fyyLZhmOanruaT4P-G5D8" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">pred 51</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="58" data-lead-id="v7k_EskSxMZPWiNKa7I4N" role="button" tabindex="0"><span class="top">COLD</span><span class="bot">pred 45</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell empty" title="No plan for this bucket — chip-weight range can't reach this band">—</div></td><td><div class="cell empty" title="No plan for this bucket — chip-weight range can't reach this band">—</div></td>
+          <td><span class="row-summary"><span class="pill success">5/5</span><span class="pill info">0 branched</span></span></td>
+        </tr>
+      
+        <tr>
+          <td class="case-type-tag">criminal_defense</td>
+          <td class="branch-name">theft</td>
+          <td><div class="cell match llm" data-idx="36" data-lead-id="Y6oo22xPIReKNo8otVr0Z" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell mismatch llm" data-idx="37" data-lead-id="wYq93fl_VcowzhX_jD3by" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">predicted HOT</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="39" data-lead-id="GfUmcghyPzpFQ7xgZqhvi" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">pred 63</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell mismatch llm" data-idx="38" data-lead-id="bcpuarPS0UQu1jTIlXmxr" role="button" tabindex="0"><span class="top">COLD</span><span class="bot">predicted WARM</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="40" data-lead-id="9D34lhjJzpkm2_VuHS8MS" role="button" tabindex="0"><span class="top">COLD</span><span class="bot">pred 38</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="42" data-lead-id="NmRVcUNlirFphOzTocXEA" role="button" tabindex="0"><span class="top">SPAM</span><span class="bot">pred 20</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell mismatch llm" data-idx="41" data-lead-id="OJknyhmSVOkmZS_Jghvoo" role="button" tabindex="0"><span class="top">COLD</span><span class="bot">predicted SPAM</span><span class="scoring-badge">LLM</span></div></td>
+          <td><span class="row-summary"><span class="pill ">4/7</span><span class="pill info">0 branched</span></span></td>
+        </tr>
+      
+        <tr>
+          <td class="case-type-tag">drug_crime</td>
+          <td class="branch-name">distribution</td>
+          <td><div class="cell mismatch llm" data-idx="88" data-lead-id="4pInKVL2R36P_PNduXp1H" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">predicted HOT</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="89" data-lead-id="Yw77PpLwQuPG4TGCMSrVv" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="90" data-lead-id="ItaNCVbiuoAcGhFgSGqFb" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">pred 63</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell mismatch llm" data-idx="92" data-lead-id="I5-PSHEYjVB4YkR0tHTX9" role="button" tabindex="0"><span class="top">SPAM</span><span class="bot">predicted WARM</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="91" data-lead-id="5Im3Hx_iFTAP2Ma-t2704" role="button" tabindex="0"><span class="top">COLD</span><span class="bot">pred 38</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell empty" title="No plan for this bucket — chip-weight range can't reach this band">—</div></td><td><div class="cell empty" title="No plan for this bucket — chip-weight range can't reach this band">—</div></td>
+          <td><span class="row-summary"><span class="pill ">3/5</span><span class="pill info">0 branched</span></span></td>
+        </tr>
+      
+        <tr>
+          <td class="case-type-tag">drug_crime</td>
+          <td class="branch-name">possession</td>
+          <td><div class="cell match llm" data-idx="80" data-lead-id="lGzThiOdw_duziCqj2WBM" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="82" data-lead-id="x-NBE5GCKOUjhICxv1Mdg" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="83" data-lead-id="WNBRam7N_cpcNe6PSYxxi" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">pred 63</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="86" data-lead-id="Y-24iIIddQoRcta4KflHN" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">pred 51</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="84" data-lead-id="nTUUeWKo8FKzLFXrC3o3j" role="button" tabindex="0"><span class="top">COLD</span><span class="bot">pred 38</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell mismatch llm" data-idx="85" data-lead-id="TQ8n3Ni18t3ZQyewBqaVm" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">predicted SPAM</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell mismatch llm" data-idx="87" data-lead-id="LLQpIsMmCoZa64C9Rbt6d" role="button" tabindex="0"><span class="top">COLD</span><span class="bot">predicted SPAM</span><span class="scoring-badge">LLM</span></div></td>
+          <td><span class="row-summary"><span class="pill ">5/7</span><span class="pill info">0 branched</span></span></td>
+        </tr>
+      
+        <tr>
+          <td class="case-type-tag">drug_crime</td>
+          <td class="branch-name">trafficking</td>
+          <td><div class="cell match llm" data-idx="93" data-lead-id="DFzlpguOZ8ZMvEDkt923x" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="95" data-lead-id="0KkFeARswIGfnJNFk8U6u" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="94" data-lead-id="E-ztFgnXWcZaTY-Ps9xkw" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">pred 63</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="96" data-lead-id="jN3EbCM_jJP7Zkp10JmPo" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">pred 52</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell empty" title="No plan for this bucket — chip-weight range can't reach this band">—</div></td><td><div class="cell empty" title="No plan for this bucket — chip-weight range can't reach this band">—</div></td><td><div class="cell empty" title="No plan for this bucket — chip-weight range can't reach this band">—</div></td>
+          <td><span class="row-summary"><span class="pill success">4/4</span><span class="pill info">0 branched</span></span></td>
+        </tr>
+      
+        <tr>
+          <td class="case-type-tag">dui</td>
+          <td class="branch-name">dui_with_injury</td>
+          <td><div class="cell match" data-idx="22" data-lead-id="R-2GgEFrY954zy1LE10YB" role="button" tabindex="0"><span class="top">HOT · 88</span><span class="bot">pred 88</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="23" data-lead-id="VjW3YKcL0wLpJV3Il7uus" role="button" tabindex="0"><span class="top">HOT · 88</span><span class="bot">pred 88</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="24" data-lead-id="a_kFCPy5AJX82m26iinyT" role="button" tabindex="0"><span class="top">WARM · 63</span><span class="bot">pred 63</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="25" data-lead-id="wLi7CzioEkDtpNm5GEDsN" role="button" tabindex="0"><span class="top">WARM · 51</span><span class="bot">pred 51</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="26" data-lead-id="GDndGEKErjefh6eFwhUw-" role="button" tabindex="0"><span class="top">COLD · 38</span><span class="bot">pred 38</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="27" data-lead-id="2oXVesacmybkKXAOZNkid" role="button" tabindex="0"><span class="top">SPAM · 17</span><span class="bot">pred 17</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="28" data-lead-id="1jHOy2gIlKl0V_OoRDb7E" role="button" tabindex="0"><span class="top">SPAM · 17</span><span class="bot">pred 17</span><span class="scoring-badge">RULE</span></div></td>
+          <td><span class="row-summary"><span class="pill success">7/7</span><span class="pill info">7 branched</span></span></td>
+        </tr>
+      
+        <tr>
+          <td class="case-type-tag">dui</td>
+          <td class="branch-name">dui_with_property</td>
+          <td><div class="cell match" data-idx="29" data-lead-id="tIHXvH6r2kc3XnfilDDVv" role="button" tabindex="0"><span class="top">HOT · 88</span><span class="bot">pred 88</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="30" data-lead-id="1Z5JjszSlp6FEHQvI_7oa" role="button" tabindex="0"><span class="top">HOT · 88</span><span class="bot">pred 88</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="31" data-lead-id="AdugemEUvbIgfhf2K2SED" role="button" tabindex="0"><span class="top">WARM · 63</span><span class="bot">pred 63</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="32" data-lead-id="c7GwqQARDDUCmZOW2_YNh" role="button" tabindex="0"><span class="top">WARM · 51</span><span class="bot">pred 51</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="33" data-lead-id="xoiP7D1e0Q_5re_fYrFPL" role="button" tabindex="0"><span class="top">COLD · 38</span><span class="bot">pred 38</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="34" data-lead-id="YaFntevLc8lQ8ZCFFRl-_" role="button" tabindex="0"><span class="top">SPAM · 11</span><span class="bot">pred 11</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match llm" data-idx="35" data-lead-id="Dp-DumGdoBaQN3p2XvdRo" role="button" tabindex="0"><span class="top">SPAM</span><span class="bot">pred 11</span><span class="scoring-badge">LLM</span></div></td>
+          <td><span class="row-summary"><span class="pill success">7/7</span><span class="pill info">6 branched</span></span></td>
+        </tr>
+      
+        <tr>
+          <td class="case-type-tag">dui</td>
+          <td class="branch-name">first_offense</td>
+          <td><div class="cell match" data-idx="9" data-lead-id="X3U3rcLOpXoMVZEJY5O2d" role="button" tabindex="0"><span class="top">HOT · 88</span><span class="bot">pred 88</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="8" data-lead-id="IJvXRaPI7aib4EN86KDJP" role="button" tabindex="0"><span class="top">HOT · 88</span><span class="bot">pred 88</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="10" data-lead-id="GMzFbMek79w2rW-yRNW4F" role="button" tabindex="0"><span class="top">WARM · 63</span><span class="bot">pred 63</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="12" data-lead-id="cCFOl-Q4abBYG-MztCPNJ" role="button" tabindex="0"><span class="top">WARM · 51</span><span class="bot">pred 51</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="11" data-lead-id="t8P-DeEDKCAXoRWVOgw85" role="button" tabindex="0"><span class="top">COLD · 38</span><span class="bot">pred 38</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="13" data-lead-id="_VFG0m0yclKFlauOKS3Ga" role="button" tabindex="0"><span class="top">SPAM · 13</span><span class="bot">pred 13</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="14" data-lead-id="PnPAMzf3VaNeNlXdi5s5I" role="button" tabindex="0"><span class="top">SPAM · 13</span><span class="bot">pred 13</span><span class="scoring-badge">RULE</span></div></td>
+          <td><span class="row-summary"><span class="pill success">7/7</span><span class="pill info">7 branched</span></span></td>
+        </tr>
+      
+        <tr>
+          <td class="case-type-tag">dui</td>
+          <td class="branch-name">repeat_offense</td>
+          <td><div class="cell match" data-idx="15" data-lead-id="rf41S9PV8Sx5DNDnOZ8ro" role="button" tabindex="0"><span class="top">HOT · 88</span><span class="bot">pred 88</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="16" data-lead-id="RSCzU4A-hvMoRIrFpEKHI" role="button" tabindex="0"><span class="top">HOT · 88</span><span class="bot">pred 88</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="17" data-lead-id="w9EyoSqokC3Y6zKlLOlH1" role="button" tabindex="0"><span class="top">WARM · 63</span><span class="bot">pred 63</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="18" data-lead-id="Y-PoGpbXFyEq42h7LCU68" role="button" tabindex="0"><span class="top">WARM · 50</span><span class="bot">pred 50</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="19" data-lead-id="8p8OZeB4i2Tpo0Y9_nugw" role="button" tabindex="0"><span class="top">COLD · 38</span><span class="bot">pred 38</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="20" data-lead-id="aFmYB_iPnsDQBbfwKwmmV" role="button" tabindex="0"><span class="top">SPAM · 13</span><span class="bot">pred 13</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="21" data-lead-id="WAqs5Gn5JdTpXfRLjg7_S" role="button" tabindex="0"><span class="top">SPAM · 13</span><span class="bot">pred 13</span><span class="scoring-badge">RULE</span></div></td>
+          <td><span class="row-summary"><span class="pill success">7/7</span><span class="pill info">7 branched</span></span></td>
+        </tr>
+      
+        <tr>
+          <td class="case-type-tag">personal_injury</td>
+          <td class="branch-name">car_accident</td>
+          <td><div class="cell match" data-idx="2" data-lead-id="iZoOwUfVA5hStGZGvOFRo" role="button" tabindex="0"><span class="top">HOT · 88</span><span class="bot">pred 88</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="3" data-lead-id="cuFAHrB0OxebZjkGcGcex" role="button" tabindex="0"><span class="top">HOT · 88</span><span class="bot">pred 88</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="1" data-lead-id="aTaKzSCLljGow_3TnurcK" role="button" tabindex="0"><span class="top">WARM · 63</span><span class="bot">pred 63</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="4" data-lead-id="rGl4JS2xuPht_pS4-eSbs" role="button" tabindex="0"><span class="top">WARM · 50</span><span class="bot">pred 50</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell mismatch llm" data-idx="6" data-lead-id="4L-qrltA_poC6UNcN238p" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">predicted COLD</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match" data-idx="5" data-lead-id="543XRqcgQgsvBHkgNlRyc" role="button" tabindex="0"><span class="top">SPAM · 13</span><span class="bot">pred 13</span><span class="scoring-badge">RULE</span></div></td><td><div class="cell match" data-idx="7" data-lead-id="0N9kc--Pgyai7VIyZiNXv" role="button" tabindex="0"><span class="top">SPAM · 13</span><span class="bot">pred 13</span><span class="scoring-badge">RULE</span></div></td>
+          <td><span class="row-summary"><span class="pill ">6/7</span><span class="pill info">6 branched</span></span></td>
+        </tr>
+      
+        <tr>
+          <td class="case-type-tag">personal_injury</td>
+          <td class="branch-name">dog_bite</td>
+          <td><div class="cell match llm" data-idx="74" data-lead-id="3oBikBcqR9Gs2vdHPBgBz" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="75" data-lead-id="VlZwb-iog_SuaLYMu7Vx_" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="76" data-lead-id="3C_UyGxnt3m6orMRYjV1w" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">pred 63</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="77" data-lead-id="RKX8kzCAtpkgjh5vnGQlX" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">pred 50</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell mismatch llm" data-idx="79" data-lead-id="cR32Y9Pcftg8O6zE920yE" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">predicted COLD</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell mismatch llm" data-idx="78" data-lead-id="_qYgruA-HOvCvo1NCqsl0" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">predicted SPAM</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell mismatch llm" data-idx="81" data-lead-id="VlxMQV5GiWHr8UOtfjaZM" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">predicted SPAM</span><span class="scoring-badge">LLM</span></div></td>
+          <td><span class="row-summary"><span class="pill ">4/7</span><span class="pill info">0 branched</span></span></td>
+        </tr>
+      
+        <tr>
+          <td class="case-type-tag">personal_injury</td>
+          <td class="branch-name">medical_malpractice</td>
+          <td><div class="cell match llm" data-idx="68" data-lead-id="7IWCIKB25G57yMD3e_mQA" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="67" data-lead-id="gsdoAuQUTFcjah79JgKpP" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="69" data-lead-id="SJgbOFDSr1DlDlfmqtIr8" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">pred 63</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="70" data-lead-id="HacvzDCp5FXkRAisOklHs" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">pred 51</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="72" data-lead-id="F1TLA7oCPJ7Ypl1lbzBXv" role="button" tabindex="0"><span class="top">COLD</span><span class="bot">pred 38</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="71" data-lead-id="bA--hAjaN1q5StmGu2LvF" role="button" tabindex="0"><span class="top">SPAM</span><span class="bot">pred 12</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="73" data-lead-id="PL--Vsn_KJVsPal77LJOV" role="button" tabindex="0"><span class="top">SPAM</span><span class="bot">pred 12</span><span class="scoring-badge">LLM</span></div></td>
+          <td><span class="row-summary"><span class="pill success">7/7</span><span class="pill info">0 branched</span></span></td>
+        </tr>
+      
+        <tr>
+          <td class="case-type-tag">personal_injury</td>
+          <td class="branch-name">slip_fall</td>
+          <td><div class="cell match llm" data-idx="60" data-lead-id="CqorDujcnCfn8OpwEKXji" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="62" data-lead-id="Zvfcg9BvCTWWSi_d3yZm7" role="button" tabindex="0"><span class="top">HOT</span><span class="bot">pred 88</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="61" data-lead-id="6mrStcfCo9WWPQHhtxJfm" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">pred 63</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="63" data-lead-id="96zygqXUwI7r0l3GaxVuT" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">pred 50</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell mismatch llm" data-idx="65" data-lead-id="RyYe746RbFjZ1yYnrj6FJ" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">predicted COLD</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell match llm" data-idx="64" data-lead-id="O-TA9M5ypGc70MTgoNeCU" role="button" tabindex="0"><span class="top">SPAM</span><span class="bot">pred 12</span><span class="scoring-badge">LLM</span></div></td><td><div class="cell mismatch llm" data-idx="66" data-lead-id="_ZBMMFEGGyIzbVBM9Mv1S" role="button" tabindex="0"><span class="top">WARM</span><span class="bot">predicted SPAM</span><span class="scoring-badge">LLM</span></div></td>
+          <td><span class="row-summary"><span class="pill ">5/7</span><span class="pill info">0 branched</span></span></td>
+        </tr>
+      </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  
+    
+    <section>
+      <h2>Mismatches (16)</h2>
+      <table class="mismatches">
+        <thead>
+          <tr>
+            <th>Branch</th>
+            <th>Target bucket / RT</th>
+            <th>Predicted</th>
+            <th>Actual</th>
+            <th>Path</th>
+            <th>Brief description</th>
+          </tr>
+        </thead>
+        <tbody>
+        <tr data-idx="6" data-lead-id="4L-qrltA_poC6UNcN238p">
+          <td class="branch-cell">personal_injury/car_accident</td>
+          <td><span class="tag COLD">COLD</span> · SELF</td>
+          <td class="delta-cell"><span class="tag COLD">COLD</span> 38</td>
+          <td class="delta-cell"><span class="tag WARM">WARM</span> null</td>
+          <td><span class="tag LLM">LLM-fallback</span></td>
+          <td class="brief-cell">Personal injury car accident in Pittsburgh, PA on May 28, 2026, where the user was a cyclist and believes they were mostly responsible. An i…</td>
+        </tr>
+      
+        <tr data-idx="37" data-lead-id="wYq93fl_VcowzhX_jD3by">
+          <td class="branch-cell">criminal_defense/theft</td>
+          <td><span class="tag HOT">HOT</span> · FRIEND_FAMILY</td>
+          <td class="delta-cell"><span class="tag HOT">HOT</span> 88</td>
+          <td class="delta-cell"><span class="tag WARM">WARM</span> null</td>
+          <td><span class="tag LLM">LLM-fallback</span> · SOP stuck at <code>where</code></td>
+          <td class="brief-cell">Criminal defense theft matter involving shoplifting in Pittsburgh, PA, a misdemeanor, involving a friend or family member, and currently und…</td>
+        </tr>
+      
+        <tr data-idx="38" data-lead-id="bcpuarPS0UQu1jTIlXmxr">
+          <td class="branch-cell">criminal_defense/theft</td>
+          <td><span class="tag WARM">WARM</span> · FRIEND_FAMILY</td>
+          <td class="delta-cell"><span class="tag WARM">WARM</span> 51</td>
+          <td class="delta-cell"><span class="tag COLD">COLD</span> null</td>
+          <td><span class="tag LLM">LLM-fallback</span> · SOP stuck at <code>where</code></td>
+          <td class="brief-cell">Criminal defense theft (shoplifting) matter in Pittsburgh, PA, where the public defender wants a private attorney.</td>
+        </tr>
+      
+        <tr data-idx="41" data-lead-id="OJknyhmSVOkmZS_Jghvoo">
+          <td class="branch-cell">criminal_defense/theft</td>
+          <td><span class="tag SPAM">SPAM</span> · FRIEND_FAMILY</td>
+          <td class="delta-cell"><span class="tag SPAM">SPAM</span> 20</td>
+          <td class="delta-cell"><span class="tag COLD">COLD</span> null</td>
+          <td><span class="tag LLM">LLM-fallback</span> · SOP stuck at <code>where</code></td>
+          <td class="brief-cell">User has already retained counsel for a shoplifting criminal defense matter in Pittsburgh, PA.</td>
+        </tr>
+      
+        <tr data-idx="46" data-lead-id="jj3K0jXzkAohClgtbhhDP">
+          <td class="branch-cell">criminal_defense/assault</td>
+          <td><span class="tag WARM">WARM</span> · FRIEND_FAMILY</td>
+          <td class="delta-cell"><span class="tag WARM">WARM</span> 50</td>
+          <td class="delta-cell"><span class="tag SPAM">SPAM</span> null</td>
+          <td><span class="tag LLM">LLM-fallback</span> · SOP stuck at <code>where</code></td>
+          <td class="brief-cell">Criminal defense / assault matter in Pittsburgh, PA, last week, involving friends/family, hands/feet, and self-defense, currently under inve…</td>
+        </tr>
+      
+        <tr data-idx="53" data-lead-id="nAvU191--p0cbsUWY0nPn">
+          <td class="branch-cell">criminal_defense/fraud</td>
+          <td><span class="tag SPAM">SPAM</span> · SELF</td>
+          <td class="delta-cell"><span class="tag SPAM">SPAM</span> 22</td>
+          <td class="delta-cell"><span class="tag COLD">COLD</span> null</td>
+          <td><span class="tag LLM">LLM-fallback</span> · SOP stuck at <code>where</code></td>
+          <td class="brief-cell">Criminal defense matter involving fraud.</td>
+        </tr>
+      
+        <tr data-idx="54" data-lead-id="fXTQGBNHBR9GYFf04c7Ob">
+          <td class="branch-cell">criminal_defense/fraud</td>
+          <td><span class="tag SPAM">SPAM</span> · FRIEND_FAMILY</td>
+          <td class="delta-cell"><span class="tag SPAM">SPAM</span> 22</td>
+          <td class="delta-cell"><span class="tag WARM">WARM</span> null</td>
+          <td><span class="tag LLM">LLM-fallback</span> · SOP stuck at <code>where</code></td>
+          <td class="brief-cell">Criminal defense matter involving fraud in Pittsburgh, PA, that happened last week.</td>
+        </tr>
+      
+        <tr data-idx="65" data-lead-id="RyYe746RbFjZ1yYnrj6FJ">
+          <td class="branch-cell">personal_injury/slip_fall</td>
+          <td><span class="tag COLD">COLD</span> · SELF</td>
+          <td class="delta-cell"><span class="tag COLD">COLD</span> 38</td>
+          <td class="delta-cell"><span class="tag WARM">WARM</span> null</td>
+          <td><span class="tag LLM">LLM-fallback</span> · SOP stuck at <code>where</code></td>
+          <td class="brief-cell">Personal injury slip and fall at a private home involving lighting.</td>
+        </tr>
+      
+        <tr data-idx="66" data-lead-id="_ZBMMFEGGyIzbVBM9Mv1S">
+          <td class="branch-cell">personal_injury/slip_fall</td>
+          <td><span class="tag SPAM">SPAM</span> · FRIEND_FAMILY</td>
+          <td class="delta-cell"><span class="tag SPAM">SPAM</span> 12</td>
+          <td class="delta-cell"><span class="tag WARM">WARM</span> null</td>
+          <td><span class="tag LLM">LLM-fallback</span> · SOP stuck at <code>where</code></td>
+          <td class="brief-cell">Slip and fall personal injury matter in a private home in Pittsburgh, PA involving lighting.</td>
+        </tr>
+      
+        <tr data-idx="78" data-lead-id="_qYgruA-HOvCvo1NCqsl0">
+          <td class="branch-cell">personal_injury/dog_bite</td>
+          <td><span class="tag SPAM">SPAM</span> · SELF</td>
+          <td class="delta-cell"><span class="tag SPAM">SPAM</span> 12</td>
+          <td class="delta-cell"><span class="tag HOT">HOT</span> null</td>
+          <td><span class="tag LLM">LLM-fallback</span> · SOP stuck at <code>where</code></td>
+          <td class="brief-cell">Personal injury dog bite matter in Pittsburgh, PA, that happened last week, was provoked, and involved medical treatment.</td>
+        </tr>
+      
+        <tr data-idx="79" data-lead-id="cR32Y9Pcftg8O6zE920yE">
+          <td class="branch-cell">personal_injury/dog_bite</td>
+          <td><span class="tag COLD">COLD</span> · SELF</td>
+          <td class="delta-cell"><span class="tag COLD">COLD</span> 38</td>
+          <td class="delta-cell"><span class="tag WARM">WARM</span> null</td>
+          <td><span class="tag LLM">LLM-fallback</span> · SOP stuck at <code>where</code></td>
+          <td class="brief-cell">Personal injury matter involving a dog bite in Pittsburgh, PA, last week, with an unknown owner, trespassing, provoked dog, and medical trea…</td>
+        </tr>
+      
+        <tr data-idx="81" data-lead-id="VlxMQV5GiWHr8UOtfjaZM">
+          <td class="branch-cell">personal_injury/dog_bite</td>
+          <td><span class="tag SPAM">SPAM</span> · FRIEND_FAMILY</td>
+          <td class="delta-cell"><span class="tag SPAM">SPAM</span> 12</td>
+          <td class="delta-cell"><span class="tag HOT">HOT</span> null</td>
+          <td><span class="tag LLM">LLM-fallback</span> · SOP stuck at <code>where</code></td>
+          <td class="brief-cell">Drug crime / possession matter in Pittsburgh, PA.</td>
+        </tr>
+      
+        <tr data-idx="85" data-lead-id="TQ8n3Ni18t3ZQyewBqaVm">
+          <td class="branch-cell">drug_crime/possession</td>
+          <td><span class="tag SPAM">SPAM</span> · SELF</td>
+          <td class="delta-cell"><span class="tag SPAM">SPAM</span> 13</td>
+          <td class="delta-cell"><span class="tag WARM">WARM</span> null</td>
+          <td><span class="tag LLM">LLM-fallback</span> · SOP stuck at <code>where</code></td>
+          <td class="brief-cell">Drug possession matter in Pittsburgh, PA.</td>
+        </tr>
+      
+        <tr data-idx="87" data-lead-id="LLQpIsMmCoZa64C9Rbt6d">
+          <td class="branch-cell">drug_crime/possession</td>
+          <td><span class="tag SPAM">SPAM</span> · FRIEND_FAMILY</td>
+          <td class="delta-cell"><span class="tag SPAM">SPAM</span> 13</td>
+          <td class="delta-cell"><span class="tag COLD">COLD</span> null</td>
+          <td><span class="tag LLM">LLM-fallback</span> · SOP stuck at <code>where</code></td>
+          <td class="brief-cell">Drug crime / possession matter involving marijuana and an infraction in Pittsburgh, PA, that happened last week.</td>
+        </tr>
+      
+        <tr data-idx="88" data-lead-id="4pInKVL2R36P_PNduXp1H">
+          <td class="branch-cell">drug_crime/distribution</td>
+          <td><span class="tag HOT">HOT</span> · SELF</td>
+          <td class="delta-cell"><span class="tag HOT">HOT</span> 88</td>
+          <td class="delta-cell"><span class="tag WARM">WARM</span> null</td>
+          <td><span class="tag LLM">LLM-fallback</span> · SOP stuck at <code>where</code></td>
+          <td class="brief-cell">Drug crime distribution matter involving mj_small and possession only, in an area not charged.</td>
+        </tr>
+      
+        <tr data-idx="92" data-lead-id="I5-PSHEYjVB4YkR0tHTX9">
+          <td class="branch-cell">drug_crime/distribution</td>
+          <td><span class="tag WARM">WARM</span> · FRIEND_FAMILY</td>
+          <td class="delta-cell"><span class="tag WARM">WARM</span> 51</td>
+          <td class="delta-cell"><span class="tag SPAM">SPAM</span> null</td>
+          <td><span class="tag LLM">LLM-fallback</span> · SOP stuck at <code>where</code></td>
+          <td class="brief-cell">Drug crime / distribution matter in Pittsburgh, PA on 2026-05-28.</td>
+        </tr>
+      </tbody>
+      </table>
+    </section>
+  
+    
+    <section>
+      <h2>Insights & action items</h2>
+      <div class="insights">
+        <div class="insight-block">
+          <h3>1. Rule scorer is correct on every conversation it actually saw</h3>
+          <p>Of the <strong>33</strong> conversations that reached the branch
+          finalisation path (and thus produced a numeric <code>lead_score</code>),
+          <strong>100%</strong> matched the harness's
+          predicted bucket. That means the chip-weight math, threshold tables, and
+          per-branch toggles all behave as designed when the conversation gets that far.</p>
+        </div>
+        <div class="insight-block">
+          <h3>2. 10 branches never reached the rule scorer</h3>
+          <p>These sub-types stayed on the LLM-fallback path because the SOP wasn't able
+          to finalise before <code>captureLead</code> fired. Inspecting each such lead's
+          <code>sop_state_snapshot</code> shows the conversation got stuck at the
+          <code>where</code> step — the firm's published v2 SOP customised that step into
+          an inline-chip step (<em>In Pittsburgh</em> / <em>Outside Pittsburgh</em>), so the
+          harness's free-text <em>"Pittsburgh, PA"</em> isn't accepted. The classifications
+          on these rows come from the LLM and should be treated as
+          <strong>incidental</strong>, not validated by this run.</p>
+          <ul><li><code>criminal_defense/assault</code> — 0 of 5 leads engaged the rule scorer</li><li><code>criminal_defense/fraud</code> — 0 of 7 leads engaged the rule scorer</li><li><code>criminal_defense/gun_charge</code> — 0 of 5 leads engaged the rule scorer</li><li><code>criminal_defense/theft</code> — 0 of 7 leads engaged the rule scorer</li><li><code>drug_crime/distribution</code> — 0 of 5 leads engaged the rule scorer</li><li><code>drug_crime/possession</code> — 0 of 7 leads engaged the rule scorer</li><li><code>drug_crime/trafficking</code> — 0 of 4 leads engaged the rule scorer</li><li><code>personal_injury/dog_bite</code> — 0 of 7 leads engaged the rule scorer</li><li><code>personal_injury/medical_malpractice</code> — 0 of 7 leads engaged the rule scorer</li><li><code>personal_injury/slip_fall</code> — 0 of 7 leads engaged the rule scorer</li></ul>
+        </div>
+        <div class="insight-block">
+          <h3>3. Branches with 100% rule-scored matches</h3>
+          <p>These can be considered fully validated against the seeded chip-weight
+          configuration:</p>
+          <ul><li><code>dui/dui_with_injury</code></li><li><code>dui/dui_with_property</code></li><li><code>dui/first_offense</code></li><li><code>dui/repeat_offense</code></li></ul>
+        </div>
+        <div class="insight-block">
+          <h3>4. Recommended next steps</h3>
+          <ul>
+            <li>Make the harness chip-aware so it sends a chip slug instead of free-text
+              when the active SOP step has <code>chip_source != null</code>. The
+              free-text-only assumption is the root cause of the LLM-fallback rows above.</li>
+            <li>Re-run the matrix once the harness is chip-aware — the
+              <strong>63</strong> currently-LLM-driven rows will then exercise the
+              rule scorer and confirm whether the predicted classifications hold.</li>
+            <li>The <strong>16</strong> current mismatches are
+              <em>all</em> on the LLM-fallback path. They are not bugs in the rule
+              scorer; they are an LLM judging-call on incomplete intake data and the
+              harness's chip selections happening to disagree with how the LLM
+              labelled them.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+  
+  </main>
+  <div class="detail-dialog" id="detail-dialog" role="dialog" aria-modal="true">
+    <div class="panel" role="document"></div>
+  </div>
+  <script>window.__LEAD_DATASET = {"1":{"case_type":"personal_injury","sub_type":"car_accident","bucket":"WARM","rt":"SELF","predicted":{"score":"63","bucket":"WARM"},"actual":{"score":"63","bucket":"WARM"},"durationSec":76.4,"turns":15,"lead":{"id":"aTaKzSCLljGow_3TnurcK","classification":"HOT","lead_score":88,"brief_description":"Criminal defense theft matter involving shoplifting in Pittsburgh, PA on May 28, 2026, currently under investigation with witnesses as evidence.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["Shoplifting","Misdemeanor","Under investigation","Eyewitnesses","No, looking now"]}},"2":{"case_type":"personal_injury","sub_type":"car_accident","bucket":"HOT","rt":"SELF","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"88","bucket":"HOT"},"durationSec":97.5,"turns":15,"lead":{"id":"iZoOwUfVA5hStGZGvOFRo","classification":"HOT","lead_score":88,"brief_description":"Personal injury car accident involving a cyclist, where the other driver was at fault, resulting in hospitalization and inability to work, and an insurance company has requested a recorded statement.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["No","Hospitalization","Cyclist","The Other Driver","Requested Recorded Statement","Unable To Work","No"]}},"3":{"case_type":"personal_injury","sub_type":"car_accident","bucket":"HOT","rt":"FRIEND_FAMILY","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"88","bucket":"HOT"},"durationSec":97.6,"turns":15,"lead":{"id":"cuFAHrB0OxebZjkGcGcex","classification":"WARM","lead_score":63,"brief_description":"Personal injury car accident matter where the client was a cyclist and unable to work, and the other driver was mostly responsible. An insurance company has requested a recorded statement.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["No","Cyclist","Mostly The Other Driver","Requested Recorded Statement","Unable To Work","No"]}},"4":{"case_type":"personal_injury","sub_type":"car_accident","bucket":"WARM","rt":"FRIEND_FAMILY","predicted":{"score":"50","bucket":"WARM"},"actual":{"score":"50","bucket":"WARM"},"durationSec":100.1,"turns":15,"lead":{"id":"rGl4JS2xuPht_pS4-eSbs","classification":"WARM","lead_score":50,"brief_description":"Personal injury car accident for a friend/family member in Pittsburgh, PA, where the other driver was responsible. An insurance company has requested a recorded statement, and the individual is unable to work. No injuries or medical treatment were received, and there is no current lawyer.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["No","No Treatment","The Other Driver","Requested Recorded Statement","Unable To Work","No"]}},"5":{"case_type":"personal_injury","sub_type":"car_accident","bucket":"SPAM","rt":"SELF","predicted":{"score":"13","bucket":"SPAM"},"actual":{"score":"13","bucket":"SPAM"},"durationSec":98.3,"turns":15,"lead":{"id":"543XRqcgQgsvBHkgNlRyc","classification":"WARM","lead_score":null,"brief_description":"Personal injury car accident in Pittsburgh, PA, involving a cyclist, resulting in inability to work, with no medical treatment yet, and a requested recorded statement.","branched":false,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":[]}},"6":{"case_type":"personal_injury","sub_type":"car_accident","bucket":"COLD","rt":"SELF","predicted":{"score":"38","bucket":"COLD"},"actual":{"score":"null","bucket":"WARM"},"durationSec":98.7,"turns":15,"lead":{"id":"4L-qrltA_poC6UNcN238p","classification":"SPAM","lead_score":13,"brief_description":"Personal injury car accident in Pittsburgh, PA on May 28, 2026, where the user was a cyclist and believes they were mostly responsible. An insurance company has contacted them, and they are unable to work due to the accident.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["No","No Treatment","Cyclist","Mostly Me","Contacted Me","Unable To Work","No"]}},"7":{"case_type":"personal_injury","sub_type":"car_accident","bucket":"SPAM","rt":"FRIEND_FAMILY","predicted":{"score":"13","bucket":"SPAM"},"actual":{"score":"13","bucket":"SPAM"},"durationSec":95.3,"turns":15,"lead":{"id":"0N9kc--Pgyai7VIyZiNXv","classification":"SPAM","lead_score":13,"brief_description":"Routine personal injury car accident matter in Pittsburgh, PA on 2026-05-28, involving a cyclist who is unable to work, and has been contacted by an insurance company.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["No","No Treatment","Cyclist","Mostly Me","Contacted Me","Unable To Work","No"]}},"8":{"case_type":"dui","sub_type":"first_offense","bucket":"HOT","rt":"FRIEND_FAMILY","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"88","bucket":"HOT"},"durationSec":87.2,"turns":14,"lead":{"id":"IJvXRaPI7aib4EN86KDJP","classification":"HOT","lead_score":88,"brief_description":"Routine first offense DUI matter in Pittsburgh, PA, traffic stop only, cited only, tested under legal limit, driver's license suspended, no attorney.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["I got a citation, no arrest","Yes, results came back under the limit","No accident, just a traffic stop","It was suspended on the spot","No, I'm looking now"]}},"9":{"case_type":"dui","sub_type":"first_offense","bucket":"HOT","rt":"SELF","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"88","bucket":"HOT"},"durationSec":88.4,"turns":14,"lead":{"id":"X3U3rcLOpXoMVZEJY5O2d","classification":"HOT","lead_score":88,"brief_description":"Routine first-offense DUI matter for a friend/family member, cited only, driver's license suspended.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["I got a citation, no arrest","Yes, results came back under the limit","No accident, just a traffic stop","It was suspended on the spot","No, I'm looking now"]}},"10":{"case_type":"dui","sub_type":"first_offense","bucket":"WARM","rt":"SELF","predicted":{"score":"63","bucket":"WARM"},"actual":{"score":"63","bucket":"WARM"},"durationSec":87.3,"turns":14,"lead":{"id":"GMzFbMek79w2rW-yRNW4F","classification":"WARM","lead_score":63,"brief_description":"First-offense DUI matter in Pittsburgh, PA, from a traffic stop, tested under the legal limit, with a temporary permit for the driver's license, and no attorney yet.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["Nothing happened yet, just want info","Yes, results came back under the limit","No accident, just a traffic stop","I got a temporary / hardship permit","No, I'm looking now"]}},"11":{"case_type":"dui","sub_type":"first_offense","bucket":"COLD","rt":"SELF","predicted":{"score":"38","bucket":"COLD"},"actual":{"score":"38","bucket":"COLD"},"durationSec":86.5,"turns":14,"lead":{"id":"t8P-DeEDKCAXoRWVOgw85","classification":"WARM","lead_score":51,"brief_description":"First-offense DUI matter for a friend/family member that occurred last week in Pittsburgh, PA. It was a routine DUI from a traffic stop, no action has been taken yet, and the court date is unknown. The driver has a temporary permit and is looking for an attorney.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["Nothing happened yet, just want info","No accident, just a traffic stop","I got a temporary / hardship permit","No, I'm looking now"]}},"12":{"case_type":"dui","sub_type":"first_offense","bucket":"WARM","rt":"FRIEND_FAMILY","predicted":{"score":"51","bucket":"WARM"},"actual":{"score":"51","bucket":"WARM"},"durationSec":93,"turns":14,"lead":{"id":"cCFOl-Q4abBYG-MztCPNJ","classification":"COLD","lead_score":38,"brief_description":"Routine DUI / first offense matter from a traffic stop last week in Pittsburgh, PA.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["Nothing happened yet, just want info","No accident, just a traffic stop","No, I'm looking now"]}},"13":{"case_type":"dui","sub_type":"first_offense","bucket":"SPAM","rt":"SELF","predicted":{"score":"13","bucket":"SPAM"},"actual":{"score":"13","bucket":"SPAM"},"durationSec":85.7,"turns":14,"lead":{"id":"_VFG0m0yclKFlauOKS3Ga","classification":"SPAM","lead_score":13,"brief_description":"First-offense DUI in Pittsburgh, PA, from a traffic stop, with a suspended license. User has already retained an attorney.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["Nothing happened yet, just want info","No accident, just a traffic stop","It was suspended on the spot","I already hired a private attorney"]}},"14":{"case_type":"dui","sub_type":"first_offense","bucket":"SPAM","rt":"FRIEND_FAMILY","predicted":{"score":"13","bucket":"SPAM"},"actual":{"score":"13","bucket":"SPAM"},"durationSec":83.7,"turns":14,"lead":{"id":"PnPAMzf3VaNeNlXdi5s5I","classification":"SPAM","lead_score":13,"brief_description":"First-offense DUI matter in Pittsburgh, PA for a friend/family member, resulting from a traffic stop, with a suspended driver's license. An attorney has already been retained.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["Nothing happened yet, just want info","No accident, just a traffic stop","It was suspended on the spot","I already hired a private attorney"]}},"15":{"case_type":"dui","sub_type":"repeat_offense","bucket":"HOT","rt":"SELF","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"88","bucket":"HOT"},"durationSec":91.6,"turns":15,"lead":{"id":"rf41S9PV8Sx5DNDnOZ8ro","classification":"HOT","lead_score":88,"brief_description":"Repeat offense DUI matter in Pittsburgh, PA, involving a summons, one old prior DUI, and the user is currently on probation.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["One prior, more than 10 years ago","Just got a notice / summons","Still valid","Yes, for something else","No, looking now"]}},"16":{"case_type":"dui","sub_type":"repeat_offense","bucket":"HOT","rt":"FRIEND_FAMILY","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"88","bucket":"HOT"},"durationSec":86.7,"turns":15,"lead":{"id":"RSCzU4A-hvMoRIrFpEKHI","classification":"HOT","lead_score":88,"brief_description":"Repeat offense DUI matter in Pittsburgh, PA, with a summons received and the individual is currently on probation.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["One prior, more than 10 years ago","Just got a notice / summons","Still valid","Yes, for something else","No, looking now"]}},"17":{"case_type":"dui","sub_type":"repeat_offense","bucket":"WARM","rt":"SELF","predicted":{"score":"63","bucket":"WARM"},"actual":{"score":"63","bucket":"WARM"},"durationSec":90.9,"turns":15,"lead":{"id":"w9EyoSqokC3Y6zKlLOlH1","classification":"WARM","lead_score":63,"brief_description":"The user has a repeat offense DUI matter in Pittsburgh, PA, from last week. They have one prior DUI and have been cited. They are unsure if it's a felony, about breath/blood tests, or their license status. They are not on probation/parole and have a public defender but want a private attorney.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["One prior, more than 10 years ago","Cited, not arrested","No","Have a public defender, want private"]}},"18":{"case_type":"dui","sub_type":"repeat_offense","bucket":"WARM","rt":"FRIEND_FAMILY","predicted":{"score":"50","bucket":"WARM"},"actual":{"score":"50","bucket":"WARM"},"durationSec":91.7,"turns":15,"lead":{"id":"Y-PoGpbXFyEq42h7LCU68","classification":"WARM","lead_score":50,"brief_description":"Repeat offense DUI matter for a friend/family member in Pittsburgh, PA, cited last week (May 28, 2026). One prior DUI, felony charge status unknown, breath/blood test unknown, license status unknown, probation/parole status unknown. Currently shopping for an attorney.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["One prior, more than 10 years ago","Cited, not arrested","Comparing firms"]}},"19":{"case_type":"dui","sub_type":"repeat_offense","bucket":"COLD","rt":"SELF","predicted":{"score":"38","bucket":"COLD"},"actual":{"score":"38","bucket":"COLD"},"durationSec":91.9,"turns":15,"lead":{"id":"8p8OZeB4i2Tpo0Y9_nugw","classification":"COLD","lead_score":38,"brief_description":"Repeat offense DUI matter in Pittsburgh, PA, with one prior offense, received a summons, and is currently on probation for a DUI. Already retained an attorney.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["One prior, more than 10 years ago","Just got a notice / summons","Yes, for a prior DUI","Already hired private counsel"]}},"20":{"case_type":"dui","sub_type":"repeat_offense","bucket":"SPAM","rt":"SELF","predicted":{"score":"13","bucket":"SPAM"},"actual":{"score":"13","bucket":"SPAM"},"durationSec":96.9,"turns":15,"lead":{"id":"aFmYB_iPnsDQBbfwKwmmV","classification":"SPAM","lead_score":13,"brief_description":"Repeat offense DUI matter in Pittsburgh, PA, with a summons received last week. User has one old prior DUI offense and is unsure about felony charges, breath/blood test, license status, and probation/parole. User has already retained an attorney.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["One prior, more than 10 years ago","Just got a notice / summons","Already hired private counsel"]}},"21":{"case_type":"dui","sub_type":"repeat_offense","bucket":"SPAM","rt":"FRIEND_FAMILY","predicted":{"score":"13","bucket":"SPAM"},"actual":{"score":"13","bucket":"SPAM"},"durationSec":96.7,"turns":15,"lead":{"id":"WAqs5Gn5JdTpXfRLjg7_S","classification":"SPAM","lead_score":13,"brief_description":"Repeat offense DUI matter for a friend/family member in Pittsburgh, PA, that happened last week. There is a summons, and the client has one old prior DUI offense. They have already retained an attorney.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["One prior, more than 10 years ago","Just got a notice / summons","Already hired private counsel"]}},"22":{"case_type":"dui","sub_type":"dui_with_injury","bucket":"HOT","rt":"SELF","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"88","bucket":"HOT"},"durationSec":80.4,"turns":15,"lead":{"id":"R-2GgEFrY954zy1LE10YB","classification":"HOT","lead_score":88,"brief_description":"DUI with injury matter in Pittsburgh, PA, involving a demand letter.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["I don't know yet","Out on bail","Yes, demand letter received","No, looking now"]}},"23":{"case_type":"dui","sub_type":"dui_with_injury","bucket":"HOT","rt":"FRIEND_FAMILY","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"88","bucket":"HOT"},"durationSec":87.5,"turns":15,"lead":{"id":"VjW3YKcL0wLpJV3Il7uus","classification":"HOT","lead_score":88,"brief_description":"DUI with injury matter for a friend/family member in Pittsburgh, PA, where a demand letter has been received and they are out on bail.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["I don't know yet","Out on bail","Yes, demand letter received","No, looking now"]}},"24":{"case_type":"dui","sub_type":"dui_with_injury","bucket":"WARM","rt":"SELF","predicted":{"score":"63","bucket":"WARM"},"actual":{"score":"63","bucket":"WARM"},"durationSec":100,"turns":15,"lead":{"id":"a_kFCPy5AJX82m26iinyT","classification":"WARM","lead_score":63,"brief_description":"Routine DUI with injury matter where the user was the only one injured, out on bail, and is shopping for a criminal defense attorney.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["I don't know yet","Only me (the driver)","Out on bail","Comparing firms"]}},"25":{"case_type":"dui","sub_type":"dui_with_injury","bucket":"WARM","rt":"FRIEND_FAMILY","predicted":{"score":"51","bucket":"WARM"},"actual":{"score":"51","bucket":"WARM"},"durationSec":96.2,"turns":15,"lead":{"id":"wLi7CzioEkDtpNm5GEDsN","classification":"WARM","lead_score":51,"brief_description":"DUI with injury matter in Pittsburgh, PA, where a lawsuit has been filed and a criminal defense attorney has already been retained.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["Minor injury, declined treatment","Released, charges pending","No test taken","Yes, lawsuit already filed","Already hired private counsel"]}},"26":{"case_type":"dui","sub_type":"dui_with_injury","bucket":"COLD","rt":"SELF","predicted":{"score":"38","bucket":"COLD"},"actual":{"score":"38","bucket":"COLD"},"durationSec":102.5,"turns":15,"lead":{"id":"GDndGEKErjefh6eFwhUw-","classification":"COLD","lead_score":38,"brief_description":"DUI with injury matter in Pittsburgh, PA, on May 28, 2026, where the client is currently held without bail.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["I don't know yet","In jail, no bail set","Not yet","Already hired private counsel"]}},"27":{"case_type":"dui","sub_type":"dui_with_injury","bucket":"SPAM","rt":"SELF","predicted":{"score":"17","bucket":"SPAM"},"actual":{"score":"17","bucket":"SPAM"},"durationSec":94.7,"turns":15,"lead":{"id":"2oXVesacmybkKXAOZNkid","classification":"SPAM","lead_score":17,"brief_description":"Fixture SPAM S26 has a DUI with injury matter that happened in Pittsburgh, PA on 2026-05-28.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["I don't know yet","Released, charges pending","Already hired private counsel"]}},"28":{"case_type":"dui","sub_type":"dui_with_injury","bucket":"SPAM","rt":"FRIEND_FAMILY","predicted":{"score":"17","bucket":"SPAM"},"actual":{"score":"17","bucket":"SPAM"},"durationSec":97,"turns":15,"lead":{"id":"1jHOy2gIlKl0V_OoRDb7E","classification":"SPAM","lead_score":17,"brief_description":"Friend/family member has a DUI with injury matter in Pittsburgh, PA, which occurred on 2026-05-28. They have already retained a criminal defense attorney.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["I don't know yet","Released, charges pending","Already hired private counsel"]}},"29":{"case_type":"dui","sub_type":"dui_with_property","bucket":"HOT","rt":"SELF","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"88","bucket":"HOT"},"durationSec":93.4,"turns":15,"lead":{"id":"tIHXvH6r2kc3XnfilDDVv","classification":"HOT","lead_score":88,"brief_description":"DUI with property damage (other vehicle, unknown damage amount) in Pittsburgh, PA, last week, stayed at scene, unknown breath/blood test, currently under investigation, facing lawsuit/demand for damages, no attorney.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["Another person's vehicle","Yes, stayed and reported it","Under investigation","Lawsuit or demand letter","No, looking now"]}},"30":{"case_type":"dui","sub_type":"dui_with_property","bucket":"HOT","rt":"FRIEND_FAMILY","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"88","bucket":"HOT"},"durationSec":80.9,"turns":15,"lead":{"id":"1Z5JjszSlp6FEHQvI_7oa","classification":"HOT","lead_score":88,"brief_description":"DUI with property damage (other vehicle) in Pittsburgh, PA, currently under investigation with a lawsuit or demand for damages.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["Another person's vehicle","Yes, stayed and reported it","Under investigation","Lawsuit or demand letter","No, looking now"]}},"31":{"case_type":"dui","sub_type":"dui_with_property","bucket":"WARM","rt":"SELF","predicted":{"score":"63","bucket":"WARM"},"actual":{"score":"63","bucket":"WARM"},"durationSec":91,"turns":15,"lead":{"id":"AdugemEUvbIgfhf2K2SED","classification":"WARM","lead_score":63,"brief_description":"DUI with property damage in Pittsburgh, PA, involving own property, no breath/blood test, no charges yet, public defender wants private attorney.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["Only my own vehicle","Yes, stayed and reported it","No test taken","No charges yet","Public defender, want private"]}},"32":{"case_type":"dui","sub_type":"dui_with_property","bucket":"WARM","rt":"FRIEND_FAMILY","predicted":{"score":"51","bucket":"WARM"},"actual":{"score":"51","bucket":"WARM"},"durationSec":95.9,"turns":15,"lead":{"id":"c7GwqQARDDUCmZOW2_YNh","classification":"WARM","lead_score":51,"brief_description":"DUI with property damage matter that occurred in Pittsburgh, PA, involving damage to own property, where the user stayed at the scene, and no charges have been filed yet.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["Only my own vehicle","Yes, stayed and reported it","No charges yet","Public defender, want private"]}},"33":{"case_type":"dui","sub_type":"dui_with_property","bucket":"COLD","rt":"SELF","predicted":{"score":"38","bucket":"COLD"},"actual":{"score":"38","bucket":"COLD"},"durationSec":103.5,"turns":15,"lead":{"id":"xoiP7D1e0Q_5re_fYrFPL","classification":"COLD","lead_score":38,"brief_description":"The user has a DUI with property damage matter in Pittsburgh, PA, involving another vehicle, with unknown damage amount. They stayed at the scene, and there was a lawsuit or demand for payment, but no charges yet. They already have an attorney.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["Another person's vehicle","Yes, stayed and reported it","No charges yet","Lawsuit or demand letter","Already hired private counsel"]}},"34":{"case_type":"dui","sub_type":"dui_with_property","bucket":"SPAM","rt":"SELF","predicted":{"score":"11","bucket":"SPAM"},"actual":{"score":"11","bucket":"SPAM"},"durationSec":90.5,"turns":15,"lead":{"id":"YaFntevLc8lQ8ZCFFRl-_","classification":"SPAM","lead_score":11,"brief_description":"Routine DUI with property damage (own only), no charges, already retained an attorney.","branched":true,"sop_finalized":true,"sop_pending_step":null,"hard_overrides_fired":[],"reasons":["Only my own vehicle","Yes, stayed and reported it","No charges yet","Already hired private counsel"]}},"35":{"case_type":"dui","sub_type":"dui_with_property","bucket":"SPAM","rt":"FRIEND_FAMILY","predicted":{"score":"11","bucket":"SPAM"},"actual":{"score":"null","bucket":"SPAM"},"durationSec":80.5,"turns":16,"lead":{"id":"Dp-DumGdoBaQN3p2XvdRo","classification":"SPAM","lead_score":null,"brief_description":"Routine DUI with property matter that occurred last week in Pittsburgh, PA, with no charges.","branched":false,"sop_finalized":false,"sop_pending_step":"contact","hard_overrides_fired":[],"reasons":[]}},"36":{"case_type":"criminal_defense","sub_type":"theft","bucket":"HOT","rt":"SELF","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":70.1,"turns":16,"lead":{"id":"Y6oo22xPIReKNo8otVr0Z","classification":"HOT","lead_score":null,"brief_description":"Criminal defense theft matter in Pittsburgh, PA last week, involving a misdemeanor and investigation with witnesses.","branched":false,"sop_finalized":false,"sop_pending_step":"sub_type","hard_overrides_fired":[],"reasons":[]}},"37":{"case_type":"criminal_defense","sub_type":"theft","bucket":"HOT","rt":"FRIEND_FAMILY","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"WARM"},"durationSec":99,"turns":16,"lead":{"id":"wYq93fl_VcowzhX_jD3by","classification":"WARM","lead_score":null,"brief_description":"Criminal defense theft matter involving shoplifting in Pittsburgh, PA, a misdemeanor, involving a friend or family member, and currently under investigation with no witnesses.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"38":{"case_type":"criminal_defense","sub_type":"theft","bucket":"WARM","rt":"FRIEND_FAMILY","predicted":{"score":"51","bucket":"WARM"},"actual":{"score":"null","bucket":"COLD"},"durationSec":92.9,"turns":16,"lead":{"id":"bcpuarPS0UQu1jTIlXmxr","classification":"WARM","lead_score":null,"brief_description":"Criminal defense theft (shoplifting) matter in Pittsburgh, PA, where the public defender wants a private attorney.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"39":{"case_type":"criminal_defense","sub_type":"theft","bucket":"WARM","rt":"SELF","predicted":{"score":"63","bucket":"WARM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":109.3,"turns":16,"lead":{"id":"GfUmcghyPzpFQ7xgZqhvi","classification":"COLD","lead_score":null,"brief_description":"Fixture WARM F38 is looking for help with a shoplifting misdemeanor that happened in Pittsburgh, PA last week, received a letter, and there is video involved. They have already retained an attorney.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"40":{"case_type":"criminal_defense","sub_type":"theft","bucket":"COLD","rt":"SELF","predicted":{"score":"38","bucket":"COLD"},"actual":{"score":"null","bucket":"COLD"},"durationSec":80.3,"turns":16,"lead":{"id":"9D34lhjJzpkm2_VuHS8MS","classification":"COLD","lead_score":null,"brief_description":"The user has a larceny matter in Pittsburgh, PA, that happened last week. They have already retained an attorney.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"41":{"case_type":"criminal_defense","sub_type":"theft","bucket":"SPAM","rt":"FRIEND_FAMILY","predicted":{"score":"20","bucket":"SPAM"},"actual":{"score":"null","bucket":"COLD"},"durationSec":79.6,"turns":16,"lead":{"id":"OJknyhmSVOkmZS_Jghvoo","classification":"SPAM","lead_score":null,"brief_description":"User has already retained counsel for a shoplifting criminal defense matter in Pittsburgh, PA.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"42":{"case_type":"criminal_defense","sub_type":"theft","bucket":"SPAM","rt":"SELF","predicted":{"score":"20","bucket":"SPAM"},"actual":{"score":"null","bucket":"SPAM"},"durationSec":99.5,"turns":16,"lead":{"id":"NmRVcUNlirFphOzTocXEA","classification":"COLD","lead_score":null,"brief_description":"Criminal defense theft matter involving shoplifting in the Pittsburgh, PA area, related to a friend or family member.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"43":{"case_type":"criminal_defense","sub_type":"assault","bucket":"HOT","rt":"SELF","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":115.5,"turns":16,"lead":{"id":"lJCYZqKfeMZKsWbOS2L64","classification":"HOT","lead_score":null,"brief_description":"Criminal defense / assault matter in Pittsburgh, PA, last week, involving hands and feet, preemptive action, and self-defense.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"44":{"case_type":"criminal_defense","sub_type":"assault","bucket":"HOT","rt":"FRIEND_FAMILY","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":115.1,"turns":16,"lead":{"id":"vXpBJ9MZ8RGr6P7Ywrs6u","classification":"HOT","lead_score":null,"brief_description":"Criminal defense matter involving assault in Pittsburgh, PA, which occurred last week, involves a friend or family member, and may involve self-defense.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"45":{"case_type":"criminal_defense","sub_type":"assault","bucket":"WARM","rt":"SELF","predicted":{"score":"63","bucket":"WARM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":110.8,"turns":16,"lead":{"id":"lrECYwtrB9oqZWdXM2y0y","classification":"WARM","lead_score":null,"brief_description":"Criminal defense matter involving assault in Pittsburgh, PA, that happened last week, involved hands and feet, and was preemptive.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"46":{"case_type":"criminal_defense","sub_type":"assault","bucket":"WARM","rt":"FRIEND_FAMILY","predicted":{"score":"50","bucket":"WARM"},"actual":{"score":"null","bucket":"SPAM"},"durationSec":89.2,"turns":16,"lead":{"id":"jj3K0jXzkAohClgtbhhDP","classification":"SPAM","lead_score":null,"brief_description":"Criminal defense / assault matter in Pittsburgh, PA, last week, involving friends/family, hands/feet, and self-defense, currently under investigation. User has already retained an attorney.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"47":{"case_type":"criminal_defense","sub_type":"fraud","bucket":"HOT","rt":"SELF","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":76.3,"turns":16,"lead":{"id":"ZzGAN4u9hFQEgjwRv8X-Q","classification":"COLD","lead_score":null,"brief_description":"Criminal defense matter involving assault in Pittsburgh, PA, that happened last week, involved hands and feet, possibly preemptive, and the user was the aggressor. User has already retained counsel.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"48":{"case_type":"criminal_defense","sub_type":"assault","bucket":"COLD","rt":"SELF","predicted":{"score":"38","bucket":"COLD"},"actual":{"score":"null","bucket":"COLD"},"durationSec":115,"turns":16,"lead":{"id":"4Mq1rMWkJY0tQFBqjTi-T","classification":"HOT","lead_score":null,"brief_description":"Identity fraud criminal defense matter in Pittsburgh, PA.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"49":{"case_type":"criminal_defense","sub_type":"fraud","bucket":"HOT","rt":"FRIEND_FAMILY","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":92.7,"turns":16,"lead":{"id":"sDzI1DzSaC_GezdAMkRQ2","classification":"HOT","lead_score":null,"brief_description":"Criminal defense matter involving identity fraud with a friend or family member, and the user has not been contacted by authorities yet.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"50":{"case_type":"criminal_defense","sub_type":"fraud","bucket":"WARM","rt":"SELF","predicted":{"score":"63","bucket":"WARM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":73.8,"turns":16,"lead":{"id":"1ucNsDBfjZB5s9qmT0w5v","classification":"WARM","lead_score":null,"brief_description":"Criminal defense fraud matter in Pittsburgh, PA.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"51":{"case_type":"criminal_defense","sub_type":"fraud","bucket":"WARM","rt":"FRIEND_FAMILY","predicted":{"score":"50","bucket":"WARM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":82.1,"turns":16,"lead":{"id":"BZH1ltLR_lvzAGw85PR2Y","classification":"WARM","lead_score":null,"brief_description":"Criminal defense fraud matter in Pittsburgh, PA, which occurred last week, possibly involving friends or family.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"52":{"case_type":"criminal_defense","sub_type":"fraud","bucket":"COLD","rt":"SELF","predicted":{"score":"38","bucket":"COLD"},"actual":{"score":"null","bucket":"COLD"},"durationSec":63.8,"turns":16,"lead":{"id":"P5m1P8tRU8x5CgU5uWAIN","classification":"COLD","lead_score":null,"brief_description":"Criminal defense fraud matter in Pittsburgh, PA, which occurred last week.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"53":{"case_type":"criminal_defense","sub_type":"fraud","bucket":"SPAM","rt":"SELF","predicted":{"score":"22","bucket":"SPAM"},"actual":{"score":"null","bucket":"COLD"},"durationSec":87.8,"turns":16,"lead":{"id":"nAvU191--p0cbsUWY0nPn","classification":"COLD","lead_score":null,"brief_description":"Criminal defense matter involving fraud.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"54":{"case_type":"criminal_defense","sub_type":"fraud","bucket":"SPAM","rt":"FRIEND_FAMILY","predicted":{"score":"22","bucket":"SPAM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":71.8,"turns":16,"lead":{"id":"fXTQGBNHBR9GYFf04c7Ob","classification":"WARM","lead_score":null,"brief_description":"Criminal defense matter involving fraud in Pittsburgh, PA, that happened last week.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"55":{"case_type":"criminal_defense","sub_type":"gun_charge","bucket":"HOT","rt":"SELF","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":87.4,"turns":16,"lead":{"id":"xEI0jHI0tD0_SvWMc4vLe","classification":"HOT","lead_score":null,"brief_description":"Criminal defense gun charge in Pittsburgh, PA from last week. User was carrying a gun, no charges yet, but the police department wants a private consultation.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"56":{"case_type":"criminal_defense","sub_type":"gun_charge","bucket":"WARM","rt":"SELF","predicted":{"score":"63","bucket":"WARM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":60.6,"turns":16,"lead":{"id":"2DwTxZCfiBZ2lsB7dOLZc","classification":"HOT","lead_score":null,"brief_description":"Criminal defense gun charge matter in Pittsburgh, PA, that happened last week, involving carrying a gun, with no charges yet, and the police department wants a private attorney.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"57":{"case_type":"criminal_defense","sub_type":"gun_charge","bucket":"HOT","rt":"FRIEND_FAMILY","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":112.8,"turns":16,"lead":{"id":"1i7p8DvhxgM0tIV7Jutwr","classification":"WARM","lead_score":null,"brief_description":"Criminal defense gun charge matter in Pittsburgh, PA.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"58":{"case_type":"criminal_defense","sub_type":"gun_charge","bucket":"COLD","rt":"SELF","predicted":{"score":"45","bucket":"COLD"},"actual":{"score":"null","bucket":"COLD"},"durationSec":65.4,"turns":16,"lead":{"id":"v7k_EskSxMZPWiNKa7I4N","classification":"WARM","lead_score":null,"brief_description":"Criminal defense gun charge matter in Pittsburgh, PA, where the user was carrying a gun, was cited, but is not currently charged and not prohibited.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"59":{"case_type":"criminal_defense","sub_type":"gun_charge","bucket":"WARM","rt":"FRIEND_FAMILY","predicted":{"score":"51","bucket":"WARM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":96.7,"turns":16,"lead":{"id":"fyyLZhmOanruaT4P-G5D8","classification":"COLD","lead_score":null,"brief_description":"Criminal defense gun charge matter in Pittsburgh, PA from last week.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"60":{"case_type":"personal_injury","sub_type":"slip_fall","bucket":"HOT","rt":"SELF","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":80.7,"turns":16,"lead":{"id":"CqorDujcnCfn8OpwEKXji","classification":"HOT","lead_score":null,"brief_description":"Slip and fall at a private home in Pittsburgh, PA, with an unknown cause, resulting in injuries requiring ongoing treatment, an incident report, and lost wages.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"61":{"case_type":"personal_injury","sub_type":"slip_fall","bucket":"WARM","rt":"SELF","predicted":{"score":"63","bucket":"WARM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":79.7,"turns":16,"lead":{"id":"6mrStcfCo9WWPQHhtxJfm","classification":"HOT","lead_score":null,"brief_description":"Fixture HOT F60 had a slip and fall in a private home in Pittsburgh, PA, with an unknown cause, is still undergoing treatment, has an incident report, and has lost wages.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"62":{"case_type":"personal_injury","sub_type":"slip_fall","bucket":"HOT","rt":"FRIEND_FAMILY","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":87.9,"turns":16,"lead":{"id":"Zvfcg9BvCTWWSi_d3yZm7","classification":"WARM","lead_score":null,"brief_description":"Fixture WARM S61 had a slip and fall personal injury in Pittsburgh, PA, around May 28, 2026, with an unknown cause, an incident report, and high bills.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"63":{"case_type":"personal_injury","sub_type":"slip_fall","bucket":"WARM","rt":"FRIEND_FAMILY","predicted":{"score":"50","bucket":"WARM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":101.1,"turns":16,"lead":{"id":"96zygqXUwI7r0l3GaxVuT","classification":"WARM","lead_score":null,"brief_description":"Personal injury slip and fall matter in Pittsburgh, PA, due to snow and ice, resulting in lost wages.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"64":{"case_type":"personal_injury","sub_type":"slip_fall","bucket":"SPAM","rt":"SELF","predicted":{"score":"12","bucket":"SPAM"},"actual":{"score":"null","bucket":"SPAM"},"durationSec":82.5,"turns":16,"lead":{"id":"O-TA9M5ypGc70MTgoNeCU","classification":"WARM","lead_score":null,"brief_description":"Personal injury slip and fall matter involving snow and ice at a private home in Pittsburgh, PA.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"65":{"case_type":"personal_injury","sub_type":"slip_fall","bucket":"COLD","rt":"SELF","predicted":{"score":"38","bucket":"COLD"},"actual":{"score":"null","bucket":"WARM"},"durationSec":91.2,"turns":16,"lead":{"id":"RyYe746RbFjZ1yYnrj6FJ","classification":"SPAM","lead_score":null,"brief_description":"Personal injury slip and fall at a private home involving lighting.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"66":{"case_type":"personal_injury","sub_type":"slip_fall","bucket":"SPAM","rt":"FRIEND_FAMILY","predicted":{"score":"12","bucket":"SPAM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":91.6,"turns":16,"lead":{"id":"_ZBMMFEGGyIzbVBM9Mv1S","classification":"WARM","lead_score":null,"brief_description":"Slip and fall personal injury matter in a private home in Pittsburgh, PA involving lighting.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"67":{"case_type":"personal_injury","sub_type":"medical_malpractice","bucket":"HOT","rt":"FRIEND_FAMILY","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":102.1,"turns":16,"lead":{"id":"gsdoAuQUTFcjah79JgKpP","classification":"HOT","lead_score":null,"brief_description":"Personal injury / medical malpractice matter involving an area infection that happened in Pittsburgh, PA within the last 3 years.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"68":{"case_type":"personal_injury","sub_type":"medical_malpractice","bucket":"HOT","rt":"SELF","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":129.7,"turns":16,"lead":{"id":"7IWCIKB25G57yMD3e_mQA","classification":"HOT","lead_score":null,"brief_description":"Personal injury / medical malpractice matter involving an infection that happened in a private office in Pittsburgh, PA.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"69":{"case_type":"personal_injury","sub_type":"medical_malpractice","bucket":"WARM","rt":"SELF","predicted":{"score":"63","bucket":"WARM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":69.5,"turns":16,"lead":{"id":"SJgbOFDSr1DlDlfmqtIr8","classification":"WARM","lead_score":null,"brief_description":"A routine personal injury / medical malpractice matter that happened in Pittsburgh, PA.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"70":{"case_type":"personal_injury","sub_type":"medical_malpractice","bucket":"WARM","rt":"FRIEND_FAMILY","predicted":{"score":"51","bucket":"WARM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":66.1,"turns":16,"lead":{"id":"HacvzDCp5FXkRAisOklHs","classification":"WARM","lead_score":null,"brief_description":"Routine personal injury / medical malpractice matter that happened in Pittsburgh, PA, last week.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"71":{"case_type":"personal_injury","sub_type":"medical_malpractice","bucket":"SPAM","rt":"SELF","predicted":{"score":"12","bucket":"SPAM"},"actual":{"score":"null","bucket":"SPAM"},"durationSec":64.8,"turns":16,"lead":{"id":"bA--hAjaN1q5StmGu2LvF","classification":"COLD","lead_score":null,"brief_description":"Routine personal injury / medical malpractice matter that happened in Pittsburgh, PA last week at a hospital.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"72":{"case_type":"personal_injury","sub_type":"medical_malpractice","bucket":"COLD","rt":"SELF","predicted":{"score":"38","bucket":"COLD"},"actual":{"score":"null","bucket":"COLD"},"durationSec":92.3,"turns":16,"lead":{"id":"F1TLA7oCPJ7Ypl1lbzBXv","classification":"SPAM","lead_score":null,"brief_description":"Routine personal injury / medical malpractice matter that happened in Pittsburgh, PA, last week.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"73":{"case_type":"personal_injury","sub_type":"medical_malpractice","bucket":"SPAM","rt":"FRIEND_FAMILY","predicted":{"score":"12","bucket":"SPAM"},"actual":{"score":"null","bucket":"SPAM"},"durationSec":66.3,"turns":16,"lead":{"id":"PL--Vsn_KJVsPal77LJOV","classification":"SPAM","lead_score":null,"brief_description":"Routine personal injury / medical malpractice matter in Pittsburgh, PA.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"74":{"case_type":"personal_injury","sub_type":"dog_bite","bucket":"HOT","rt":"SELF","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":94.5,"turns":16,"lead":{"id":"3oBikBcqR9Gs2vdHPBgBz","classification":"HOT","lead_score":null,"brief_description":"Personal injury dog bite matter in Pittsburgh, PA on May 28, 2026, involving an elderly person, with an unknown owner, in a public area, unprovoked, with no break, requiring medical treatment, and no one was looking.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"75":{"case_type":"personal_injury","sub_type":"dog_bite","bucket":"HOT","rt":"FRIEND_FAMILY","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":97,"turns":16,"lead":{"id":"VlZwb-iog_SuaLYMu7Vx_","classification":"HOT","lead_score":null,"brief_description":"Personal injury matter involving an unprovoked dog bite in Pittsburgh, PA, that occurred on 2026-05-28, involves an elderly person, the owner is unknown, happened in a public place, and requires medical treatment.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"76":{"case_type":"personal_injury","sub_type":"dog_bite","bucket":"WARM","rt":"SELF","predicted":{"score":"63","bucket":"WARM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":88.6,"turns":16,"lead":{"id":"3C_UyGxnt3m6orMRYjV1w","classification":"WARM","lead_score":null,"brief_description":"Personal injury dog bite matter with facial injury and medical treatment.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"77":{"case_type":"personal_injury","sub_type":"dog_bite","bucket":"WARM","rt":"FRIEND_FAMILY","predicted":{"score":"50","bucket":"WARM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":96.4,"turns":16,"lead":{"id":"RKX8kzCAtpkgjh5vnGQlX","classification":"WARM","lead_score":null,"brief_description":"Personal injury matter involving a dog bite, unknown owner, trespassing, and seeking medical treatment.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"78":{"case_type":"personal_injury","sub_type":"dog_bite","bucket":"SPAM","rt":"SELF","predicted":{"score":"12","bucket":"SPAM"},"actual":{"score":"null","bucket":"HOT"},"durationSec":95.9,"turns":16,"lead":{"id":"_qYgruA-HOvCvo1NCqsl0","classification":"WARM","lead_score":null,"brief_description":"Personal injury dog bite matter in Pittsburgh, PA, that happened last week, was provoked, and involved medical treatment.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"79":{"case_type":"personal_injury","sub_type":"dog_bite","bucket":"COLD","rt":"SELF","predicted":{"score":"38","bucket":"COLD"},"actual":{"score":"null","bucket":"WARM"},"durationSec":125.6,"turns":16,"lead":{"id":"cR32Y9Pcftg8O6zE920yE","classification":"HOT","lead_score":null,"brief_description":"Personal injury matter involving a dog bite in Pittsburgh, PA, last week, with an unknown owner, trespassing, provoked dog, and medical treatment received.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"80":{"case_type":"drug_crime","sub_type":"possession","bucket":"HOT","rt":"SELF","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":59.1,"turns":16,"lead":{"id":"lGzThiOdw_duziCqj2WBM","classification":"HOT","lead_score":null,"brief_description":"Personal injury dog bite incident involving an adult, no bone break, unknown owner, trespassing, and was provoked, requiring medical treatment.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"81":{"case_type":"personal_injury","sub_type":"dog_bite","bucket":"SPAM","rt":"FRIEND_FAMILY","predicted":{"score":"12","bucket":"SPAM"},"actual":{"score":"null","bucket":"HOT"},"durationSec":104.8,"turns":16,"lead":{"id":"VlxMQV5GiWHr8UOtfjaZM","classification":"HOT","lead_score":null,"brief_description":"Drug crime / possession matter in Pittsburgh, PA.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"82":{"case_type":"drug_crime","sub_type":"possession","bucket":"HOT","rt":"FRIEND_FAMILY","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":78.5,"turns":16,"lead":{"id":"x-NBE5GCKOUjhICxv1Mdg","classification":"HOT","lead_score":null,"brief_description":"Drug possession matter involving marijuana, classified as an infraction, that occurred in Pittsburgh, PA.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"83":{"case_type":"drug_crime","sub_type":"possession","bucket":"WARM","rt":"SELF","predicted":{"score":"63","bucket":"WARM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":67.1,"turns":16,"lead":{"id":"WNBRam7N_cpcNe6PSYxxi","classification":"WARM","lead_score":null,"brief_description":"Drug crime / possession matter involving marijuana in Pittsburgh, PA, that happened last week.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"84":{"case_type":"drug_crime","sub_type":"possession","bucket":"COLD","rt":"SELF","predicted":{"score":"38","bucket":"COLD"},"actual":{"score":"null","bucket":"COLD"},"durationSec":66.7,"turns":16,"lead":{"id":"nTUUeWKo8FKzLFXrC3o3j","classification":"WARM","lead_score":null,"brief_description":"Drug possession matter.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"85":{"case_type":"drug_crime","sub_type":"possession","bucket":"SPAM","rt":"SELF","predicted":{"score":"13","bucket":"SPAM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":56.4,"turns":16,"lead":{"id":"TQ8n3Ni18t3ZQyewBqaVm","classification":"COLD","lead_score":null,"brief_description":"Drug possession matter in Pittsburgh, PA.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"86":{"case_type":"drug_crime","sub_type":"possession","bucket":"WARM","rt":"FRIEND_FAMILY","predicted":{"score":"51","bucket":"WARM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":115.8,"turns":16,"lead":{"id":"Y-24iIIddQoRcta4KflHN","classification":"WARM","lead_score":null,"brief_description":"Drug crime / possession matter in Pittsburgh, PA that occurred on May 28, 2026.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"87":{"case_type":"drug_crime","sub_type":"possession","bucket":"SPAM","rt":"FRIEND_FAMILY","predicted":{"score":"13","bucket":"SPAM"},"actual":{"score":"null","bucket":"COLD"},"durationSec":87.7,"turns":16,"lead":{"id":"LLQpIsMmCoZa64C9Rbt6d","classification":"COLD","lead_score":null,"brief_description":"Drug crime / possession matter involving marijuana and an infraction in Pittsburgh, PA, that happened last week.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"88":{"case_type":"drug_crime","sub_type":"distribution","bucket":"HOT","rt":"SELF","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"WARM"},"durationSec":111.7,"turns":16,"lead":{"id":"4pInKVL2R36P_PNduXp1H","classification":"WARM","lead_score":null,"brief_description":"Drug crime distribution matter involving mj_small and possession only, in an area not charged.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"89":{"case_type":"drug_crime","sub_type":"distribution","bucket":"HOT","rt":"FRIEND_FAMILY","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":119.6,"turns":16,"lead":{"id":"Yw77PpLwQuPG4TGCMSrVv","classification":"HOT","lead_score":null,"brief_description":"Drug crime distribution matter involving a small quantity of marijuana.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"90":{"case_type":"drug_crime","sub_type":"distribution","bucket":"WARM","rt":"SELF","predicted":{"score":"63","bucket":"WARM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":62.2,"turns":16,"lead":{"id":"ItaNCVbiuoAcGhFgSGqFb","classification":"WARM","lead_score":null,"brief_description":"Drug crime / distribution matter involving possession only, which happened in Pittsburgh, PA, last week.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"91":{"case_type":"drug_crime","sub_type":"distribution","bucket":"COLD","rt":"SELF","predicted":{"score":"38","bucket":"COLD"},"actual":{"score":"null","bucket":"COLD"},"durationSec":67.8,"turns":16,"lead":{"id":"5Im3Hx_iFTAP2Ma-t2704","classification":"SPAM","lead_score":null,"brief_description":"User inquired about a drug crime distribution matter involving a small amount of marijuana but has already retained an attorney.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"92":{"case_type":"drug_crime","sub_type":"distribution","bucket":"WARM","rt":"FRIEND_FAMILY","predicted":{"score":"51","bucket":"WARM"},"actual":{"score":"null","bucket":"SPAM"},"durationSec":81.5,"turns":16,"lead":{"id":"I5-PSHEYjVB4YkR0tHTX9","classification":"COLD","lead_score":null,"brief_description":"Drug crime / distribution matter in Pittsburgh, PA on 2026-05-28.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"93":{"case_type":"drug_crime","sub_type":"trafficking","bucket":"HOT","rt":"SELF","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":71.9,"turns":16,"lead":{"id":"DFzlpguOZ8ZMvEDkt923x","classification":"HOT","lead_score":null,"brief_description":"Drug crime / trafficking matter in Pittsburgh, PA, that happened on 2026-05-28.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"94":{"case_type":"drug_crime","sub_type":"trafficking","bucket":"WARM","rt":"SELF","predicted":{"score":"63","bucket":"WARM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":76,"turns":16,"lead":{"id":"E-ztFgnXWcZaTY-Ps9xkw","classification":"HOT","lead_score":null,"brief_description":"Drug crime trafficking matter involving large pills in Pittsburgh, PA, with the user in federal custody.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"95":{"case_type":"drug_crime","sub_type":"trafficking","bucket":"HOT","rt":"FRIEND_FAMILY","predicted":{"score":"88","bucket":"HOT"},"actual":{"score":"null","bucket":"HOT"},"durationSec":81.2,"turns":16,"lead":{"id":"0KkFeARswIGfnJNFk8U6u","classification":"WARM","lead_score":null,"brief_description":"Routine drug crime trafficking matter in Pittsburgh, PA.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}},"96":{"case_type":"drug_crime","sub_type":"trafficking","bucket":"WARM","rt":"FRIEND_FAMILY","predicted":{"score":"52","bucket":"WARM"},"actual":{"score":"null","bucket":"WARM"},"durationSec":78.7,"turns":16,"lead":{"id":"jN3EbCM_jJP7Zkp10JmPo","classification":"WARM","lead_score":null,"brief_description":"Drug crime/trafficking matter in Pittsburgh, PA, involving a large quantity of marijuana.","branched":false,"sop_finalized":false,"sop_pending_step":"where","hard_overrides_fired":[],"reasons":[]}}};</script>
+  <script>
+(function () {
+  const dataset = window.__LEAD_DATASET || {};
+  const dialog = document.getElementById('detail-dialog');
+  const panel = dialog.querySelector('.panel');
+
+  function renderDetail(idx) {
+    const row = dataset[String(idx)];
+    if (!row) return '<p>No data for this row.</p>';
+    const lead = row.lead;
+    const reasons = (lead && lead.reasons && lead.reasons.length)
+      ? '<ul class="reasons">' + lead.reasons.map(r => '<li>' + r + '</li>').join('') + '</ul>'
+      : '<em>none</em>';
+    const overrides = (lead && lead.hard_overrides_fired && lead.hard_overrides_fired.length)
+      ? lead.hard_overrides_fired.join(', ')
+      : '<em>none</em>';
+    const path = (row.actual.score === 'null') ? 'LLM-fallback' : 'Rule-scored';
+    const sopStatus = lead
+      ? (lead.sop_finalized ? 'Finalized' : 'Pending at <code>' + (lead.sop_pending_step || 'unknown') + '</code>')
+      : '—';
+    return [
+      '<button class="close-btn" type="button" id="dlg-close" aria-label="Close">×</button>',
+      '<h3>' + row.case_type + ' / ' + row.sub_type + ' · ' + row.bucket + ' · ' + row.rt + '</h3>',
+      '<dl>',
+      '  <dt>Predicted</dt><dd>' + row.predicted.bucket + ' (score ' + row.predicted.score + ')</dd>',
+      '  <dt>Actual</dt><dd>' + row.actual.bucket + ' (score ' + row.actual.score + ')</dd>',
+      '  <dt>Path</dt><dd>' + path + '</dd>',
+      '  <dt>Duration</dt><dd>' + row.durationSec + 's, ' + row.turns + ' turns</dd>',
+      '  <dt>Lead ID</dt><dd><code>' + (lead ? lead.id : '—') + '</code></dd>',
+      '  <dt>SOP</dt><dd>' + sopStatus + '</dd>',
+      '  <dt>Overrides fired</dt><dd>' + overrides + '</dd>',
+      '  <dt>Reasons</dt><dd>' + reasons + '</dd>',
+      '  <dt>Brief</dt><dd>' + (lead && lead.brief_description ? lead.brief_description : '—') + '</dd>',
+      '</dl>',
+      '<p class="footer-note">Tip: copy the lead ID and look it up in /dashboard/leads for the full conversation transcript.</p>',
+    ].join('');
+  }
+
+  function open(idx) {
+    panel.innerHTML = renderDetail(idx);
+    dialog.classList.add('open');
+    const closeBtn = document.getElementById('dlg-close');
+    if (closeBtn) closeBtn.addEventListener('click', close);
+  }
+  function close() { dialog.classList.remove('open'); }
+
+  dialog.addEventListener('click', (e) => { if (e.target === dialog) close(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+
+  // Wire up clicks on cells and mismatch rows.
+  document.querySelectorAll('[data-idx]').forEach((el) => {
+    el.addEventListener('click', () => {
+      const idx = el.getAttribute('data-idx');
+      if (idx) open(idx);
+    });
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        const idx = el.getAttribute('data-idx');
+        if (idx) open(idx);
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

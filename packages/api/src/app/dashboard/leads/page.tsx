@@ -1,9 +1,32 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { eq, desc } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { db } from '../../../db';
 import { leads } from '../../../db/schema';
 import { getAuthSession } from '../../../lib/dashboard-session';
 import { LeadTable } from './lead-table';
+
+/**
+ * Detect whether the test-matrix HTML report has been published to
+ * `public/reports/lead-matrix-latest.html`. The "View test report"
+ * button is rendered only when the file exists, so a fresh deploy
+ * without a generated report doesn't surface a broken link.
+ *
+ * The check runs at request time (force-dynamic page), so
+ * regenerating the report shows the button immediately on next
+ * page load without a build / restart.
+ */
+function testReportAvailable(): boolean {
+  try {
+    const p = path.resolve(process.cwd(), 'public', 'reports', 'lead-matrix-latest.html');
+    return fs.statSync(p).isFile();
+  } catch {
+    return false;
+  }
+}
+
+export const dynamic = 'force-dynamic';
 
 export default async function LeadsPage() {
   const session = await getAuthSession();
@@ -22,13 +45,45 @@ export default async function LeadsPage() {
   const warmCount = allLeads.filter((l) => l.classification === 'WARM').length;
   const coldCount = allLeads.filter((l) => l.classification === 'COLD').length;
   const spamCount = allLeads.filter((l) => l.classification === 'SPAM').length;
+  const showTestReport = testReportAvailable();
 
   return (
     <div>
       {/* Page Header */}
-      <div className="mb-8">
-        <h2 className="text-2xl font-semibold text-[#171717] tracking-tight">Leads</h2>
-        <p className="text-sm text-[#737373] mt-1">Track and manage incoming inquiries</p>
+      <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-2xl font-semibold text-[#171717] tracking-tight">Leads</h2>
+          <p className="text-sm text-[#737373] mt-1">Track and manage incoming inquiries</p>
+        </div>
+        {showTestReport && (
+          // Static published report from packages/api/scripts/
+          // generate-matrix-report.ts. Opens in a new tab; the
+          // file is self-contained (inlined CSS + JS) so no
+          // build-time data binding is needed here.
+          <a
+            href="/reports/lead-matrix-latest.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 bg-[#171717] hover:bg-[#404040] text-white rounded-lg px-4 py-2 text-sm font-medium transition"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M3 13V3h7l3 3v7H3z" />
+              <path d="M10 3v3h3" />
+              <path d="M5 8h6M5 10h6M5 12h4" />
+            </svg>
+            View test report
+          </a>
+        )}
       </div>
 
       {/* Stats Summary */}
