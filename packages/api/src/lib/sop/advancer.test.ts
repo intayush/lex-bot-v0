@@ -282,19 +282,22 @@ describe('advanceForVisitorMessage — when step (date inference)', () => {
     expect(after).toBe(before);
   });
 
-  it('inline-chip path falls back to chip slug if inference fails (defensive)', async () => {
-    // We provided the chip slug ourselves, so even if Gemini fails we
-    // still capture the slug rather than leaving the step pending.
+  it('inline-chip path uses deterministic chip→ISO mapper without calling inferDate', async () => {
+    // Known when-step chip slugs are mapped to ISO dates by a
+    // hard-coded converter (skip-detector.ts:chipSlugToIsoDate)
+    // instead of an LLM round-trip. The inferDate stub should
+    // therefore be unused even when it would have failed.
     const sopConfig = buildSOPConfig();
     const before = await walkToWhenPending(sopConfig);
     const after = await advanceForVisitorMessage({
       state: before, sopConfig, caseTypes: CASE_TYPES,
       message: 'yesterday', capturedAt: T1,
-      inferDateImpl: ALWAYS_NULL,
+      inferDateImpl: ALWAYS_NULL, // proves we never call it
     });
     const whenStep = after.steps.find((st) => st.slug === 'when')!;
     expect(whenStep.status).toBe('complete');
-    expect(whenStep.captured_value).toBe('yesterday'); // chip slug preserved
+    // ANCHOR is 2026-05-23T...; yesterday from anchor = 2026-05-22.
+    expect(whenStep.captured_value).toBe('2026-05-22');
   });
 });
 

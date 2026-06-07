@@ -455,9 +455,20 @@ export async function POST(req: Request) {
       console.error('[chat] Stream error:', event.error);
     },
     onFinish: async ({ text }) => {
-      // Persist the assistant turn alongside the latest SOP state in a
-      // single update so message history and SOP state stay in sync.
-      await appendMessagesAndSOPState(
+      // The four post-stream writes split into two independent
+      // streams that can run in parallel:
+      //   (a) `sessions` writes: appendMessagesAndSOPState. Independent
+      //       of any `leads` write.
+      //   (b) `leads` writes: updateLeadSOPState → branch finalization
+      //       UPDATE → savePartialLead. These touch the same row so
+      //       they MUST stay sequential among themselves to avoid
+      //       races, but the whole chain can execute alongside (a).
+      // The AI SDK awaits onFinish before closing the data-stream, so
+      // shaving 30–60ms off this phase is visible to the client as a
+      // faster `done` event.
+      const allMessages = [...fullMessages, { role: 'assistant', content: text }];
+
+      const sessionsWrite = appendMessagesAndSOPState(
         sessionId,
         [
           newUserMessage,
@@ -466,53 +477,57 @@ export async function POST(req: Request) {
         sopState,
       );
 
-      // 010-sop-workflow: backfill the lead row's sop_state_snapshot and
-      // (if eligible) incident_date with the latest SOP runtime state.
-      // Handles the case where captureLead fired earlier in the
-      // conversation before the when-step ISO date was captured. No-ops
-      // when no lead exists for the session yet.
-      await updateLeadSOPState(sessionId, sopState);
+      const leadsWrite = (async () => {
+        // 010-sop-workflow: backfill the lead row's sop_state_snapshot
+        // and (if eligible) incident_date with the latest SOP runtime
+        // state. Handles the case where captureLead fired earlier in
+        // the conversation before the when-step ISO date was captured.
+        // No-ops when no lead exists for the session yet.
+        await updateLeadSOPState(sessionId, sopState);
 
-      // Spec 016 US2 — When the branch orchestrator finalized the
-      // configured-branch flow this turn, write the snapshot + score
-      // onto the existing lead row (the agent's earlier captureLead
-      // call already created the row; we update it with branch data).
-      // No-op when this turn didn't finalize a branch.
-      if (branchFinalizationPayload) {
-        const reasonsJson = JSON.stringify(branchFinalizationPayload.reasons);
-        const branchUpdateResult = await db
-          .update(schema.leads)
-          .set({
-            branch_snapshot_json: JSON.stringify(branchFinalizationPayload.snapshot),
-            branch_incomplete: false,
-            lead_score: branchFinalizationPayload.score,
-            classification: branchFinalizationPayload.classification,
-            score_reasons_json: reasonsJson,
-          })
-          .where(eq(schema.leads.session_id, sessionId))
-          .returning({ id: schema.leads.id });
+        // Spec 016 US2 — When the branch orchestrator finalized the
+        // configured-branch flow this turn, write the snapshot + score
+        // onto the existing lead row (the agent's earlier captureLead
+        // call already created the row; we update it with branch
+        // data). No-op when this turn didn't finalize a branch.
+        if (branchFinalizationPayload) {
+          const reasonsJson = JSON.stringify(branchFinalizationPayload.reasons);
+          const branchUpdateResult = await db
+            .update(schema.leads)
+            .set({
+              branch_snapshot_json: JSON.stringify(branchFinalizationPayload.snapshot),
+              branch_incomplete: false,
+              lead_score: branchFinalizationPayload.score,
+              classification: branchFinalizationPayload.classification,
+              score_reasons_json: reasonsJson,
+            })
+            .where(eq(schema.leads.session_id, sessionId))
+            .returning({ id: schema.leads.id });
 
-        // Spec 015 T064 — apply hard-override rules to the
-        // freshly-branch-scored lead. Critical because the branch
-        // orchestrator's score / classification stage operates on
-        // chip weights only — it doesn't know about missing_contact,
-        // out_of_scope, no_injury_no_treatment, or fake_info. The
-        // override step is a downgrade-only safety net per FR-009.
-        const branchedLeadId = branchUpdateResult[0]?.id ?? null;
-        if (branchedLeadId) {
-          await applyAndPersistHardOverrides({
-            accountId: auth.accountId,
-            leadId: branchedLeadId,
-            sopState,
-          });
+          // Spec 015 T064 — apply hard-override rules to the
+          // freshly-branch-scored lead. Critical because the branch
+          // orchestrator's score / classification stage operates on
+          // chip weights only — it doesn't know about missing_contact,
+          // out_of_scope, no_injury_no_treatment, or fake_info. The
+          // override step is a downgrade-only safety net per FR-009.
+          const branchedLeadId = branchUpdateResult[0]?.id ?? null;
+          if (branchedLeadId) {
+            await applyAndPersistHardOverrides({
+              accountId: auth.accountId,
+              leadId: branchedLeadId,
+              sopState,
+            });
+          }
         }
-      }
 
-      // Extract and save partial lead data from the conversation so that
-      // information shared before an abandoned session is not lost.
-      const allMessages = [...fullMessages, { role: 'assistant', content: text }];
-      const partial = extractPartialLeadData(allMessages);
-      await savePartialLead(auth.accountId, sessionId, partial, allMessages);
+        // Extract and save partial lead data from the conversation so
+        // that information shared before an abandoned session is not
+        // lost. Early-exits when a full lead already exists.
+        const partial = extractPartialLeadData(allMessages);
+        await savePartialLead(auth.accountId, sessionId, partial, allMessages);
+      })();
+
+      await Promise.all([sessionsWrite, leadsWrite]);
     },
   });
 

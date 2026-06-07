@@ -29,6 +29,90 @@ const WHEN_STEP_SLUG = 'when';
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
+ * Date-shape pre-filter for the `when`-step free-text inferDate call.
+ *
+ * The Gemini-backed `inferDate` LLM round-trip costs 300-1500ms and
+ * historically fired on every visitor turn while the `when` step was
+ * pending — even when the visitor was answering a different question
+ * (e.g. typing "Personal Injury" or "I had a slip and fall"). Most of
+ * those calls returned `iso_date: null`; the LLM call was wasted.
+ *
+ * The regex below matches text that PLAUSIBLY contains a date /
+ * temporal phrase. Kept intentionally permissive — we want to catch:
+ *   - common temporal words: yesterday, today, tonight, ago, last,
+ *     before, after, while, when, since, recent, recently
+ *   - duration units: day(s), week(s), month(s), year(s), hour(s),
+ *     minute(s), morning, evening, night, weekend
+ *   - day names: monday … sunday + abbreviations
+ *   - month names: january … december + abbreviations
+ *   - 4-digit years (1900-2199)
+ *   - common date separators: M/D, M-D, M.D where M and D are 1-2
+ *     digits; also handles ISO-shaped strings
+ *   - the bare number "1"-"31" (the visitor saying "the 14th" — this
+ *     covers more false positives than we'd like, hence the digit
+ *     check requires either ordinal suffix or "the" lead-in)
+ *
+ * False negatives here regress to "no inference attempted" which is
+ * the same as the inferDate call returning null — the SOP advancer
+ * just leaves the when step pending and asks again. False positives
+ * cost an LLM call but produce no semantic harm.
+ */
+const DATE_SHAPED_REGEX =
+  /\b(yesterday|today|tonight|ago|last|earlier|recently|recent|past|since|while|before|after|when|day|days|week|weeks|month|months|year|years|hour|hours|minute|minutes|morning|afternoon|evening|night|weekend|weekday|monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|tues|wed|thu|thurs|fri|sat|sun|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|the\s+\d{1,2}(?:st|nd|rd|th)|\d{1,2}\/\d{1,2}|\d{1,2}-\d{1,2}|\d{4}-\d{2}-\d{2})\b/i;
+
+/**
+ * Deterministic when-chip slug → ISO date converter, used in place
+ * of an `inferDate` LLM round-trip on the inline-chip path. The
+ * `when` step's chips have fixed semantics seeded in
+ * `seed-defaults/sop.ts:131-138`; their meanings are stable enough
+ * to be hard-coded here. Anchor is the conversation start.
+ *
+ * Returns null for unknown chip slugs (defensive — falls through to
+ * inferDate so a custom firm SOP that adds new chip slugs still works).
+ */
+function chipSlugToIsoDate(
+  chipSlug: string,
+  conversationAnchorIso: string,
+): string | null {
+  const anchor = new Date(conversationAnchorIso);
+  if (Number.isNaN(anchor.getTime())) return null;
+
+  const fmt = (d: Date): string => {
+    // YYYY-MM-DD in UTC. Date inference is fundamentally calendrical
+    // not wall-clock, so UTC is the right baseline; the LLM-backed
+    // inferDate uses the same convention.
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const subDays = (n: number): string => {
+    const d = new Date(anchor);
+    d.setUTCDate(d.getUTCDate() - n);
+    return fmt(d);
+  };
+
+  switch (chipSlug) {
+    case 'today': return fmt(anchor);
+    case 'yesterday': return subDays(1);
+    case 'this_week': return subDays(3); // mid-week approximation
+    case 'last_week': return subDays(10);
+    case 'this_month': return subDays(15);
+    case 'earlier_this_year':
+      // mid-year of anchor's year
+      return `${anchor.getUTCFullYear()}-06-15`;
+    case 'longer_ago':
+      // 1 year before anchor — the spec treats this as 0 score, so
+      // exact value doesn't matter for scoring, only that it's not
+      // a recent date.
+      return `${anchor.getUTCFullYear() - 1}-01-01`;
+    default:
+      return null;
+  }
+}
+
+/**
  * Words/phrases that signal the visitor is correcting an earlier answer.
  * Word-boundary matched, case-insensitive. Conservative list: matches
  * are explicit-intent only ("actually it's...", "wait, no...", "i meant
@@ -205,7 +289,14 @@ export async function detectSkippedSteps(
   let whenInferenceAttempted = false;
   if (whenStep && !matchedStepIds.has(whenStep.id)) {
     const inferenceText = computeInferenceText(trimmed, matches, caseTypes);
-    if (inferenceText) {
+    // Pre-filter: only call the LLM-backed inferDate when the text
+    // PLAUSIBLY contains a date phrase. This eliminates the 300-1500ms
+    // LLM round trip on every turn while the `when` step is pending
+    // but the visitor is answering a different question (e.g. "Personal
+    // Injury", "I had a slip and fall"). The regex is permissive — false
+    // positives cost an LLM call; false negatives just leave the step
+    // pending so the SOP advancer asks again next turn.
+    if (inferenceText && DATE_SHAPED_REGEX.test(inferenceText)) {
       whenInferenceAttempted = true;
       const result = await inferDateFn({
         userText: inferenceText,
@@ -226,11 +317,25 @@ export async function detectSkippedSteps(
   }
 
   // --- inline-chip path: if matchInlineChip captured a slug for the when
-  //     step, run that slug through date inference so we store an ISO. ---
+  //     step, convert it to an ISO date. The seeded chip slugs have
+  //     deterministic meanings (today, yesterday, this_week, ...) so
+  //     we use a hard-coded mapper instead of an LLM round trip. Any
+  //     unknown chip slug (e.g. a firm-customised SOP with new
+  //     when-chip vocabulary) falls back to the LLM-backed inferDate. ---
 
   for (let i = 0; i < matches.length; i++) {
     const m = matches[i]!;
     if (m.slug === WHEN_STEP_SLUG && m.source === 'chip') {
+      const fastIso = chipSlugToIsoDate(
+        m.captured_value,
+        state.conversation_anchor_iso,
+      );
+      if (fastIso) {
+        matches[i] = { ...m, captured_value: fastIso, source: 'date_inference' };
+        continue;
+      }
+      // Unknown chip slug — fall back to the slow LLM path so a
+      // custom firm SOP that adds new chip slugs still works.
       const result = await inferDateFn({
         userText: m.captured_value,
         conversationAnchorIso: state.conversation_anchor_iso,

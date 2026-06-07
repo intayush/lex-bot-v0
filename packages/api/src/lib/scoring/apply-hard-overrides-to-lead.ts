@@ -190,6 +190,15 @@ export interface ApplyAndPersistHardOverridesArgs {
   accountId: string;
   leadId: string;
   sopState: SOPState | null;
+  /**
+   * Optional: a pre-loaded leads row (e.g. from the immediately-prior
+   * SELECT inside captureLead / updateLeadSOPState). When supplied,
+   * this saves one Neon HTTP round trip per finalize. The caller
+   * MUST guarantee that the passed row IS the row identified by
+   * `leadId` and is current (no other writes have happened since
+   * the SELECT).
+   */
+  preloadedLead?: Lead;
 }
 
 export interface ApplyAndPersistHardOverridesResult {
@@ -222,30 +231,36 @@ export async function applyAndPersistHardOverrides({
   accountId,
   leadId,
   sopState,
+  preloadedLead,
 }: ApplyAndPersistHardOverridesArgs): Promise<ApplyAndPersistHardOverridesResult> {
-  // Fetch the lead row in its just-persisted state.
-  const leadRows = await db
-    .select()
-    .from(schema.leads)
-    .where(eq(schema.leads.id, leadId))
-    .limit(1);
-  if (leadRows.length === 0) {
-    return { firedRules: [], finalClassification: 'COLD' };
+  // If the caller already loaded the row in the same transaction-ish
+  // window, use it directly. Otherwise fetch.
+  let leadRow: Lead;
+  if (preloadedLead) {
+    leadRow = preloadedLead;
+  } else {
+    const leadRows = await db
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.id, leadId))
+      .limit(1);
+    if (leadRows.length === 0) {
+      return { firedRules: [], finalClassification: 'COLD' };
+    }
+    leadRow = leadRows[0]! as unknown as Lead;
   }
-  const leadRow = leadRows[0]!;
 
-  // Resolve toggles + caseType.
+  // Resolve toggles + caseType in parallel — independent reads, two
+  // separate Neon HTTP round trips that don't need to be sequential.
   const caseTypeSlug = leadRow.case_type
     ?? sopState?.steps.find((s) => s.slug === 'case_type')?.captured_value
     ?? null;
   const subTypeSlug =
     sopState?.steps.find((s) => s.slug === 'sub_type')?.captured_value ?? null;
-  const enabled = await resolveEnabledToggles(
-    accountId,
-    caseTypeSlug,
-    subTypeSlug,
-  );
-  const caseType = await fetchCapturedCaseType(accountId, caseTypeSlug);
+  const [enabled, caseType] = await Promise.all([
+    resolveEnabledToggles(accountId, caseTypeSlug, subTypeSlug),
+    fetchCapturedCaseType(accountId, caseTypeSlug),
+  ]);
 
   // The combinator expects a Lead-shaped object. The `leads` row from
   // db has a slightly broader shape (DB columns map 1:1 to the Lead

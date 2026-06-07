@@ -5,6 +5,7 @@ import { leads, notifications, sopSteps, sopConfigurations, subTypes, caseTypes 
 import type {
   Chip,
   ContactFormPayload,
+  Lead,
   LeadClassification,
   ScoringConfig,
   SOPState,
@@ -678,10 +679,28 @@ export async function updateLeadSOPState(
 
   // Spec 015 T064 — apply hard-override rules AFTER the row is
   // persisted. Identical wiring to captureLead's two paths above.
+  // Pass the post-update row in memory so the helper doesn't have
+  // to issue another SELECT — saves one Neon round trip.
+  const postUpdateLead: Lead = {
+    ...existingRow,
+    sop_state_snapshot: JSON.stringify(sopState),
+    incident_date: newIncidentDate,
+    name: newName,
+    contact_email: newEmail,
+    contact_phone: newPhone,
+    classification: finalClassification,
+    lead_score: scoringFields.lead_score,
+    score_reasons_json: scoringFields.score_reasons_json,
+    request_type: scoringFields.request_type,
+    geographic_qualification: scoringFields.geographic_qualification,
+    geographic_qualification_details_json:
+      scoringFields.geographic_qualification_details_json,
+  } as unknown as Lead;
   const overrideOutcome = await applyAndPersistHardOverrides({
     accountId: existingRow.account_id,
     leadId: existingRow.id,
     sopState,
+    preloadedLead: postUpdateLead,
   });
   const postOverrideClassification = (overrideOutcome.finalClassification as LeadClassification);
 

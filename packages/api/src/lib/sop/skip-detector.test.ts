@@ -274,6 +274,12 @@ describe('detectSkippedSteps — multi-step matches (US2 core)', () => {
     const matches = await detectSkippedSteps({
       message: 'I was in a car accident last week',
       state, sopConfig, caseTypes: CASE_TYPES,
+      // The stub still gets passed through for the free-text path,
+      // but the message also matches the `last_week` inline chip
+      // exactly, so the inline-chip path engages and uses the
+      // deterministic chip→ISO mapper (no LLM call). The mapper
+      // resolves `last_week` to anchor minus 10 days =
+      // ANCHOR(2026-05-23) - 10 = 2026-05-13.
       inferDateImpl: async () => ({ iso_date: '2026-05-16', confidence: 0.9 }),
     });
     const slugs = matches.map((m) => m.slug).sort();
@@ -282,7 +288,7 @@ describe('detectSkippedSteps — multi-step matches (US2 core)', () => {
     expect(slugs).toContain('when');
     expect(matches.find((m) => m.slug === 'case_type')!.captured_value).toBe('personal_injury');
     expect(matches.find((m) => m.slug === 'sub_type')!.captured_value).toBe('car_accident');
-    expect(matches.find((m) => m.slug === 'when')!.captured_value).toBe('2026-05-16');
+    expect(matches.find((m) => m.slug === 'when')!.captured_value).toBe('2026-05-13');
   });
 
   it('does NOT re-capture already-complete steps', async () => {
