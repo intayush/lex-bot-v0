@@ -63,10 +63,23 @@ export interface ScoreLeadPartialResult extends ScoreBranchResult {
 export function scoreBranch(args: ScoreBranchArgs): ScoreBranchResult {
   const { branchVersion, capturedChips, requestType, contactBonus = 0 } = args;
 
-  // Build a chip lookup keyed by slug across every question.
-  const chipBySlug = new Map<string, BranchChip>();
+  // Build a chip lookup keyed by (question_id, slug). Chip slugs are
+  // unique within a question (validated by branchQuestionSchema in
+  // packages/shared/src/schemas/branch.ts) but the same slug can —
+  // and does — appear across multiple questions in the same branch
+  // (e.g. `unknown`, `none`, `i_dont_know`). The previous flat
+  // `Map<slug, BranchChip>` keyed only by slug silently overwrote
+  // collisions, so a captured chip's recorded weight was the LAST
+  // occurrence of that slug across the whole branch — not the chip
+  // from the question that captured it. With branches having
+  // 13 weight-differing collisions across the seeded set, this
+  // miscalculated lead_score for a non-trivial fraction of real
+  // leads.
+  const chipByQuestionAndSlug = new Map<string, BranchChip>();
   for (const q of branchVersion.questions) {
-    for (const chip of q.chips) chipBySlug.set(chip.slug, chip);
+    for (const chip of q.chips) {
+      chipByQuestionAndSlug.set(`${q.id}:${chip.slug}`, chip);
+    }
   }
 
   // Sum weights for every selected chip across every captured question.
@@ -74,7 +87,7 @@ export function scoreBranch(args: ScoreBranchArgs): ScoreBranchResult {
   const reasonChips: BranchChip[] = [];
   for (const captured of capturedChips) {
     for (const slug of captured.chip_slugs) {
-      const chip = chipBySlug.get(slug);
+      const chip = chipByQuestionAndSlug.get(`${captured.question_id}:${slug}`);
       if (!chip) continue;
       rawScore += chip.score_weight;
       if (Math.abs(chip.score_weight) >= REASONS_INCLUSION_THRESHOLD) {

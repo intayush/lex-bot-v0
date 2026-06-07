@@ -238,3 +238,116 @@ describe('scoreLeadPartial — partial-branch wrapper', () => {
     expect(partial.branch_incomplete).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// scoreBranch — slug-collision regression
+//
+// Real seeded branches reuse slugs across questions (e.g. `unknown`,
+// `none`, `i_dont_know`). The previous flat slug-keyed lookup
+// silently overwrote collisions, picking up the LAST occurrence's
+// weight regardless of which question captured the chip. Audit
+// against DEFAULT_BRANCH_SEEDS counted 13 weight-differing collisions
+// across the 15 seeded branches, so this affected real leads.
+//
+// The fix keys the chip lookup by (question_id, slug). This test
+// pins that contract.
+// ---------------------------------------------------------------------------
+
+describe('scoreBranch — duplicate slug across questions', () => {
+  function versionWithDuplicateSlug(): BranchVersion {
+    return {
+      id: 'bv_dup',
+      branch_id: 'br_dup',
+      version_number: 1,
+      is_published: true,
+      questions: [
+        {
+          id: 'q_a',
+          position: 0,
+          text: 'Q A',
+          preface: null,
+          chips: [
+            // Same slug `unknown`, different weight from q_b's `unknown`.
+            { slug: 'unknown', label: 'Unknown', score_weight: 25 },
+            { slug: 'a_other', label: 'Other', score_weight: 5 },
+          ],
+          free_text_allowed: false,
+          multi_select: false,
+        },
+        {
+          id: 'q_b',
+          position: 1,
+          text: 'Q B',
+          preface: null,
+          chips: [
+            { slug: 'unknown', label: 'Unknown', score_weight: 0 },
+            { slug: 'b_other', label: 'Other', score_weight: 5 },
+          ],
+          free_text_allowed: false,
+          multi_select: false,
+        },
+      ],
+      classification_thresholds: {
+        self: { hot: [76, 100], warm: [51, 75], cold: [26, 50], spam: [0, 25] },
+        family_friend: { hot: [76, 100], warm: [26, 75], spam: [0, 25] },
+      },
+      hard_override_toggles: {
+        missing_contact: true,
+        out_of_scope: true,
+        no_injury_no_treatment: true,
+        fake_info: true,
+      },
+      published_at: 0,
+      created_at: 0,
+      created_by_user_id: 'sys',
+    };
+  }
+
+  it('uses the chip from the captured question, not the LAST chip with that slug', () => {
+    // q_a captured `unknown` — that chip carries weight 25 in q_a.
+    // The pre-fix scorer's flat Map would resolve `unknown` to q_b's
+    // chip (weight 0) because q_b is registered later in iteration
+    // order. The fixed scorer keys by (question_id, slug) and
+    // returns 25 as expected.
+    const captured: CapturedChip[] = [
+      { question_id: 'q_a', chip_slugs: ['unknown'] },
+    ];
+    const result = scoreBranch({
+      branchVersion: versionWithDuplicateSlug(),
+      capturedChips: captured,
+      requestType: 'SELF',
+    });
+    expect(result.raw_score).toBe(25);
+    expect(result.score).toBe(25);
+  });
+
+  it('captures the q_b version of the slug independently', () => {
+    const captured: CapturedChip[] = [
+      { question_id: 'q_b', chip_slugs: ['unknown'] },
+    ];
+    const result = scoreBranch({
+      branchVersion: versionWithDuplicateSlug(),
+      capturedChips: captured,
+      requestType: 'SELF',
+    });
+    // q_b's `unknown` is 0; total raw score is 0.
+    expect(result.raw_score).toBe(0);
+    expect(result.score).toBe(0);
+  });
+
+  it('combines collisions from BOTH questions correctly', () => {
+    // Both `unknown` chips selected — q_a contributes 25, q_b
+    // contributes 0. Pre-fix: 0+0=0 (both lookups returned q_b's
+    // chip). Post-fix: 25+0=25.
+    const captured: CapturedChip[] = [
+      { question_id: 'q_a', chip_slugs: ['unknown'] },
+      { question_id: 'q_b', chip_slugs: ['unknown'] },
+    ];
+    const result = scoreBranch({
+      branchVersion: versionWithDuplicateSlug(),
+      capturedChips: captured,
+      requestType: 'SELF',
+    });
+    expect(result.raw_score).toBe(25);
+  });
+});
