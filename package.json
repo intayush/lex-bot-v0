@@ -7,6 +7,9 @@
     "test": "turbo test",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
+    "smoke": "pnpm --filter @legal-chatbot/api e2e",
+    "smoke:walk": "pnpm --filter @legal-chatbot/api e2e:walk",
+    "regression": "pnpm test && pnpm --filter @legal-chatbot/api e2e",
     "db:migrate": "pnpm --filter @legal-chatbot/api db:migrate",
     "db:seed": "pnpm --filter @legal-chatbot/api db:seed"
   },

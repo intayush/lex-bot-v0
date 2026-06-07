@@ -19,5 +19,9 @@ packages/*/playwright-report/
 
 # Design assets / mockups (kept on disk but not version-controlled)
 bot-design-*.png
+chatbot-redesign-*.png
 *.psd
 *.fig
+
+# macOS Finder metadata
+.DS_Store

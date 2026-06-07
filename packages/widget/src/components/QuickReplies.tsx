@@ -35,22 +35,22 @@ export function QuickReplies({ onSelect, options }: QuickRepliesProps) {
           onClick={() => onSelect(text)}
           style={{
             padding: '8px 14px',
-            borderRadius: '16px',
-            border: '1px solid var(--lc-primary-color, #1a365d)',
+            borderRadius: 'var(--lc-message-radius, 16px)',
+            border: '1px solid var(--lc-primary-color, #4338ca)',
             backgroundColor: 'transparent',
-            color: 'var(--lc-primary-color, #1a365d)',
+            color: 'var(--lc-primary-color, #4338ca)',
             fontSize: '13px',
             cursor: 'pointer',
             transition: 'background-color 0.15s, color 0.15s',
             whiteSpace: 'nowrap',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--lc-primary-color, #1a365d)';
+            e.currentTarget.style.backgroundColor = 'var(--lc-primary-color, #4338ca)';
             e.currentTarget.style.color = 'var(--lc-primary-text, #ffffff)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.color = 'var(--lc-primary-color, #1a365d)';
+            e.currentTarget.style.color = 'var(--lc-primary-color, #4338ca)';
           }}
         >
           {text}

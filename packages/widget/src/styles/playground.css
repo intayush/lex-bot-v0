@@ -1,0 +1,269 @@
+/*
+ * Spec 017 — LexBot Playground page styles.
+ *
+ * The page reuses the chatbot's design tokens (defined on `.lc-panel`)
+ * by re-declaring them at the page root so the page-and-panel feel
+ * coherent. Customer embeds running their own site won't see this
+ * file — only the playground demo does.
+ */
+
+:root,
+.lc-pg-root {
+  --lc-primary-color: #4338ca;
+  --lc-primary-text: #ffffff;
+  --lc-background: #fcfaf5;
+  --lc-text-primary: #1f1b16;
+  --lc-text-muted: #65604f;
+  --lc-message-bg-assistant: #f5f1e8;
+  --lc-border-subtle: rgba(31, 27, 22, 0.06);
+  --lc-shadow: 0 8px 40px rgba(20, 16, 8, 0.16);
+  --lc-message-radius: 16px;
+  --lc-panel-radius: 20px;
+  --lc-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Inter, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--lc-background);
+  color: var(--lc-text-primary);
+  font-family: var(--lc-font-family);
+  font-size: 16px;
+  line-height: 1.6;
+  letter-spacing: -0.005em;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Top bar
+ * ───────────────────────────────────────────────────────────────── */
+
+.lc-pg-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 32px;
+  background-color: rgba(252, 250, 245, 0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid var(--lc-border-subtle);
+}
+
+.lc-pg-wordmark {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--lc-primary-color);
+  letter-spacing: -0.01em;
+}
+
+.lc-pg-brand {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.lc-pg-brand-suffix {
+  font-weight: 500;
+  color: var(--lc-text-muted);
+}
+
+.lc-pg-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.lc-pg-pill-label {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background-color: var(--lc-message-bg-assistant);
+  color: var(--lc-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.lc-pg-pill-sublabel {
+  font-size: 11px;
+  color: var(--lc-text-muted);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Hero
+ * ───────────────────────────────────────────────────────────────── */
+
+.lc-pg-hero {
+  padding: 88px 32px 64px;
+  background: linear-gradient(180deg, #fcfaf5 0%, #f5f1e8 100%);
+  text-align: center;
+}
+
+.lc-pg-hero-inner {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.lc-pg-hero-title {
+  margin: 0 0 16px;
+  font-size: clamp(28px, 5vw, 44px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--lc-text-primary);
+}
+
+.lc-pg-hero-sub {
+  margin: 0;
+  font-size: clamp(16px, 2.4vw, 18px);
+  color: var(--lc-text-muted);
+  line-height: 1.6;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Content / banner / practice areas
+ * ───────────────────────────────────────────────────────────────── */
+
+.lc-pg-content {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 48px 32px;
+}
+
+.lc-pg-banner {
+  background-color: var(--lc-message-bg-assistant);
+  border: 1px solid var(--lc-border-subtle);
+  border-radius: var(--lc-message-radius);
+  padding: 12px 18px;
+  font-size: 14px;
+  color: var(--lc-text-muted);
+  margin-bottom: 32px;
+}
+
+.lc-pg-section-title {
+  margin: 0 0 12px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--lc-text-primary);
+}
+
+.lc-pg-paragraph {
+  margin: 0 0 24px;
+  color: var(--lc-text-muted);
+  line-height: 1.7;
+}
+
+.lc-pg-areas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  margin-bottom: 56px;
+}
+
+.lc-pg-area-card {
+  background-color: #fff;
+  border: 1px solid var(--lc-border-subtle);
+  border-radius: var(--lc-message-radius);
+  padding: 22px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.lc-pg-area-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(20, 16, 8, 0.08);
+}
+
+.lc-pg-area-card h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  color: var(--lc-primary-color);
+  letter-spacing: -0.005em;
+}
+
+.lc-pg-area-card p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--lc-text-muted);
+  line-height: 1.6;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * CTA
+ * ───────────────────────────────────────────────────────────────── */
+
+.lc-pg-cta {
+  background-color: var(--lc-message-bg-assistant);
+  border-radius: var(--lc-panel-radius);
+  padding: 40px;
+  text-align: center;
+}
+
+.lc-pg-cta-title {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--lc-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.lc-pg-cta-text {
+  margin: 0;
+  color: var(--lc-text-muted);
+}
+
+.lc-pg-cta-phone {
+  margin: 16px 0 4px;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--lc-primary-color);
+}
+
+.lc-pg-cta-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--lc-text-muted);
+  font-style: italic;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Footer
+ * ───────────────────────────────────────────────────────────────── */
+
+.lc-pg-footer {
+  padding: 32px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--lc-text-muted);
+  border-top: 1px solid var(--lc-border-subtle);
+}
+
+/* Typing indicator dots animation (reused from spec 010 styles). */
+@keyframes typing {
+  0%,
+  60% {
+    opacity: 0.3;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+.lc-typing span {
+  animation: typing 1.4s infinite;
+}

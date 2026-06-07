@@ -1,0 +1,296 @@
+/*
+ * Spec 017 — Chatbot panel design tokens.
+ *
+ * Public tokens (override-safe; embedding firms may set these):
+ *   --lc-primary-color, --lc-primary-text, --lc-background,
+ *   --lc-border-radius, --lc-font-family
+ *
+ * Internal tokens (may change between minor versions):
+ *   --lc-surface, --lc-surface-fallback, --lc-surface-blur,
+ *   --lc-shadow, --lc-message-radius, --lc-panel-radius,
+ *   --lc-text-primary, --lc-text-muted, --lc-message-bg-assistant,
+ *   --lc-border-subtle, --lc-panel-anim-distance,
+ *   --lc-panel-anim-duration, --lc-panel-anim-easing
+ *
+ * See specs/017-chatbot-redesign/contracts/design-tokens.md for the
+ * full contract.
+ */
+
+.lc-panel {
+  /* Public — preserve names; embedding firms override these. */
+  --lc-primary-color: #4338ca;
+  --lc-primary-text: #ffffff;
+  --lc-background: #fcfaf5;
+  --lc-border-radius: 20px;
+  --lc-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Inter, sans-serif;
+
+  /* Internal — glass surface. */
+  --lc-surface: rgba(252, 250, 245, 0.72);
+  --lc-surface-fallback: rgba(252, 250, 245, 0.96);
+  --lc-surface-blur: blur(20px) saturate(180%);
+  --lc-shadow: 0 8px 40px rgba(20, 16, 8, 0.16);
+
+  /* Internal — shape. */
+  --lc-message-radius: 16px;
+  --lc-panel-radius: 20px;
+
+  /* Internal — text. */
+  --lc-text-primary: #1f1b16;
+  --lc-text-muted: #65604f;
+
+  /* Internal — message variants. */
+  --lc-message-bg-assistant: #f5f1e8;
+  --lc-border-subtle: rgba(31, 27, 22, 0.06);
+
+  /* Internal — animation (mobile slide-up). */
+  --lc-panel-anim-distance: 100%;
+  --lc-panel-anim-duration: 320ms;
+  --lc-panel-anim-easing: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-panel {
+    --lc-panel-anim-duration: 0ms;
+  }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .lc-panel {
+    --lc-surface: var(--lc-surface-fallback);
+    --lc-surface-blur: none;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Panel structural layout (T011)
+ *
+ * The panel is a CSS grid with four named rows so children can be
+ * placed in document order (header → content → progress → composer)
+ * without intermediate wrapper divs. The conversation track (1fr) is
+ * the only flexible row; everything else sizes to content.
+ *
+ * Each breakpoint is keyed off `data-breakpoint` set by PanelShell
+ * from the usePanelLayout hook. Animation keyframes land in T015.
+ * ───────────────────────────────────────────────────────────────── */
+
+.lc-panel {
+  position: fixed;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  grid-template-areas:
+    'header'
+    'content'
+    'progress'
+    'composer';
+  background-color: var(--lc-surface);
+  -webkit-backdrop-filter: var(--lc-surface-blur);
+  backdrop-filter: var(--lc-surface-blur);
+  color: var(--lc-text-primary);
+  font-family: var(--lc-font-family);
+  overflow: hidden;
+  z-index: 9999;
+}
+
+.lc-panel:focus {
+  outline: none;
+}
+
+/* Mobile: full-viewport takeover, flush edges, no rounding. */
+.lc-panel[data-breakpoint='mobile'] {
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-height: 100vh; /* fallback for browsers without dvh */
+  border-radius: 0;
+  z-index: 2147483646;
+}
+
+/* Tablet: right-anchored sheet, 420px wide, full height, inner-edge rounding. */
+.lc-panel[data-breakpoint='tablet'] {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(420px, 100vw - 32px);
+  height: 100dvh;
+  max-height: 100vh;
+  border-radius: var(--lc-panel-radius) 0 0 var(--lc-panel-radius);
+  box-shadow: var(--lc-shadow);
+}
+
+/* Desktop: floating bottom-right, 480x760, 24px edge padding. */
+.lc-panel[data-breakpoint='desktop'] {
+  right: 24px;
+  bottom: 24px;
+  width: 480px;
+  height: 760px;
+  border-radius: var(--lc-panel-radius);
+  box-shadow: var(--lc-shadow);
+}
+
+/* Desktop on a short viewport: clamp height to fit available space. */
+.lc-panel[data-breakpoint='desktop-clamped'] {
+  right: 24px;
+  bottom: 24px;
+  width: 480px;
+  height: calc(100vh - 48px);
+  border-radius: var(--lc-panel-radius);
+  box-shadow: var(--lc-shadow);
+}
+
+/* Children grid placement. The PanelShell delegates ordering to
+ * children but most parents will follow header/content/progress/
+ * composer; we pin them to the named tracks via :nth-child for the
+ * common case. (Child components can opt out by setting their own
+ * grid-area inline.) */
+.lc-panel > :nth-child(1) {
+  grid-area: header;
+}
+
+.lc-panel > :nth-child(2) {
+  grid-area: content;
+  overflow: auto;
+  min-height: 0;
+}
+
+.lc-panel > :nth-child(3) {
+  grid-area: progress;
+}
+
+.lc-panel > :nth-child(4) {
+  grid-area: composer;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Slide animation (T015) — mobile only.
+ *
+ * Mobile mounts at translateY(100%) and slides up to 0; close runs
+ * the inverse keyframe. On tablet/desktop --lc-panel-anim-distance
+ * is 0 so the keyframe is a no-op (and no animation property is
+ * applied; we only attach the animation on mobile).
+ *
+ * Reduced-motion is honored at two layers:
+ *   1) --lc-panel-anim-duration goes to 0ms via @media in the token
+ *      block above, so the keyframe runs in 0ms
+ *   2) PanelShell's useReducedMotion short-circuits the JS phase
+ *      timer so onClosed fires immediately on close
+ * ───────────────────────────────────────────────────────────────── */
+
+@keyframes lc-slide-up {
+  from {
+    transform: translateY(var(--lc-panel-anim-distance));
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes lc-slide-down {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(var(--lc-panel-anim-distance));
+  }
+}
+
+.lc-panel[data-breakpoint='mobile'][data-phase='entering'] {
+  animation: lc-slide-up var(--lc-panel-anim-duration)
+    var(--lc-panel-anim-easing);
+}
+
+.lc-panel[data-breakpoint='mobile'][data-phase='exiting'] {
+  animation: lc-slide-down var(--lc-panel-anim-duration)
+    var(--lc-panel-anim-easing) forwards;
+}
+
+/* Tablet / desktop: instant appearance — no keyframe attached. The
+ * --lc-panel-anim-distance is 0 there too so even if a keyframe ran
+ * it would be visually nil. */
+.lc-panel[data-breakpoint='tablet'],
+.lc-panel[data-breakpoint='desktop'],
+.lc-panel[data-breakpoint='desktop-clamped'] {
+  --lc-panel-anim-distance: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Mobile backdrop scrim (T016)
+ *
+ * Sits one z-index below the panel (2147483645) and dims the host
+ * page so the panel reads as the focused surface even though host
+ * content is technically still under it. Tapping the scrim triggers
+ * onCloseRequest. Only present on the 'mobile' breakpoint.
+ * ───────────────────────────────────────────────────────────────── */
+
+.lc-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 16, 8, 0.32);
+  z-index: 2147483645;
+  animation: lc-fade-in var(--lc-panel-anim-duration) ease-out;
+}
+
+.lc-backdrop[data-phase='exiting'] {
+  animation: lc-fade-out var(--lc-panel-anim-duration) ease-out forwards;
+}
+
+@keyframes lc-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes lc-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Message cards (T031)
+ *
+ * Inline styles in MessageList.tsx provide the layout-critical values
+ * (alignment, padding, border-radius, max-width). These class rules
+ * supplement them with the visual treatment that customer overrides
+ * can pick up via the public design tokens (e.g. overriding
+ * --lc-primary-color cascades into the user-variant background).
+ * ───────────────────────────────────────────────────────────────── */
+
+.lc-message {
+  /* Inline styles in MessageList.tsx are authoritative for layout;
+   * this class rule is here so themes targeting `.lc-message` and
+   * `.lc-message[data-variant=...]` can override surface treatments. */
+}
+
+.lc-message[data-variant='assistant'] {
+  background-color: var(--lc-message-bg-assistant);
+  color: var(--lc-text-primary);
+  border: 1px solid var(--lc-border-subtle);
+}
+
+.lc-message[data-variant='user'] {
+  background-color: var(--lc-primary-color);
+  color: var(--lc-primary-text);
+  border: none;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Composer (T032)
+ * ───────────────────────────────────────────────────────────────── */
+
+.lc-composer {
+  background-color: var(--lc-background);
+  /* Inline composer styles are authoritative for layout. */
+}
+
+/* Mobile: ensure the composer sits above safe-area insets (iOS). */
+.lc-panel[data-breakpoint='mobile'] .lc-composer {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+

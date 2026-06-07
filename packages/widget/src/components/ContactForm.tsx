@@ -45,18 +45,19 @@ export function ContactForm({ onSubmit }: ContactFormProps): ReactElement {
   const inputStyle: React.CSSProperties = {
     width: '100%',
     padding: '10px 12px',
-    borderRadius: '8px',
-    border: '1px solid #cbd5e0',
+    borderRadius: '12px',
+    border: '1px solid var(--lc-border-subtle, rgba(31,27,22,0.06))',
     fontSize: '14px',
     fontFamily: 'inherit',
     outline: 'none',
-    backgroundColor: '#ffffff',
+    backgroundColor: 'var(--lc-background, #fcfaf5)',
+    color: 'var(--lc-text-primary, #1f1b16)',
   };
   const labelStyle: React.CSSProperties = {
     display: 'block',
     fontSize: '12px',
     fontWeight: 500,
-    color: '#4a5568',
+    color: 'var(--lc-text-muted, #65604f)',
     marginBottom: '4px',
   };
 
@@ -65,14 +66,15 @@ export function ContactForm({ onSubmit }: ContactFormProps): ReactElement {
       onSubmit={handleSubmit}
       aria-label="Contact information"
       style={{
-        backgroundColor: 'var(--lc-bubble-bot, #f0f4f8)',
+        backgroundColor: 'var(--lc-message-bg-assistant, #f5f1e8)',
         padding: '14px',
-        borderRadius: '12px 12px 12px 4px',
+        borderRadius: 'var(--lc-message-radius, 16px)',
         marginTop: '8px',
         display: 'flex',
         flexDirection: 'column',
         gap: '10px',
         maxWidth: '85%',
+        border: '1px solid var(--lc-border-subtle, rgba(31,27,22,0.06))',
       }}
     >
       <div>
@@ -112,7 +114,7 @@ export function ContactForm({ onSubmit }: ContactFormProps): ReactElement {
           style={inputStyle}
         />
       </div>
-      <div style={{ fontSize: '11px', color: '#718096', lineHeight: 1.4 }}>
+      <div style={{ fontSize: '11px', color: 'var(--lc-text-muted, #65604f)', lineHeight: 1.4 }}>
         Provide at least one of email or phone so we can follow up.
       </div>
       <button
@@ -120,11 +122,11 @@ export function ContactForm({ onSubmit }: ContactFormProps): ReactElement {
         disabled={!canSubmit}
         style={{
           padding: '10px 16px',
-          borderRadius: '8px',
+          borderRadius: '12px',
           border: 'none',
           backgroundColor: canSubmit
-            ? 'var(--lc-primary-color, #1a365d)'
-            : '#cbd5e0',
+            ? 'var(--lc-primary-color, #4338ca)'
+            : 'rgba(31,27,22,0.12)',
           color: 'var(--lc-primary-text, #ffffff)',
           fontSize: '14px',
           fontWeight: 500,

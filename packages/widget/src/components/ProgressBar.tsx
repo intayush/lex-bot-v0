@@ -37,9 +37,9 @@ import type { ReactElement } from 'react';
  *     verbose aria-label. Visible label is aria-hidden=true (decorative).
  *
  * Theming hooks (CSS custom properties, with defaults):
- *   --lc-progress-color: fill color (default #22c55e — WCAG AA on white)
- *   --lc-progress-bg: track background (default rgba(0,0,0,0.06))
- *   --lc-progress-label-color: label text color (default #171717)
+ *   --lc-progress-color: fill color (default #4338ca — warm indigo, spec 017)
+ *   --lc-progress-bg: track background (default rgba(31,27,22,0.06))
+ *   --lc-progress-label-color: label text color (default #1f1b16 — warm charcoal)
  */
 
 export interface ProgressBarProps {
@@ -95,7 +95,7 @@ export function ProgressBar({ current, total, reducedMotion }: ProgressBarProps)
           left: 0,
           width: '100%',
           height: `${BAR_HEIGHT}px`,
-          backgroundColor: 'var(--lc-progress-bg, rgba(0, 0, 0, 0.06))',
+          backgroundColor: 'var(--lc-progress-bg, rgba(31, 27, 22, 0.06))',
           overflow: 'hidden',
         }}
       >
@@ -107,7 +107,7 @@ export function ProgressBar({ current, total, reducedMotion }: ProgressBarProps)
             left: 0,
             width: '100%',
             height: '100%',
-            backgroundColor: 'var(--lc-progress-color, #22c55e)',
+            backgroundColor: 'var(--lc-progress-color, #4338ca)',
             transformOrigin: 'left',
             transform: `scaleX(${ratio})`,
             transition: reducedMotion ? 'none' : 'transform 300ms ease-out',
@@ -148,7 +148,7 @@ export function ProgressBar({ current, total, reducedMotion }: ProgressBarProps)
           top: `${LABEL_TOP}px`,
           right: '8px',
           fontSize: '11px',
-          color: 'var(--lc-progress-label-color, #171717)',
+          color: 'var(--lc-progress-label-color, #1f1b16)',
           fontFamily: 'inherit',
           fontWeight: 500,
           letterSpacing: '0.02em',

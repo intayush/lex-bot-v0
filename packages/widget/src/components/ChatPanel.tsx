@@ -2,8 +2,10 @@ import { useChat } from '@ai-sdk/react';
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { QuickReplies } from './QuickReplies';
 import { Chips } from './Chips';
-import { ContactForm } from './ContactForm';
 import { ProgressBar } from './ProgressBar';
+import { PanelShell } from './PanelShell';
+import { MessageList } from './MessageList';
+import { Composer } from './Composer';
 import { useSOPState } from '../hooks/useSOPState';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import { usePreflightPhrase } from '../hooks/usePreflightPhrase';
@@ -16,30 +18,10 @@ import {
 interface ChatPanelProps {
   apiKey: string;
   apiUrl: string;
-  onClose: () => void;
-}
-
-type Breakpoint = 'mobile' | 'tablet' | 'desktop';
-
-function useBreakpoint(): Breakpoint {
-  const [bp, setBp] = useState<Breakpoint>(() => {
-    if (typeof window === 'undefined') return 'desktop';
-    if (window.innerWidth < 768) return 'mobile';
-    if (window.innerWidth < 1024) return 'tablet';
-    return 'desktop';
-  });
-
-  useEffect(() => {
-    function handle() {
-      if (window.innerWidth < 768) setBp('mobile');
-      else if (window.innerWidth < 1024) setBp('tablet');
-      else setBp('desktop');
-    }
-    window.addEventListener('resize', handle);
-    return () => window.removeEventListener('resize', handle);
-  }, []);
-
-  return bp;
+  /** Called when the user requests close (header X, Escape, scrim). */
+  onCloseRequest: () => void;
+  /** Called after the close animation completes (parent unmounts). */
+  onClosed: () => void;
 }
 
 function getSessionId(): string | undefined {
@@ -64,9 +46,24 @@ interface WidgetConfig {
   case_types?: WidgetCaseType[];
 }
 
-export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const breakpoint = useBreakpoint();
+/**
+ * Spec 017 — `ChatPanel` is the chatbot orchestrator. It owns:
+ *   - the AI SDK `useChat` (messages, streaming, send)
+ *   - `useSOPState` + `usePreflightPhrase` + the SOP-step computation
+ *   - the `widgetConfig` fetch from /api/config
+ *   - the session-id `sessionStorage` round-trip via `sessionAwareFetch`
+ *
+ * The visual surface is delegated to:
+ *   - `PanelShell` (positioning, glass, animation, scroll-lock, ARIA)
+ *   - `MessageList` (the conversation-area surface)
+ *   - `Composer` (chips + input/contact-form + disclaimer)
+ *
+ * ChatPanel itself stays a thin orchestrator: it computes derived
+ * state (active chips, contact-form pending) and passes everything
+ * down as props.
+ */
+export function ChatPanel({ apiKey, apiUrl, onCloseRequest, onClosed }: ChatPanelProps) {
+  const [isOpen, setIsOpen] = useState(true);
   const [widgetConfig, setWidgetConfig] = useState<WidgetConfig | null>(null);
 
   useEffect(() => {
@@ -90,25 +87,8 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
   const { sopState, onResponse: onSOPResponse } = useSOPState();
   const reducedMotion = useReducedMotion();
 
-  // 011-preflight-phrase rev2: query-tailored loading status phrase
-  // that swaps the typing-indicator content from `● ● ●` to e.g.
-  // "✨ Looking into your DUI matter…" within ~1ms of Send.
-  //
-  // Rev2 history: the original LLM-driven preflight (POST /api/chat/preflight
-  // → gemini-2.5-flash-lite) hit production latencies of 1300-3500ms,
-  // 5-10x the design target. Rolled to a synchronous client-side
-  // keyword + SOP-step classifier — instant, deterministic, free.
-  // Messages that don't match any rule AND have no pending step return
-  // null; the widget falls back to dots (honest "we don't know" state).
   const { phrase: preflightPhrase, start: startPreflight, clear: clearPreflight } = usePreflightPhrase();
 
-  // Custom fetch that reads the session id from sessionStorage at REQUEST
-  // time rather than at component-mount time. Critical for multi-turn
-  // conversations: the first fetch returns a new session id (which we
-  // save in onResponse below); subsequent fetches must include that id
-  // so the server resumes the same session. The previous useMemo-captured
-  // headers approach never re-read sessionStorage, so every turn created
-  // a fresh server-side session.
   const sessionAwareFetch: typeof fetch = (input, init) => {
     const id = getSessionId();
     const headers = new Headers(init?.headers);
@@ -129,15 +109,10 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
       if (newSessionId) {
         saveSessionId(newSessionId);
       }
-      // 010-sop-workflow T037: forward the same Response to the SOP
-      // hook so it can read x-sop-state and update progress + chips.
       onSOPResponse(response);
     },
   });
 
-  // 010-sop-workflow T037: compute the chip row for the current pending
-  // SOP step. Empty array when SOP isn't active or pending step is
-  // free-text only — Chips returns null in that case so no row renders.
   const activeChips = useMemo(
     () =>
       computeActiveChips({
@@ -146,18 +121,11 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
         capturedCaseTypeSlug: sopState?.captured_case_type_slug ?? null,
         pendingStepSlug: sopState?.pending_step_slug ?? null,
         isFinalized: sopState?.is_finalized ?? false,
-        // Spec 016 — branch chips take precedence over default-step
-        // chips. The orchestrator emits these on `present_question`
-        // turns; computeActiveChips short-circuits to them.
         branchActiveChips: sopState?.branch_active_chips ?? null,
       }),
     [widgetConfig, sopState],
   );
 
-  // 010-sop-workflow contact step: when the pending SOP step is a
-  // contact_form step, render <ContactForm> instead of chips. The form
-  // dispatches a well-formed message that the advancer's contact-form
-  // short-circuit captures.
   const pendingStepIsContactForm = useMemo(() => {
     if (!widgetConfig?.sop || !sopState?.pending_step_slug || sopState.is_finalized) {
       return false;
@@ -166,14 +134,7 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
     return step?.chip_source === 'contact_form';
   }, [widgetConfig, sopState]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  // 011-preflight-phrase T014: clear the preflight phrase as soon as the
-  // assistant's first token has streamed. The streaming bubble takes over
-  // the visual real estate; keeping the phrase up after the agent starts
-  // talking would feel broken.
+  // Clear preflight phrase as soon as the assistant's first token streams.
   useEffect(() => {
     const last = messages[messages.length - 1];
     if (last?.role === 'assistant' && typeof last.content === 'string' && last.content.length > 0) {
@@ -181,58 +142,105 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
     }
   }, [messages, clearPreflight]);
 
-  const panelStyle = useMemo((): React.CSSProperties => {
-    const base: React.CSSProperties = {
-      position: 'fixed',
-      backgroundColor: 'var(--lc-background, #ffffff)',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-      zIndex: 9999,
-      fontFamily: 'var(--lc-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif)',
-    };
+  const handleClose = () => setIsOpen(false);
 
-    if (breakpoint === 'mobile') {
-      return {
-        ...base,
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        borderRadius: 0,
-      };
-    }
+  // The Composer's chips prop is a flat list of strings rather than the
+  // ChipSpec object that <Chips> consumes. We pass the raw labels via
+  // Composer (which renders its own chip buttons), AND keep <Chips>
+  // available for the trailing slot when SOP-driven chips need richer
+  // rendering (e.g. selected state, shimmer).
+  const chipLabels = useMemo<string[] | null>(() => {
+    if (!activeChips || activeChips.length === 0) return null;
+    return activeChips.map((c) => c.label);
+  }, [activeChips]);
 
-    if (breakpoint === 'tablet') {
-      return {
-        ...base,
-        top: 0,
-        right: 0,
-        bottom: 0,
-        width: '380px',
-        borderRadius: 0,
-        boxShadow: '-4px 0 16px rgba(0, 0, 0, 0.1)',
-      };
-    }
+  // Derived: is the assistant the most recent speaker AND not still
+  // streaming? Used to gate the chip + contact-form trailing slots.
+  const showSOPTrailing =
+    !isLoading
+    && messages.length > 0
+    && messages[messages.length - 1]?.role === 'assistant';
 
-    return {
-      ...base,
-      bottom: '100px',
-      right: '24px',
-      width: '400px',
-      height: '600px',
-      borderRadius: 'var(--lc-border-radius, 12px)',
-      boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
-    };
-  }, [breakpoint]);
+  // SOP chips render in the conversation trailing slot (NOT the
+  // composer chips row) so they're visually anchored to the most
+  // recent assistant message — the existing pre-spec-017 behavior.
+  const trailingNode = (
+    <>
+      {showSOPTrailing && (
+        <Chips
+          chips={activeChips}
+          onSelect={(label) => {
+            startPreflight(label, sopState?.pending_step_slug ?? null);
+            append({ role: 'user', content: label });
+          }}
+          ariaLabel="Choose an option"
+        />
+      )}
+    </>
+  );
+
+  // Hide composer's own chip row — we use the trailing slot for SOP chips.
+  const composerChips = null;
+
+  const greetingNode = (
+    <>
+      <div
+        className="lc-message"
+        data-variant="assistant"
+        style={{
+          backgroundColor: 'var(--lc-message-bg-assistant, #f5f1e8)',
+          padding: '12px 16px',
+          borderRadius: 'var(--lc-message-radius, 16px)',
+          maxWidth: '85%',
+          fontSize: '14px',
+          lineHeight: '1.5',
+          color: 'var(--lc-text-primary, #1f1b16)',
+          border: '1px solid var(--lc-border-subtle, rgba(31,27,22,0.06))',
+        }}
+      >
+        {widgetConfig?.greeting_message ?? "Hi! I'm LexBot, a virtual assistant. How can I help you today?"}
+      </div>
+      <QuickReplies
+        onSelect={(text) => {
+          const message = `I need help with ${text}`;
+          startPreflight(message, sopState?.pending_step_slug ?? null);
+          append({ role: 'user', content: message });
+        }}
+        options={widgetConfig?.practice_areas}
+      />
+    </>
+  );
+
+  const errorBanner = error ? (
+    <div
+      style={{
+        padding: '12px 16px',
+        borderRadius: '8px',
+        fontSize: '13px',
+        backgroundColor: '#fff5f5',
+        color: '#c53030',
+        border: '1px solid #fed7d7',
+      }}
+    >
+      Something went wrong. Please try again or call {widgetConfig?.phone ?? '(555) 123-4567'}.
+    </div>
+  ) : null;
 
   return (
-    <div style={panelStyle}>
-      {/* Header */}
+    <PanelShell
+      isOpen={isOpen}
+      onClosed={onClosed}
+      onCloseRequest={() => {
+        setIsOpen(false);
+        onCloseRequest();
+      }}
+      ariaLabel={`Chat with ${widgetConfig?.chatbot_name ?? 'LexBot'}`}
+    >
+      {/* 1. Header */}
       <div
         style={{
           padding: '16px 20px',
-          backgroundColor: 'var(--lc-primary-color, #1a365d)',
+          backgroundColor: 'var(--lc-primary-color, #4338ca)',
           color: 'var(--lc-primary-text, #ffffff)',
           display: 'flex',
           alignItems: 'center',
@@ -241,11 +249,11 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
         }}
       >
         <div>
-          <div style={{ fontWeight: 600, fontSize: '16px' }}>{widgetConfig?.chatbot_name ?? 'Sarah'}</div>
+          <div style={{ fontWeight: 600, fontSize: '16px' }}>{widgetConfig?.chatbot_name ?? 'LexBot'}</div>
           <div style={{ fontSize: '12px', opacity: 0.8 }}>Virtual Assistant</div>
         </div>
         <button
-          onClick={onClose}
+          onClick={handleClose}
           aria-label="Close chat"
           style={{
             background: 'none',
@@ -265,16 +273,39 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
         </button>
       </div>
 
-      {/* SOP progress bar — 012-progressbar-refinement positions this
-          INSIDE the chat content area: below the header bar, above the
-          messages list. Returns null when total === 0 (no SOP active for
-          the account). See specs/012-progressbar-refinement/. */}
-      <div
-        style={{
-          padding: '8px 16px 0',
-          flexShrink: 0,
-        }}
-      >
+      {/* 2. Messages region */}
+      <MessageList
+        messages={messages.map((m) => ({
+          id: m.id,
+          role: m.role === 'user' ? 'user' : 'assistant',
+          content: typeof m.content === 'string' ? m.content : '',
+        }))}
+        preflightPhrase={preflightPhrase}
+        isStreaming={isLoading}
+        greeting={greetingNode}
+        errorBanner={errorBanner}
+        trailing={
+          <>
+            {trailingNode}
+            {showSOPTrailing && pendingStepIsContactForm && (
+              // ContactForm rendered as trailing slot when the pending
+              // step is contact_form. Composer's contactForm prop is
+              // for a future pattern where the form replaces the input
+              // entirely; keeping it here in the trailing slot
+              // preserves pre-017 placement.
+              <ContactFormTrailing
+                onSubmit={(message) => {
+                  startPreflight(message, sopState?.pending_step_slug ?? null);
+                  append({ role: 'user', content: message });
+                }}
+              />
+            )}
+          </>
+        }
+      />
+
+      {/* 3. Progress bar (renders null when total === 0) */}
+      <div style={{ padding: '0 16px', flexShrink: 0 }}>
         <ProgressBar
           current={sopState?.current ?? 0}
           total={sopState?.total ?? 0}
@@ -282,231 +313,28 @@ export function ChatPanel({ apiKey, apiUrl, onClose }: ChatPanelProps) {
         />
       </div>
 
-      {/* Messages */}
-      <div
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          padding: '16px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-        }}
-      >
-        {messages.length === 0 && (
-          <>
-            <div
-              style={{
-                backgroundColor: 'var(--lc-bubble-bot, #f0f4f8)',
-                padding: '12px 16px',
-                borderRadius: '12px 12px 12px 4px',
-                maxWidth: '85%',
-                fontSize: '14px',
-                lineHeight: '1.5',
-                color: '#1a202c',
-              }}
-            >
-              {widgetConfig?.greeting_message ?? "Hi! I'm Sarah, a virtual assistant for Smith & Associates. How can I help you today?"}
-            </div>
-            <QuickReplies
-              onSelect={(text) => {
-                const message = `I need help with ${text}`;
-                startPreflight(message, sopState?.pending_step_slug ?? null);
-                append({ role: 'user', content: message });
-              }}
-              options={widgetConfig?.practice_areas}
-            />
-          </>
-        )}
-
-        {messages.map((message) => (
-          <div
-            key={message.id}
-            style={{
-              display: 'flex',
-              justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
-            }}
-          >
-            <div
-              style={{
-                padding: '12px 16px',
-                borderRadius:
-                  message.role === 'user'
-                    ? '12px 12px 4px 12px'
-                    : '12px 12px 12px 4px',
-                maxWidth: '85%',
-                fontSize: '14px',
-                lineHeight: '1.5',
-                backgroundColor:
-                  message.role === 'user'
-                    ? 'var(--lc-bubble-user, #1a365d)'
-                    : 'var(--lc-bubble-bot, #f0f4f8)',
-                color: message.role === 'user' ? '#ffffff' : '#1a202c',
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-              }}
-            >
-              {message.content}
-            </div>
-          </div>
-        ))}
-
-        {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
-          <div
-            role="status"
-            aria-live="polite"
-            style={{
-              padding: '12px 16px',
-              borderRadius: '12px 12px 12px 4px',
-              maxWidth: '85%',
-              fontSize: '14px',
-              backgroundColor: 'var(--lc-bubble-bot, #f0f4f8)',
-              color: '#718096',
-            }}
-          >
-            {preflightPhrase ? (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                <span aria-hidden="true">✨</span>
-                <span>{preflightPhrase}…</span>
-              </span>
-            ) : (
-              <span className="lc-typing">● ● ●</span>
-            )}
-          </div>
-        )}
-
-        {error && (
-          <div
-            style={{
-              padding: '12px 16px',
-              borderRadius: '8px',
-              fontSize: '13px',
-              backgroundColor: '#fff5f5',
-              color: '#c53030',
-              border: '1px solid #fed7d7',
-            }}
-          >
-            Something went wrong. Please try again or call {widgetConfig?.phone ?? '(555) 123-4567'}.
-          </div>
-        )}
-
-        {/* 010-sop-workflow T037: SOP chip row, rendered after the
-            latest assistant message when the pending SOP step has chips
-            and we're not mid-stream. Sending a chip-derived user message
-            triggers the existing useChat flow. */}
-        {!isLoading
-          && messages.length > 0
-          && messages[messages.length - 1]?.role === 'assistant'
-          && (
-            <Chips
-              chips={activeChips}
-              onSelect={(label) => {
-                startPreflight(label, sopState?.pending_step_slug ?? null);
-                append({ role: 'user', content: label });
-              }}
-              ariaLabel="Choose an option"
-            />
-          )}
-
-        {/* 010-sop-workflow contact step: form rendered when the pending
-            SOP step's chip_source='contact_form'. The form captures
-            name + email/phone with browser-native validation; on submit
-            it dispatches a human-readable sentence that the advancer's
-            contact-form short-circuit parses. */}
-        {!isLoading
-          && messages.length > 0
-          && messages[messages.length - 1]?.role === 'assistant'
-          && pendingStepIsContactForm
-          && (
-            <ContactForm
-              onSubmit={(message) => {
-                startPreflight(message, sopState?.pending_step_slug ?? null);
-                append({ role: 'user', content: message });
-              }}
-            />
-          )}
-
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input */}
-      <form
+      {/* 4. Composer */}
+      <Composer
+        chips={composerChips}
         onSubmit={(e) => {
-          // 011-preflight-phrase T014: fire preflight in parallel with the
-          // useChat submit so a tailored phrase can replace the typing
-          // dots before the agent's first token streams.
           if (input.trim()) {
             startPreflight(input, sopState?.pending_step_slug ?? null);
           }
           handleSubmit(e);
         }}
-        style={{
-          padding: '12px 16px',
-          borderTop: '1px solid #e2e8f0',
-          display: 'flex',
-          gap: '8px',
-          alignItems: 'center',
-          flexShrink: 0,
-        }}
-      >
-        <input
-          value={input}
-          onChange={handleInputChange}
-          placeholder="Type your message..."
-          disabled={isLoading}
-          autoFocus
-          style={{
-            flex: 1,
-            padding: '12px 14px',
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0',
-            fontSize: '16px',
-            outline: 'none',
-            fontFamily: 'inherit',
-            WebkitAppearance: 'none',
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.borderColor = 'var(--lc-primary-color, #1a365d)';
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.borderColor = '#e2e8f0';
-          }}
-        />
-        <button
-          type="submit"
-          disabled={isLoading || !input.trim()}
-          aria-label="Send message"
-          style={{
-            padding: '12px 18px',
-            borderRadius: '8px',
-            backgroundColor: 'var(--lc-primary-color, #1a365d)',
-            color: 'var(--lc-primary-text, #ffffff)',
-            border: 'none',
-            cursor: isLoading || !input.trim() ? 'not-allowed' : 'pointer',
-            fontSize: '14px',
-            fontWeight: 500,
-            opacity: isLoading || !input.trim() ? 0.5 : 1,
-            minWidth: '44px',
-            minHeight: '44px',
-          }}
-        >
-          Send
-        </button>
-      </form>
-
-      {/* Disclaimer */}
-      <div
-        style={{
-          padding: '8px 16px',
-          fontSize: '11px',
-          color: '#a0aec0',
-          textAlign: 'center',
-          borderTop: '1px solid #f0f4f8',
-          flexShrink: 0,
-        }}
-      >
-        AI assistant — not legal advice
-      </div>
-    </div>
+        inputValue={input}
+        onInputChange={handleInputChange}
+        disabled={isLoading}
+      />
+    </PanelShell>
   );
+}
+
+// Local helper: ContactForm rendered as a trailing slot in MessageList
+// (anchored to the most recent assistant message). Imported here to
+// avoid circular import noise between Composer and ContactForm.
+import { ContactForm } from './ContactForm';
+
+function ContactFormTrailing({ onSubmit }: { onSubmit: (message: string) => void }) {
+  return <ContactForm onSubmit={onSubmit} />;
 }

@@ -1,69 +1,94 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ChatWidget } from './components/ChatWidget';
+import './styles/playground.css';
 
-function TestSite() {
+/**
+ * Spec 017 — LexBot Playground page. The in-repo demo page renamed
+ * from "Smith & Associates" to "LexBot Playground" so the page
+ * identifies itself as a developer / stakeholder demo of the LexBot
+ * widget rather than impersonating a customer law firm.
+ *
+ * Contract: specs/017-chatbot-redesign/contracts/playground-page.md
+ *
+ * Demo law-firm content (practice-area cards, contact CTA) is preserved
+ * in structure but explicitly framed as "sample / fictional" so the
+ * chatbot has realistic legal-services context to talk about during
+ * conversations. The "firm" shown is anonymous (no fictional name).
+ */
+export function LexBotPlayground() {
   return (
     <>
-      <style>{`
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Georgia, 'Times New Roman', serif; color: #1a202c; }
-        .hero { background: #1a365d; color: white; padding: 80px 40px; text-align: center; }
-        .hero h1 { font-size: 2.5rem; margin-bottom: 16px; }
-        .hero p { font-size: 1.2rem; opacity: 0.9; max-width: 600px; margin: 0 auto; }
-        .content { max-width: 900px; margin: 0 auto; padding: 60px 40px; }
-        .content h2 { font-size: 1.8rem; margin-bottom: 24px; color: #1a365d; }
-        .content p { font-size: 1.1rem; line-height: 1.8; margin-bottom: 16px; color: #4a5568; }
-        .areas { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 24px; margin: 40px 0; }
-        .area-card { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px; }
-        .area-card h3 { color: #1a365d; margin-bottom: 8px; }
-        .area-card p { font-size: 0.95rem; }
-        .cta { background: #f7fafc; padding: 60px 40px; text-align: center; }
-        .cta h2 { color: #1a365d; margin-bottom: 16px; }
-        .cta p { font-size: 1.1rem; color: #4a5568; }
-        .cta .phone { font-size: 1.4rem; color: #1a365d; font-weight: bold; margin-top: 16px; }
-        footer { background: #2d3748; color: #a0aec0; padding: 40px; text-align: center; font-size: 0.9rem; }
-        @keyframes typing { 0%, 60% { opacity: 0.3; } 30% { opacity: 1; } }
-        .lc-typing span { animation: typing 1.4s infinite; }
-      `}</style>
+      <header className="lc-pg-topbar">
+        <h1 className="lc-pg-brand" aria-label="LexBot Playground">
+          <span className="lc-pg-wordmark">LexBot</span>{' '}
+          <span className="lc-pg-brand-suffix">Playground</span>
+        </h1>
+        <div className="lc-pg-pill">
+          <span className="lc-pg-pill-sublabel">demo / sample content</span>
+        </div>
+      </header>
 
-      <div className="hero">
-        <h1>Smith & Associates</h1>
-        <p>Attorneys at Law — Fighting for Your Rights Since 2006</p>
-      </div>
+      <section className="lc-pg-hero">
+        <div className="lc-pg-hero-inner">
+          <h1 className="lc-pg-hero-title">
+            Try LexBot on a sample legal-services site
+          </h1>
+          <p className="lc-pg-hero-sub">
+            This is a developer demo of the LexBot widget. The "firm" below is
+            fictional — chat with the bot in the corner to see it in action.
+          </p>
+        </div>
+      </section>
 
-      <div className="content">
-        <h2>How We Can Help</h2>
-        <p>
-          For over 20 years, Smith & Associates has been helping families and individuals
-          in Springfield and the surrounding communities. Our dedicated team provides
-          compassionate, aggressive representation.
+      <main className="lc-pg-content">
+        <div className="lc-pg-banner" role="note">
+          Sample content for the LexBot demo — the firm shown below is
+          fictional.
+        </div>
+
+        <h2 className="lc-pg-section-title">How a real firm might describe their work</h2>
+        <p className="lc-pg-paragraph">
+          For decades, attorneys have helped families and individuals
+          navigate difficult legal moments. The cards below illustrate
+          the practice areas a firm might list on a similar site, so
+          the chatbot has realistic context for a sample conversation.
         </p>
 
-        <div className="areas">
-          <div className="area-card">
+        <div className="lc-pg-areas">
+          <article className="lc-pg-area-card">
             <h3>Personal Injury</h3>
-            <p>Car accidents, medical malpractice, wrongful death. No fee unless we win.</p>
-          </div>
-          <div className="area-card">
+            <p>
+              Car accidents, medical malpractice, wrongful death. Sample
+              firms typically work on contingency.
+            </p>
+          </article>
+          <article className="lc-pg-area-card">
             <h3>Family Law</h3>
-            <p>Divorce, custody, adoption. Compassionate guidance through difficult times.</p>
-          </div>
-          <div className="area-card">
+            <p>
+              Divorce, custody, adoption. Compassionate guidance through
+              difficult transitions.
+            </p>
+          </article>
+          <article className="lc-pg-area-card">
             <h3>Estate Planning</h3>
-            <p>Wills, trusts, probate. Protect your family's future.</p>
-          </div>
+            <p>Wills, trusts, probate. Long-term family-asset protection.</p>
+          </article>
         </div>
-      </div>
 
-      <div className="cta">
-        <h2>Ready to Talk?</h2>
-        <p>Schedule your free consultation today.</p>
-        <p className="phone">(555) 123-4567</p>
-      </div>
+        <section className="lc-pg-cta">
+          <h2 className="lc-pg-cta-title">Ready to Talk?</h2>
+          <p className="lc-pg-cta-text">Schedule a free consultation today.</p>
+          <p className="lc-pg-cta-phone">(555) 123-4567</p>
+          <p className="lc-pg-cta-note">
+            Sample contact info — for demo purposes only.
+          </p>
+        </section>
+      </main>
 
-      <footer>
-        <p>&copy; 2026 Smith & Associates. 123 Main Street, Suite 400, Springfield, IL 62701</p>
+      <footer className="lc-pg-footer">
+        © LexBot — sample-content demo. The "firm" shown on this page is
+        fictional.
       </footer>
 
       <ChatWidget apiKey="dev_test_key" />
@@ -71,8 +96,13 @@ function TestSite() {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <TestSite />
-  </React.StrictMode>
-);
+// Mount only when running in the browser; tests import the component
+// directly and render it via React Testing Library.
+const rootEl = typeof document !== 'undefined' ? document.getElementById('root') : null;
+if (rootEl) {
+  ReactDOM.createRoot(rootEl).render(
+    <React.StrictMode>
+      <LexBotPlayground />
+    </React.StrictMode>,
+  );
+}
