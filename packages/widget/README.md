@@ -27,28 +27,64 @@ screen readers announce both the dots state and the phrase swap.
 
 ## CSS Custom Properties
 
-The widget exposes the following CSS custom properties for theming
-without rebuilding:
+Public override tokens (preserved across spec 017 — embedding firms can
+continue to override these):
 
-| Property | Default | Purpose |
+| Property | Spec 017 default | Purpose |
 |---|---|---|
-| `--lc-progress-color` | `#2563EB` | Progress-bar fill color (010-sop-workflow) |
-| `--lc-progress-bg` | `#E2E8F0` | Progress-bar track color |
-| `--lc-progress-label-color` | `#64748B` | Progress-bar label text |
-| `--lc-bubble-bot` | `#f0f4f8` | Background of the bot's message bubbles + the typing indicator |
-| `--lc-primary-color` | `#1a365d` | Primary brand color (form submit buttons, active states) |
-| `--lc-primary-text` | `#ffffff` | Text color on primary-colored elements |
+| `--lc-primary-color` | `#4338ca` (warm indigo; was `#1a365d` navy) | Bubble, user-message bg, focused input ring, chip selected bg, primary button |
+| `--lc-primary-text` | `#ffffff` | Text on primary-color surfaces |
+| `--lc-background` | `#fcfaf5` (warm off-white; was pure white) | Panel solid background, fallback when backdrop-filter unsupported |
+| `--lc-border-radius` | `20px` (was `12px`) | Panel corner radius (tablet/desktop) |
+| `--lc-font-family` | system stack | Panel font family |
 
-Set these on the `<html>` or `<body>` element to override:
+The progress bar continues to expose its own theme tokens; spec 017
+adjusted their defaults to match the warm palette but kept the names:
+
+| Property | Spec 017 default | Purpose |
+|---|---|---|
+| `--lc-progress-color` | `#4338ca` (was `#22c55e`) | Progress-bar fill |
+| `--lc-progress-bg` | `rgba(31,27,22,0.06)` | Progress-bar track |
+| `--lc-progress-label-color` | `#1f1b16` (was `#171717`) | Progress-bar label |
+
+Set these on the `<html>` or `<body>` element (or any ancestor of the
+widget root) to override:
 
 ```html
 <style>
   :root {
-    --lc-progress-color: #ef4444;
-    --lc-bubble-bot: #fef3c7;
+    --lc-primary-color: #0F2447;  /* navy override */
+    --lc-background: #ffffff;     /* if you want pure white */
   }
 </style>
 ```
+
+### Dark-background override caveat
+
+If you override `--lc-background` to a dark color, you should also
+override `--lc-text-primary` (default `#1f1b16` — warm charcoal) to a
+light value. The widget does not auto-flip text colors; this is a
+deliberate decision to keep CSS small and cascade-friendly.
+
+### Spec 017 internal tokens (not public)
+
+The redesigned widget exposes additional internal tokens
+(`--lc-surface`, `--lc-surface-blur`, `--lc-shadow`,
+`--lc-message-radius`, `--lc-text-primary`, `--lc-text-muted`,
+`--lc-message-bg-assistant`, `--lc-border-subtle`, plus animation
+tokens). These are NOT part of the override surface promised to
+embedding customers and may change between minor versions. See
+`specs/017-chatbot-redesign/contracts/design-tokens.md` for the
+internal-token catalog.
+
+### Browser support
+
+The redesigned panel uses `backdrop-filter` for the glass effect and
+`100dvh` for the mobile viewport. Both are supported in all evergreen
+targets (Chrome 76+, Safari 15.4+, Firefox 103+, Edge 79+). Older
+browsers receive an equally functional fallback: a near-solid panel
+surface (no glass) and a `100vh` height with the same shadow + corner
+radius.
 
 ## Usage
 
@@ -80,6 +116,11 @@ The widget's behavior is described in spec docs under `specs/`:
   (`useSOPState`).
 - **011-preflight-phrase** — query-tailored loading status hook
   (`usePreflightPhrase`).
+- **017-chatbot-redesign** — visual redesign: glassmorphism, mobile
+  full-viewport takeover with slide-up animation, 480×760 desktop
+  panel, LexBot Playground rebrand of the test page. Introduces
+  `<PanelShell>`, `<MessageList>`, `<Composer>`, and the
+  `usePanelLayout` / `useScrollLock` hooks.
 
 ## Bundle size
 
