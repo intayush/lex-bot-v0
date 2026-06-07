@@ -2,7 +2,73 @@ import { db, schema } from '../db';
 import { eq, and, desc } from 'drizzle-orm';
 import type { Configuration } from '@legal-chatbot/shared';
 
+/**
+ * In-process per-account cache for `getPublishedConfig` and
+ * `getLatestConfig`. The chat route reads these on every turn but
+ * the underlying configurations row only changes when the lawyer
+ * publishes a new version — typically once per session at most.
+ *
+ * 60 second TTL is chosen to bound staleness after a publish event;
+ * if we want zero-lag invalidation later, expose
+ * `invalidateConfigCache(accountId)` from this file and call it
+ * from the publish endpoint. For now the bounded staleness is the
+ * right trade-off.
+ *
+ * Cache keys include the variant (`'published' | 'latest'`) because
+ * /api/config and the dashboard preview see different rows.
+ */
+interface CachedConfigEntry<T> {
+  value: T | null;
+  expiresAt: number;
+}
+
+const CONFIG_CACHE_TTL_MS = 60_000;
+const publishedCache = new Map<string, CachedConfigEntry<Configuration>>();
+const latestCache = new Map<
+  string,
+  CachedConfigEntry<{
+    id: string;
+    version: number;
+    isPublished: boolean;
+    config: Configuration;
+  }>
+>();
+
+function getCached<T>(
+  cache: Map<string, CachedConfigEntry<T>>,
+  key: string,
+): T | null | undefined {
+  const entry = cache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) {
+    cache.delete(key);
+    return undefined;
+  }
+  return entry.value;
+}
+
+function putCached<T>(
+  cache: Map<string, CachedConfigEntry<T>>,
+  key: string,
+  value: T | null,
+): void {
+  cache.set(key, { value, expiresAt: Date.now() + CONFIG_CACHE_TTL_MS });
+}
+
+/**
+ * Test-only hook to clear the config caches. Production code never
+ * imports this directly; it exists so unit tests can validate the
+ * underlying DB path without stale-cache interference.
+ */
+export function __resetConfigCachesForTests(): void {
+  publishedCache.clear();
+  latestCache.clear();
+}
+
 export async function getPublishedConfig(accountId: string): Promise<Configuration | null> {
+  const cached = getCached(publishedCache, accountId);
+  if (cached !== undefined) return cached;
+
   const rows = await db
     .select()
     .from(schema.configurations)
@@ -16,11 +82,19 @@ export async function getPublishedConfig(accountId: string): Promise<Configurati
     .limit(1);
 
   const row = rows[0];
-  if (!row) return null;
-  return JSON.parse(row.config_json) as Configuration;
+  if (!row) {
+    putCached(publishedCache, accountId, null);
+    return null;
+  }
+  const config = JSON.parse(row.config_json) as Configuration;
+  putCached(publishedCache, accountId, config);
+  return config;
 }
 
 export async function getLatestConfig(accountId: string): Promise<{ id: string; version: number; isPublished: boolean; config: Configuration } | null> {
+  const cached = getCached(latestCache, accountId);
+  if (cached !== undefined) return cached;
+
   const rows = await db
     .select()
     .from(schema.configurations)
@@ -29,13 +103,18 @@ export async function getLatestConfig(accountId: string): Promise<{ id: string; 
     .limit(1);
 
   const row = rows[0];
-  if (!row) return null;
-  return {
+  if (!row) {
+    putCached(latestCache, accountId, null);
+    return null;
+  }
+  const value = {
     id: row.id,
     version: row.version,
     isPublished: !!row.is_published,
     config: JSON.parse(row.config_json) as Configuration,
   };
+  putCached(latestCache, accountId, value);
+  return value;
 }
 
 export async function getMaxVersion(accountId: string): Promise<number> {

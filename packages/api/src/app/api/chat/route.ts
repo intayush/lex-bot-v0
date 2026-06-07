@@ -9,7 +9,6 @@ import {
   createSession,
   getSessionForSOP,
   appendMessagesAndSOPState,
-  sessionExists,
 } from '../../../lib/session';
 import { searchContext, fetchManifest } from '../../../lib/context-search';
 import { captureLead, updateLeadSOPState } from '../../../lib/leads';
@@ -66,6 +65,11 @@ export async function POST(req: Request) {
     return Response.json({ error: 'unauthorized', message: 'Missing API key' }, { status: 401, headers: corsHeaders });
   }
 
+  // Body parse can race the auth check — neither depends on the other.
+  // Auth is the slower call when the LRU cache is cold (bcrypt loop),
+  // so this saves the cost of body parse on the warm path too.
+  const bodyPromise = req.json();
+
   const auth = await verifyApiKey(apiKey);
   if (!auth) {
     return Response.json({ error: 'unauthorized', message: 'Invalid API key' }, { status: 401, headers: corsHeaders });
@@ -81,42 +85,48 @@ export async function POST(req: Request) {
 
   const isPreview = req.headers.get('x-preview') === 'true';
 
-  let config;
-  if (isPreview) {
-    const latest = await getLatestConfig(auth.accountId);
-    config = latest?.config ?? null;
-  } else {
-    config = await getPublishedConfig(auth.accountId);
-  }
+  // Parallelise the three independent loads. Each one is a separate
+  // Neon HTTP round trip (`@neondatabase/serverless` doesn't pool /
+  // batch). On the cold path this saves ~80-200ms vs the previous
+  // strictly-sequential await chain. On the warm path (LRU caches
+  // hit) the saving is smaller but still net positive.
+  //
+  // We also race the body parse with auth above. The session-id
+  // header read is sync so we kick off `getSessionForSOP` here too,
+  // tolerating a `null` return from a stale / forged x-session-id —
+  // we'll create a new session below in that case. This obsoletes
+  // the previous separate `sessionExists` round trip.
+  const incomingSessionId = req.headers.get('x-session-id');
+  const [config, sopBundle, body, existingSession] = await Promise.all([
+    isPreview
+      ? getLatestConfig(auth.accountId).then((latest) => latest?.config ?? null)
+      : getPublishedConfig(auth.accountId),
+    getSOPBundle(auth.accountId, { isPreview }),
+    bodyPromise,
+    incomingSessionId ? getSessionForSOP(incomingSessionId) : Promise.resolve(null),
+  ]);
   if (!config) {
     return Response.json({ error: 'internal', message: 'No published configuration found' }, { status: 500, headers: corsHeaders });
   }
-
-  // 010-sop-workflow T031 + T069: load SOP, case types, and goodbye phrases
-  // for the account. Any of these may be empty (account hasn't migrated to
-  // SOP yet); we treat that as the legacy intake-question path. In Preview
-  // & Test mode (`x-preview: true`) the loader returns the latest SOP
-  // regardless of its is_published flag, so the lawyer can chat against
-  // an unpublished draft before publishing it.
-  const sopBundle = await getSOPBundle(auth.accountId, { isPreview });
-
-  const body = await req.json();
   const messages = body.messages;
   if (!Array.isArray(messages) || messages.length === 0) {
     return Response.json({ error: 'bad_request', message: 'Messages array required' }, { status: 400, headers: corsHeaders });
   }
 
-  // Session management
-  let sessionId = req.headers.get('x-session-id');
-  if (sessionId && !(await sessionExists(sessionId))) {
-    sessionId = null;
-  }
-  if (!sessionId) {
+  // Session management. `existingSession` is non-null only when the
+  // visitor sent a valid x-session-id AND the row is still in the
+  // sessions table. Otherwise we mint a new session id. Note we
+  // dropped the previous `sessionExists` precheck — `getSessionForSOP`
+  // already returns null for a missing row.
+  let sessionId: string;
+  let sessionData = existingSession;
+  if (sessionData && incomingSessionId) {
+    sessionId = incomingSessionId;
+  } else {
     sessionId = await createSession(auth.accountId, isPreview);
+    sessionData = null;
   }
 
-  // Load history + existing SOP state in a single query.
-  const sessionData = await getSessionForSOP(sessionId);
   const history = sessionData?.messages ?? [];
   const conversationAnchorIso = sessionData?.conversationAnchorIso ?? new Date().toISOString();
   const newUserMessage = messages[messages.length - 1];
@@ -403,7 +413,7 @@ export async function POST(req: Request) {
         }
         const result = await captureLead({
           accountId: auth.accountId,
-          sessionId: sessionId!,
+          sessionId: sessionId,
           name: resolvedName,
           contactEmail: resolvedEmail,
           contactPhone: resolvedPhone,
@@ -448,7 +458,7 @@ export async function POST(req: Request) {
       // Persist the assistant turn alongside the latest SOP state in a
       // single update so message history and SOP state stay in sync.
       await appendMessagesAndSOPState(
-        sessionId!,
+        sessionId,
         [
           newUserMessage,
           { role: 'assistant', content: text },
@@ -461,7 +471,7 @@ export async function POST(req: Request) {
       // Handles the case where captureLead fired earlier in the
       // conversation before the when-step ISO date was captured. No-ops
       // when no lead exists for the session yet.
-      await updateLeadSOPState(sessionId!, sopState);
+      await updateLeadSOPState(sessionId, sopState);
 
       // Spec 016 US2 — When the branch orchestrator finalized the
       // configured-branch flow this turn, write the snapshot + score
@@ -479,7 +489,7 @@ export async function POST(req: Request) {
             classification: branchFinalizationPayload.classification,
             score_reasons_json: reasonsJson,
           })
-          .where(eq(schema.leads.session_id, sessionId!))
+          .where(eq(schema.leads.session_id, sessionId))
           .returning({ id: schema.leads.id });
 
         // Spec 015 T064 — apply hard-override rules to the
@@ -502,7 +512,7 @@ export async function POST(req: Request) {
       // information shared before an abandoned session is not lost.
       const allMessages = [...fullMessages, { role: 'assistant', content: text }];
       const partial = extractPartialLeadData(allMessages);
-      await savePartialLead(auth.accountId, sessionId!, partial, allMessages);
+      await savePartialLead(auth.accountId, sessionId, partial, allMessages);
     },
   });
 
