@@ -278,6 +278,10 @@ export async function POST(req: Request) {
           return {};
         }
       })(),
+      // Suppress branch-question presentation on goodbye turns so
+      // the chip row doesn't render under a goodbye assistant
+      // message. Same phrase list the LLM sees in its system prompt.
+      goodbyePhrases: sopBundle.goodbyePhrases,
     };
     const userText =
       typeof newUserMessage?.content === 'string' ? newUserMessage.content : '';

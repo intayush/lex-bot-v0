@@ -20,6 +20,7 @@ import { advanceBranch } from './branch-advancer';
 import { freezeBranchSnapshot } from './branch-snapshot';
 import { scoreBranch, type ScoreBranchResult } from '../scoring/score-lead-partial';
 import { emitBranchEvent } from './branch-events';
+import { isGoodbyeMessage } from './goodbye-detector';
 import type {
   Branch,
   BranchQuestion,
@@ -77,6 +78,20 @@ export interface BranchOrchestratorDeps {
    * normalisation.
    */
   whenChipWeightsByLabel?: Record<string, number>;
+  /**
+   * Configured goodbye phrases for the account. When the visitor's
+   * latest message matches any of these (whole-word, case-insensitive),
+   * the orchestrator short-circuits to `noop` so we don't surface a
+   * branch question's chips while the assistant is bidding the
+   * visitor goodbye. Without this gate the orchestrator
+   * deterministically presents the next question on every
+   * post-finalize turn, including the goodbye turn — visible to the
+   * user as the request_type chips (`Myself` / `Friend / Family
+   * Member`) flashing under a goodbye assistant message.
+   *
+   * Default-shipped at `seed-defaults/sop.ts:DEFAULT_GOODBYE_PHRASES`.
+   */
+  goodbyePhrases?: readonly string[];
 }
 
 export interface BranchOrchestratorInput {
@@ -237,6 +252,21 @@ export async function runBranchOrchestrator(
   input: BranchOrchestratorInput,
 ): Promise<OrchestratorResult> {
   const { accountId, sopState, userMessage, deps } = input;
+
+  // Gate 0: visitor signalled end-of-conversation. Don't initialize
+  // a branch or advance one when the visitor's latest message is a
+  // goodbye — otherwise we present the next branch question's chips
+  // while the assistant is bidding them goodbye, which is jarring
+  // UX. The chat route's LLM has the same goodbye-phrase list in
+  // its system prompt, so the assistant correctly stops asking
+  // questions; this gate keeps the chip surface in sync with that.
+  if (
+    deps.goodbyePhrases &&
+    deps.goodbyePhrases.length > 0 &&
+    isGoodbyeMessage(userMessage, deps.goodbyePhrases)
+  ) {
+    return { action: 'noop' };
+  }
 
   // Gate 1: SOP must be finalized (Step 6 contact captured).
   if (!sopState.is_finalized) return { action: 'noop' };

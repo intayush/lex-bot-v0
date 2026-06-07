@@ -548,3 +548,76 @@ describe('runBranchOrchestrator — `when` chip bonus on finalize', () => {
     expect(result.score.score).toBe(25);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Goodbye gate (user-reported issue: request_type chips appearing
+// after a goodbye exchange because the orchestrator presents the
+// next branch question deterministically on every post-finalize turn).
+// ---------------------------------------------------------------------------
+
+describe('runBranchOrchestrator — goodbye gate', () => {
+  const SAMPLE_GOODBYES = [
+    'bye',
+    'goodbye',
+    'thanks',
+    'thank you',
+  ] as const;
+
+  it('returns no-op when the visitor message matches a goodbye phrase', async () => {
+    const sopState = makeFinalizedSopState();
+    const result = await runBranchOrchestrator({
+      accountId: ACCOUNT_ID,
+      sopState,
+      userMessage: 'thanks for the help',
+      deps: {
+        ...makeDeps({ branchLookup: { branch: SAMPLE_BRANCH, version: SAMPLE_VERSION } }),
+        goodbyePhrases: SAMPLE_GOODBYES,
+      },
+    });
+    expect(result.action).toBe('noop');
+  });
+
+  it('does NOT skip when the message is a real branch answer', async () => {
+    const sopState = makeFinalizedSopState();
+    const result = await runBranchOrchestrator({
+      accountId: ACCOUNT_ID,
+      sopState,
+      userMessage: 'I was the driver',
+      deps: {
+        ...makeDeps({ branchLookup: { branch: SAMPLE_BRANCH, version: SAMPLE_VERSION } }),
+        goodbyePhrases: SAMPLE_GOODBYES,
+      },
+    });
+    expect(result.action).toBe('present_question');
+  });
+
+  it('does NOT skip when goodbyePhrases is undefined (back-compat)', async () => {
+    const sopState = makeFinalizedSopState();
+    const result = await runBranchOrchestrator({
+      accountId: ACCOUNT_ID,
+      sopState,
+      userMessage: 'thanks',
+      deps: makeDeps({ branchLookup: { branch: SAMPLE_BRANCH, version: SAMPLE_VERSION } }),
+    });
+    // Without the phrase list configured, the orchestrator behaves
+    // as it did pre-fix and presents the first question.
+    expect(result.action).toBe('present_question');
+  });
+
+  it('does NOT skip on word-boundary-violating substrings (no false positives)', async () => {
+    const sopState = makeFinalizedSopState();
+    const result = await runBranchOrchestrator({
+      accountId: ACCOUNT_ID,
+      sopState,
+      userMessage: 'we discussed thanksgiving plans',
+      deps: {
+        ...makeDeps({ branchLookup: { branch: SAMPLE_BRANCH, version: SAMPLE_VERSION } }),
+        goodbyePhrases: SAMPLE_GOODBYES,
+      },
+    });
+    // 'thanks' should not match inside 'thanksgiving' — the gate
+    // shouldn't fire and we should present a question (free-text
+    // path or whatever the orchestrator decides).
+    expect(result.action).not.toBe('noop');
+  });
+});
