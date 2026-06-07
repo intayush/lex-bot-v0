@@ -502,7 +502,8 @@ function QuestionRow({
         value={question.text}
         onChange={(e) => onChange({ text: e.target.value })}
         placeholder="Question text"
-        className="w-full px-2 py-1.5 text-sm rounded border border-[#E5E5E5] bg-white mb-2"
+        aria-label={`Question ${index + 1} text`}
+        className="w-full px-2 py-1.5 text-sm rounded border border-[#E5E5E5] bg-white text-[#171717] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-2 focus:ring-[#171717] focus:border-[#171717] mb-2"
       />
 
       <div className="flex items-center gap-3 mb-2 text-xs text-[#737373]">
@@ -542,8 +543,9 @@ function QuestionRow({
               type="text"
               value={chip.label}
               onChange={(e) => updateChip(chipIdx, { label: e.target.value })}
-              placeholder="Label"
-              className="flex-1 px-2 py-1 text-xs rounded border border-[#E5E5E5] bg-white"
+              placeholder="Display label (e.g. Myself)"
+              aria-label={`Chip ${chipIdx + 1} label`}
+              className="flex-1 min-w-0 px-2 py-1.5 text-sm rounded border border-[#E5E5E5] bg-white text-[#171717] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-2 focus:ring-[#171717] focus:border-[#171717]"
             />
             <input
               type="text"
@@ -551,7 +553,8 @@ function QuestionRow({
               onChange={(e) => updateChip(chipIdx, { slug: e.target.value })}
               placeholder="slug"
               pattern="[a-z0-9_-]+"
-              className="w-28 px-2 py-1 text-xs rounded border border-[#E5E5E5] bg-white font-mono"
+              aria-label={`Chip ${chipIdx + 1} slug`}
+              className="w-28 px-2 py-1.5 text-xs rounded border border-[#E5E5E5] bg-white font-mono text-[#171717] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-2 focus:ring-[#171717] focus:border-[#171717]"
             />
             <input
               type="number"
@@ -562,7 +565,8 @@ function QuestionRow({
               step={1}
               min={-50}
               max={50}
-              className="w-16 px-2 py-1 text-xs rounded border border-[#E5E5E5] bg-white text-right"
+              aria-label={`Chip ${chipIdx + 1} score weight`}
+              className="w-16 px-2 py-1.5 text-xs rounded border border-[#E5E5E5] bg-white text-right text-[#171717] focus:outline-none focus:ring-2 focus:ring-[#171717] focus:border-[#171717]"
             />
             <button
               type="button"
