@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getAuthSession } from '../../../lib/dashboard-session';
+import { getLatestConfig } from '../../../lib/config';
 import {
   getLatestSOP,
   getCaseTypes,
@@ -38,11 +39,12 @@ export default async function SopPage() {
   const session = await getAuthSession();
   if (!session.accountId) redirect('/login');
 
-  const [sop, caseTypes, goodbyePhrases, branchPairs] = await Promise.all([
+  const [sop, caseTypes, goodbyePhrases, branchPairs, latestConfig] = await Promise.all([
     getLatestSOP(session.accountId),
     getCaseTypes(session.accountId),
     getGoodbyePhrases(session.accountId),
     listBranchPairsForAccount(session.accountId),
+    getLatestConfig(session.accountId),
   ]);
 
   // Tagline: tell the lawyer whether they're looking at the live
@@ -96,7 +98,7 @@ export default async function SopPage() {
           />
         </div>
         <div className="lg:col-span-1">
-          <PreviewChat />
+          <PreviewChat initialTheme={latestConfig?.config.theme ?? null} />
         </div>
       </div>
     </div>

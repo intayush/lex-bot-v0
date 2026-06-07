@@ -53,6 +53,11 @@ export async function GET(req: Request) {
       greeting_message: config.persona.greeting_message,
       practice_areas: [...config.practice_areas.active, ...config.practice_areas.custom.filter(Boolean)],
       phone: config.contact.phone,
+      // Optional widget theme (per-firm branding). When absent the
+      // widget keeps the indigo defaults from panel.css. When present
+      // the widget applies the values as inline CSS variables on the
+      // ChatPanel wrapper, mirroring the dashboard PreviewChat path.
+      theme: config.theme ?? null,
       // SOP fields — null when an account has no published SOP.
       sop: sop
         ? {

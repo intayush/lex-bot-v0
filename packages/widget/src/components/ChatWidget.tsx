@@ -57,13 +57,50 @@ const DEFAULT_API_URL = readDefaultApiUrl();
  *   - the bubble's DOM ref so focus can return to it after the panel closes
  *   - mount lifecycle for ChatPanel: mounts on open, stays mounted while
  *     exiting (so the close animation can run), unmounts on `onClosed`
+ *   - the firm-configured theme (an inline CSS-variable override applied
+ *     on the `.lc-widget` wrapper so it cascades into BOTH the bubble
+ *     and the panel)
  */
 export function ChatWidget({ apiKey, apiUrl = DEFAULT_API_URL }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  // Theme cascading style. Null when /api/config hasn't returned yet
+  // OR when the firm hasn't customised colors — both cases fall back
+  // to the indigo defaults declared in panel.css.
+  const [themeStyle, setThemeStyle] = useState<React.CSSProperties | null>(null);
   const bubbleRef = useRef<HTMLButtonElement>(null);
   const wasOpenRef = useRef(false);
+
+  // Fetch the firm's theme once on mount. The full /api/config payload
+  // is also fetched by ChatPanel when the panel opens; this lightweight
+  // fetch lets the bubble carry the theme even before the panel mounts.
+  // Both calls hit the same cache-friendly endpoint.
+  useEffect(() => {
+    const baseUrl = apiUrl.replace(/\/api\/chat\/?$/, '');
+    fetch(`${baseUrl}/api/config`, {
+      headers: { 'x-api-key': apiKey },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const theme = data?.theme as
+          | { primary_bg?: string; primary_color?: string }
+          | null
+          | undefined;
+        if (theme && theme.primary_bg && theme.primary_color) {
+          setThemeStyle({
+            // Cast through CSSProperties because TypeScript doesn't
+            // know about arbitrary --custom-property keys.
+            ['--lc-primary-bg' as keyof React.CSSProperties]: theme.primary_bg,
+            ['--lc-primary-color' as keyof React.CSSProperties]: theme.primary_color,
+          } as React.CSSProperties);
+        }
+      })
+      .catch(() => {
+        // Silently fall back to defaults; bubble still renders with
+        // indigo. Same failure semantics as ChatPanel's own fetch.
+      });
+  }, [apiKey, apiUrl]);
 
   useEffect(() => {
     function check() {
@@ -93,7 +130,7 @@ export function ChatWidget({ apiKey, apiUrl = DEFAULT_API_URL }: ChatWidgetProps
   }, [isOpen]);
 
   return (
-    <div className="lc-widget">
+    <div className="lc-widget" style={themeStyle ?? undefined}>
       {isMounted && (
         <ChatPanel
           apiKey={apiKey}

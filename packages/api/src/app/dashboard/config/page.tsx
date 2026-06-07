@@ -37,7 +37,7 @@ export default async function ConfigPage() {
           <ConfigForm initialConfig={latest?.config ?? null} />
         </div>
         <div className="lg:col-span-1">
-          <PreviewChat />
+          <PreviewChat initialTheme={latest?.config.theme ?? null} />
         </div>
       </div>
     </div>

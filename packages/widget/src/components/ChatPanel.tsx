@@ -50,6 +50,22 @@ function saveSessionId(id: string) {
   }
 }
 
+interface WidgetTheme {
+  /** Stable preset id ('default' | 'sunset' | …). Display-only. */
+  id: string;
+  /**
+   * Paintable background — solid color OR CSS gradient (any
+   * background-image-compatible value). Applied as
+   * `--lc-primary-bg` on the wrapper.
+   */
+  primary_bg: string;
+  /**
+   * Solid color for borders and foreground text. Applied as
+   * `--lc-primary-color` on the wrapper.
+   */
+  primary_color: string;
+}
+
 interface WidgetConfig {
   chatbot_name: string;
   greeting_message: string;
@@ -59,6 +75,12 @@ interface WidgetConfig {
   sop?: WidgetSOP | null;
   /** Case-type catalog with sub-types (010-sop-workflow T033). */
   case_types?: WidgetCaseType[];
+  /**
+   * Optional firm-configured visual theme. Null when the firm hasn't
+   * customised colors — the widget falls back to the indigo defaults
+   * declared in panel.css.
+   */
+  theme?: WidgetTheme | null;
 }
 
 /**

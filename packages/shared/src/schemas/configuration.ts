@@ -52,6 +52,34 @@ export const contactSchema = z.object({
   after_hours_message: z.string(),
 });
 
+/**
+ * Visual theme for the chat widget (bubble + panel + chips + buttons).
+ *
+ * `primary_bg` is the paintable surface — may be a solid CSS color
+ * OR a CSS gradient (any `background-image`-compatible value:
+ * `linear-gradient(...)`, `radial-gradient(...)`, etc.). Used by
+ * the widget for buttons, chip hover state, the floating bubble,
+ * and the user-message bubble background.
+ *
+ * `primary_color` MUST be a solid color (no gradients). Used for
+ * borders, text foreground, and outlines — places where CSS
+ * doesn't accept a gradient. When the host sets a gradient
+ * `primary_bg`, they must also set a representative solid
+ * `primary_color` so border/outline treatments still paint.
+ *
+ * `id` is a stable identifier for the chosen preset (`'default'`,
+ * `'sunset'`, etc.) so the dashboard can highlight the active
+ * swatch on reload. Custom themes use `'custom'`.
+ *
+ * `null` / absent on the configuration falls back to the
+ * indigo defaults shipped in `packages/widget/src/styles/panel.css`.
+ */
+export const themeSchema = z.object({
+  id: z.string().min(1).max(64),
+  primary_bg: z.string().min(1).max(512),
+  primary_color: z.string().min(1).max(64),
+});
+
 export const configurationSchema = z.object({
   version: z.number().int(),
   saved_at: z.string(),
@@ -62,6 +90,13 @@ export const configurationSchema = z.object({
   escalation: escalationSchema,
   contact: contactSchema,
   custom_instructions: z.string().default(''),
+  /**
+   * Optional widget theme. Absent on legacy rows; new rows persisted
+   * via the dashboard's theme picker carry it. Consumed by
+   * /api/config and cascaded into the widget via inline CSS
+   * variables on `ChatPanel`'s wrapper.
+   */
+  theme: themeSchema.nullable().optional(),
 });
 
 export type Tone = z.infer<typeof toneSchema>;
@@ -72,4 +107,5 @@ export type Boundaries = z.infer<typeof boundariesSchema>;
 export type Escalation = z.infer<typeof escalationSchema>;
 export type OfficeHours = z.infer<typeof officeHoursSchema>;
 export type Contact = z.infer<typeof contactSchema>;
+export type Theme = z.infer<typeof themeSchema>;
 export type Configuration = z.infer<typeof configurationSchema>;

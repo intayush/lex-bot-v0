@@ -65,6 +65,22 @@ export function __resetConfigCachesForTests(): void {
   latestCache.clear();
 }
 
+/**
+ * Production-callable cache invalidation. Drop both the published
+ * and latest cache entries for an account so the next /api/config
+ * read re-fetches from the DB.
+ *
+ * Call this from any handler that mutates the configurations table
+ * (e.g. /api/dashboard/config save / publish / save_theme) so the
+ * widget picks up the new value immediately instead of after up to
+ * `CONFIG_CACHE_TTL_MS`. Without invalidation, a publish event
+ * remains invisible to live conversations for up to 60s.
+ */
+export function invalidateConfigCache(accountId: string): void {
+  publishedCache.delete(accountId);
+  latestCache.delete(accountId);
+}
+
 export async function getPublishedConfig(accountId: string): Promise<Configuration | null> {
   const cached = getCached(publishedCache, accountId);
   if (cached !== undefined) return cached;
