@@ -60,22 +60,35 @@ describe('panel.css — mobile breakpoint (T014)', () => {
 });
 
 describe('panel.css — public design tokens (T002)', () => {
-  const root = block('\\.lc-panel');
+  // Public tokens live on `:root` (not `.lc-panel`) so that an
+  // embedding host can override them by setting the same custom
+  // property on a parent element of the panel — declaring them on
+  // `.lc-panel` itself shadowed parent overrides because the panel's
+  // own declaration was the closest definition the cascade saw.
+  const rootBlock = block(':root');
+  const panelBlock = block('\\.lc-panel');
 
-  it('declares --lc-primary-color default #4338ca', () => {
-    expect(root).toMatch(/--lc-primary-color\s*:\s*#4338ca/);
+  it('declares --lc-primary-color default #4338ca on :root', () => {
+    expect(rootBlock).toMatch(/--lc-primary-color\s*:\s*#4338ca/);
   });
 
-  it('declares --lc-background default #fcfaf5', () => {
-    expect(root).toMatch(/--lc-background\s*:\s*#fcfaf5/);
+  it('declares --lc-background default #fcfaf5 on :root', () => {
+    expect(rootBlock).toMatch(/--lc-background\s*:\s*#fcfaf5/);
   });
 
-  it('declares --lc-border-radius default 20px', () => {
-    expect(root).toMatch(/--lc-border-radius\s*:\s*20px/);
+  it('declares --lc-border-radius default 20px on :root', () => {
+    expect(rootBlock).toMatch(/--lc-border-radius\s*:\s*20px/);
   });
 
-  it('declares --lc-panel-anim-duration default 320ms', () => {
-    expect(root).toMatch(/--lc-panel-anim-duration\s*:\s*320ms/);
+  it('declares --lc-panel-anim-duration default 320ms on .lc-panel (internal token)', () => {
+    expect(panelBlock).toMatch(/--lc-panel-anim-duration\s*:\s*320ms/);
+  });
+
+  it('does NOT redeclare public tokens on .lc-panel (would shadow parent overrides)', () => {
+    expect(panelBlock).not.toMatch(/--lc-primary-color\s*:/);
+    expect(panelBlock).not.toMatch(/--lc-primary-bg\s*:/);
+    expect(panelBlock).not.toMatch(/--lc-background\s*:\s*#/);
+    expect(panelBlock).not.toMatch(/--lc-border-radius\s*:/);
   });
 });
 

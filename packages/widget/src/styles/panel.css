@@ -16,8 +16,21 @@
  * full contract.
  */
 
-.lc-panel {
-  /* Public — preserve names; embedding firms override these. */
+/*
+ * Public tokens — declared on :root so embedding hosts can override
+ * any of them by setting the same custom property on a parent
+ * element of `.lc-panel` (e.g. via inline style or a wrapping
+ * stylesheet). Declaring them on `.lc-panel` itself shadowed
+ * parent-level overrides because the panel's own declaration is the
+ * closest definition the cascade finds — that broke the dashboard
+ * Preview Chat's theme picker, which sets `--lc-primary-bg` /
+ * `--lc-primary-color` on a wrapper div.
+ *
+ * Internal tokens stay scoped to `.lc-panel` further down so the
+ * widget's surface treatment can't be accidentally inverted by host
+ * page CSS.
+ */
+:root {
   --lc-primary-color: #4338ca;
   --lc-primary-text: #ffffff;
   /*
@@ -42,7 +55,9 @@
   --lc-border-radius: 20px;
   --lc-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, Inter, sans-serif;
+}
 
+.lc-panel {
   /* Internal — glass surface. */
   --lc-surface: rgba(252, 250, 245, 0.72);
   --lc-surface-fallback: rgba(252, 250, 245, 0.96);
