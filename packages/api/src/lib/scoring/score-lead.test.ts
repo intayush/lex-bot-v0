@@ -203,7 +203,10 @@ describe('scoreLead — HOT walk (Self table)', () => {
       sopState,
       scoringConfig: carAccidentDefaultConfig,
       chipsBySlug,
-      // Simulate +15 from contact form (phone + email both valid)
+      // Hypothetical contactBonus = 15. Real production formula
+      // (leads.ts) is +5 phone +5 email = max +10 per
+      // lead-classification-revamp.md Q9; we pass +15 here only to
+      // exercise the score-clamp behaviour at >100.
       contactBonus: 15,
     });
 

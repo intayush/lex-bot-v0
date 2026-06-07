@@ -297,9 +297,14 @@ async function computeScoringFields(
     }
   }
 
-  // Compute the contact-form bonus (xlsx Q8: phone +10, email +5).
+  // Compute the contact-form bonus (lead-classification-revamp.md Q9:
+  // phone +5, email +5, max +10). The same formula is implemented in
+  // `branch-orchestrator.computeContactBonus`; the two paths must
+  // stay aligned. (Earlier this path used phone +10 / email +5 with
+  // a misleading "xlsx Q8" comment that contradicted the source-spec
+  // table; corrected to match the canonical +5/+5/max+10 rule.)
   const contactBonus =
-    (contactPhone && contactPhone.replace(/[^0-9]/g, '').length >= 7 ? 10 : 0) +
+    (contactPhone && contactPhone.replace(/[^0-9]/g, '').length >= 7 ? 5 : 0) +
     (contactEmail && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail) ? 5 : 0);
 
   let scored;
