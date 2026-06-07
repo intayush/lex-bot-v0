@@ -13,6 +13,7 @@ import {
   CAR_ACCIDENT_BRANCH_QUESTIONS_JSON,
   CAR_ACCIDENT_BRANCH_THRESHOLDS_JSON,
 } from './seed-defaults/sop.js';
+import { DEFAULT_BRANCH_SEEDS } from './seed-defaults/branches.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -127,12 +128,45 @@ export async function seedSopForAccount(accountId: string): Promise<void> {
     created_by_user_id: 'system_seed_016',
   });
 
+  // 6. Seed every other default sub-type's Branch (spec 017 follow-up —
+  // expansion beyond the car_accident reference). Family Law and Estate
+  // Planning are intentionally excluded from this batch; their seed entries
+  // are absent from `DEFAULT_BRANCH_SEEDS`. See `seed-defaults/branches.ts`.
+  for (const seed of DEFAULT_BRANCH_SEEDS) {
+    const seededBranchId = nanoid();
+    const seededVersionId = nanoid();
+    await db.insert(schema.branches).values({
+      id: seededBranchId,
+      account_id: accountId,
+      case_type_slug: seed.case_type_slug,
+      sub_type_slug: seed.sub_type_slug,
+      is_active: true,
+      current_version_id: seededVersionId,
+      created_at: now,
+      updated_at: now,
+    });
+    await db.insert(schema.branchVersions).values({
+      id: seededVersionId,
+      branch_id: seededBranchId,
+      version_number: 1,
+      is_published: true,
+      questions_json: seed.questions_json,
+      classification_thresholds_json: seed.classification_thresholds_json,
+      hard_override_toggles_json: seed.hard_override_toggles_json,
+      published_at: now,
+      created_at: now,
+      created_by_user_id: 'system_seed_017',
+    });
+  }
+
   const subTypeCount = DEFAULT_CASE_TYPES.reduce((acc, ct) => acc + ct.sub_types.length, 0);
   console.log(
     `  SOP seeded for account ${accountId}: ` +
     `1 config, ${DEFAULT_SOP_STEPS.length} steps, ` +
     `${DEFAULT_CASE_TYPES.length} case types, ${subTypeCount} sub-types, ` +
-    `${DEFAULT_GOODBYE_PHRASES.length} goodbye phrases, 1 car-accident branch (spec 016).`,
+    `${DEFAULT_GOODBYE_PHRASES.length} goodbye phrases, ` +
+    `${1 + DEFAULT_BRANCH_SEEDS.length} branches ` +
+    `(1 car-accident reference + ${DEFAULT_BRANCH_SEEDS.length} default sub-type branches).`,
   );
 }
 
