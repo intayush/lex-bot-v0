@@ -169,20 +169,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             initialChangedAt={lead.follow_up_action_changed_at ?? null}
           />
 
-          {lead.brief_description && (
-            <div className="bg-white rounded-xl border border-[#E5E5E5] p-6">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-[#A3A3A3] mb-3">Description</h3>
-              <p className="text-sm text-[#171717] leading-relaxed">{lead.brief_description}</p>
-            </div>
-          )}
-
-          {lead.classification_rationale && (
-            <div className="bg-white rounded-xl border border-[#E5E5E5] p-6">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-[#A3A3A3] mb-3">Classification Rationale</h3>
-              <p className="text-sm text-[#171717] leading-relaxed">{lead.classification_rationale}</p>
-            </div>
-          )}
-
+          {/* Urgency Factors — surfaced FIRST in the descriptive content so
+              lawyers see the most actionable signal immediately after the
+              Lead Details card. The red panel + alert icon make it
+              unmissable; lower-priority sections (Description, Classification
+              Rationale, Branch snapshot) come below. */}
           {urgencyFactors.length > 0 && (
             <div className="bg-[#FEF2F2] rounded-xl border border-[#FECACA] p-6">
               <h3 className="text-xs font-medium uppercase tracking-wide text-[#991B1B] mb-3 flex items-center gap-1.5">
@@ -201,6 +192,20 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+
+          {lead.brief_description && (
+            <div className="bg-white rounded-xl border border-[#E5E5E5] p-6">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-[#A3A3A3] mb-3">Description</h3>
+              <p className="text-sm text-[#171717] leading-relaxed">{lead.brief_description}</p>
+            </div>
+          )}
+
+          {lead.classification_rationale && (
+            <div className="bg-white rounded-xl border border-[#E5E5E5] p-6">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-[#A3A3A3] mb-3">Classification Rationale</h3>
+              <p className="text-sm text-[#171717] leading-relaxed">{lead.classification_rationale}</p>
             </div>
           )}
 
