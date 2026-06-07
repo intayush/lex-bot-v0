@@ -142,7 +142,18 @@ export function ChatPanel({ apiKey, apiUrl, onCloseRequest, onClosed }: ChatPane
     }
   }, [messages, clearPreflight]);
 
-  const handleClose = () => setIsOpen(false);
+  // Single source of truth for "user wants to close": flips the local
+  // isOpen (which drives PanelShell.isOpen) AND signals the parent
+  // (ChatWidget) so it can flip its own isOpen state in sync. Used by
+  // the header X, by Escape (via PanelShell), and by the mobile scrim
+  // (also via PanelShell). Without this unified handler, the header X
+  // only updated local state and the parent re-mounted ChatPanel via
+  // its `if (isOpen && !isMounted) setIsMounted(true)` auto-mount
+  // effect — visible as the panel staying open after clicking X.
+  const requestClose = () => {
+    setIsOpen(false);
+    onCloseRequest();
+  };
 
   // The Composer's chips prop is a flat list of strings rather than the
   // ChipSpec object that <Chips> consumes. We pass the raw labels via
@@ -230,10 +241,7 @@ export function ChatPanel({ apiKey, apiUrl, onCloseRequest, onClosed }: ChatPane
     <PanelShell
       isOpen={isOpen}
       onClosed={onClosed}
-      onCloseRequest={() => {
-        setIsOpen(false);
-        onCloseRequest();
-      }}
+      onCloseRequest={requestClose}
       ariaLabel={`Chat with ${widgetConfig?.chatbot_name ?? 'LexBot'}`}
     >
       {/* 1. Header */}
@@ -253,7 +261,7 @@ export function ChatPanel({ apiKey, apiUrl, onCloseRequest, onClosed }: ChatPane
           <div style={{ fontSize: '12px', opacity: 0.8 }}>Virtual Assistant</div>
         </div>
         <button
-          onClick={handleClose}
+          onClick={requestClose}
           aria-label="Close chat"
           style={{
             background: 'none',
