@@ -15,6 +15,7 @@ import {
 } from '@legal-chatbot/shared';
 import { scoreLead } from './scoring/score-lead';
 import { buildReasons } from './scoring/reason-builder';
+import { applyAndPersistHardOverrides } from './scoring/apply-hard-overrides-to-lead';
 
 interface CaptureLeadInput {
   accountId: string;
@@ -406,9 +407,24 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
       })
       .where(eq(leads.id, existingRow.id));
 
+    // Spec 015 T064 — apply hard-override rules AFTER the row is
+    // persisted (FR-010c: lawyers retain visibility into spam
+    // attempts). Downgrades classification to 'SPAM' and appends
+    // fired rule names to score_reasons_json when applicable.
+    const overrideOutcome = await applyAndPersistHardOverrides({
+      accountId: input.accountId,
+      leadId: existingRow.id,
+      sopState: input.sopState ?? null,
+    });
+    const postOverrideClassification = (overrideOutcome.finalClassification as LeadClassification);
+
     // Notification fires only on transition into urgent. Existing-urgent
     // updates don't re-notify; downgrades don't notify either.
-    if (wasNotUrgent && isNowUrgent) {
+    // Use POST-override classification so a SPAM downgrade suppresses
+    // any notification that the pre-override HOT classification
+    // might have triggered.
+    const isStillUrgent = postOverrideClassification === 'HOT';
+    if (wasNotUrgent && isStillUrgent) {
       await db.insert(notifications).values({
         id: nanoid(),
         account_id: input.accountId,
@@ -427,7 +443,7 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
       accountId: input.accountId,
       leadId: existingRow.id,
       sessionId: input.sessionId,
-      classification: finalClassification,
+      classification: postOverrideClassification,
       scoring: scoringFields,
       caseTypeSlug:
         input.sopState?.steps.find((s) => s.slug === 'case_type')
@@ -435,11 +451,14 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
       subTypeSlug:
         input.sopState?.steps.find((s) => s.slug === 'sub_type')
           ?.captured_value ?? null,
-      hardOverrideFired: null, // Phase 6 / T064 wires hard-overrides
+      hardOverrideFired:
+        overrideOutcome.firedRules.length > 0
+          ? overrideOutcome.firedRules.join(',')
+          : null,
       sopVersion: input.sopState?.sop_version ?? null,
     });
 
-    return { leadId: existingRow.id, classification: finalClassification };
+    return { leadId: existingRow.id, classification: postOverrideClassification };
   }
 
   // Spec 016 FR-002b / SC-003 — partial-gate guard: every captured
@@ -484,7 +503,16 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
     created_at: now,
   });
 
-  if (finalClassification === 'HOT') {
+  // Spec 015 T064 — apply hard-override rules AFTER the row is
+  // persisted. Same FR-010c rationale as the UPDATE branch above.
+  const overrideOutcome = await applyAndPersistHardOverrides({
+    accountId: input.accountId,
+    leadId,
+    sopState: input.sopState ?? null,
+  });
+  const postOverrideClassification = (overrideOutcome.finalClassification as LeadClassification);
+
+  if (postOverrideClassification === 'HOT') {
     await db.insert(notifications).values({
       id: nanoid(),
       account_id: input.accountId,
@@ -503,7 +531,7 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
     accountId: input.accountId,
     leadId,
     sessionId: input.sessionId,
-    classification: finalClassification,
+    classification: postOverrideClassification,
     scoring: scoringFields,
     caseTypeSlug:
       input.sopState?.steps.find((s) => s.slug === 'case_type')
@@ -511,11 +539,14 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
     subTypeSlug:
       input.sopState?.steps.find((s) => s.slug === 'sub_type')
         ?.captured_value ?? null,
-    hardOverrideFired: null, // Phase 6 / T064 wires hard-overrides
+    hardOverrideFired:
+      overrideOutcome.firedRules.length > 0
+        ? overrideOutcome.firedRules.join(',')
+        : null,
     sopVersion: input.sopState?.sop_version ?? null,
   });
 
-  return { leadId, classification: finalClassification };
+  return { leadId, classification: postOverrideClassification };
 }
 
 /**
@@ -645,11 +676,20 @@ export async function updateLeadSOPState(
     })
     .where(eq(leads.id, existingRow.id));
 
+  // Spec 015 T064 — apply hard-override rules AFTER the row is
+  // persisted. Identical wiring to captureLead's two paths above.
+  const overrideOutcome = await applyAndPersistHardOverrides({
+    accountId: existingRow.account_id,
+    leadId: existingRow.id,
+    sopState,
+  });
+  const postOverrideClassification = (overrideOutcome.finalClassification as LeadClassification);
+
   emitLeadClassifiedLog({
     accountId: existingRow.account_id,
     leadId: existingRow.id,
     sessionId,
-    classification: finalClassification,
+    classification: postOverrideClassification,
     scoring: scoringFields,
     caseTypeSlug:
       sopState.steps.find((s) => s.slug === 'case_type')?.captured_value ??
@@ -657,7 +697,10 @@ export async function updateLeadSOPState(
     subTypeSlug:
       sopState.steps.find((s) => s.slug === 'sub_type')?.captured_value ??
       null,
-    hardOverrideFired: null, // Phase 6 / T064 wires hard-overrides
+    hardOverrideFired:
+      overrideOutcome.firedRules.length > 0
+        ? overrideOutcome.firedRules.join(',')
+        : null,
     sopVersion: sopState.sop_version ?? null,
   });
 }

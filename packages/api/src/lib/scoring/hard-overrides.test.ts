@@ -85,6 +85,30 @@ function makeSOPState(captures: Record<string, string> = {}): SOPState {
   };
 }
 
+/**
+ * Spec 016+ shape: returns an SOPState with `branch_state.captured_chips`
+ * populated. The branch-state captures are the production data shape for
+ * any branch-flow lead since spec 016. Used by the new-shape tests for
+ * `checkNoInjuryNoTreatment`.
+ */
+function makeBranchSOPState(
+  branchCaptures: Record<string, string[]>,
+): SOPState {
+  const base = makeSOPState();
+  return {
+    ...base,
+    branch_state: {
+      branch_id: 'br_test',
+      branch_version_id: 'bv_test',
+      current_question_index: Object.keys(branchCaptures).length,
+      captured_chips: Object.entries(branchCaptures).map(
+        ([question_id, chip_slugs]) => ({ question_id, chip_slugs }),
+      ),
+      captured_free_text: [],
+    },
+  };
+}
+
 const allEnabled: HardOverridesEnabled = {
   missing_contact: true,
   out_of_scope: true,
@@ -200,6 +224,71 @@ describe('checkNoInjuryNoTreatment', () => {
   it('returns false when both steps are unanswered', () => {
     const sop = makeSOPState({});
     expect(checkNoInjuryNoTreatment(sop)).toBe(false);
+  });
+
+  // ---- Spec 016+ branch-flow shape ----
+  // Production branch-flow leads carry their answers on
+  // `sopState.branch_state.captured_chips`, NOT on `sopState.steps[]`.
+  // The legacy steps[] path remains supported for spec-015-shaped
+  // leads and unit fixtures, but the branch-state path is the
+  // hot path post-spec-016.
+
+  it('branch-state: returns true when both branch chips fire', () => {
+    const sop = makeBranchSOPState({
+      injury: ['injury_no'],
+      medical_treatment: ['no_treatment'],
+    });
+    expect(checkNoInjuryNoTreatment(sop)).toBe(true);
+  });
+
+  it('branch-state: returns false when only injury_no fires', () => {
+    const sop = makeBranchSOPState({
+      injury: ['injury_no'],
+      medical_treatment: ['er_visit'],
+    });
+    expect(checkNoInjuryNoTreatment(sop)).toBe(false);
+  });
+
+  it('branch-state: returns false when only no_treatment fires', () => {
+    const sop = makeBranchSOPState({
+      injury: ['injury_yes'],
+      medical_treatment: ['no_treatment'],
+    });
+    expect(checkNoInjuryNoTreatment(sop)).toBe(false);
+  });
+
+  it('branch-state: returns false when neither question is answered', () => {
+    const sop = makeBranchSOPState({
+      // The branch is in flight but the visitor hasn't reached
+      // the injury / medical_treatment questions yet.
+      request_type: ['myself'],
+      geographic_qualification: ['yes_in_area'],
+    });
+    expect(checkNoInjuryNoTreatment(sop)).toBe(false);
+  });
+
+  it('branch-state authoritative: legacy steps[] capture is ignored when branch_state is populated', () => {
+    // Defensive: if a branch is in flight (branch_state populated),
+    // we MUST NOT fall back to the legacy steps[] shape — that would
+    // re-fire on a stale step capture from a previous flow.
+    const base = makeSOPState({
+      injury: 'injury_no',
+      medical_treatment: 'no_treatment',
+    });
+    const withBranch: SOPState = {
+      ...base,
+      branch_state: {
+        branch_id: 'br_test',
+        branch_version_id: 'bv_test',
+        current_question_index: 2,
+        captured_chips: [
+          { question_id: 'injury', chip_slugs: ['injury_yes'] },
+          { question_id: 'medical_treatment', chip_slugs: ['er_visit'] },
+        ],
+        captured_free_text: [],
+      },
+    };
+    expect(checkNoInjuryNoTreatment(withBranch)).toBe(false);
   });
 });
 

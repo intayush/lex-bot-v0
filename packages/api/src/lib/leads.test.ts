@@ -160,7 +160,11 @@ function makeLeadInput(overrides: Record<string, unknown> = {}) {
     accountId: TEST_ACCOUNT_ID,
     sessionId: TEST_SESSION_ID,
     name: 'Jane Doe',
-    contactEmail: 'jane@example.com',
+    // NOTE: avoid `@example.com` / `@test.com` and `test@…` patterns —
+    // they trip the `fake_info` hard-override and downgrade every
+    // captured lead to SPAM, masking the behaviour these tests want
+    // to exercise. Use a vanilla TLD instead.
+    contactEmail: 'jane@gmail.com',
     contactPhone: '555-0100',
     caseType: 'Personal Injury',
     incidentDate: '2026-01-15',
@@ -869,7 +873,9 @@ describe('updateLeadSOPState — onFinish backfill helper', () => {
     await captureLead(makeLeadInput({
       classification: 'HOT',
       name: 'Jane Doe',
-      contactEmail: 'jane@example.com',
+      // Use a non-fake-info-tripping email; @example.com hits the
+      // fake_info regex and SPAM-downgrades the lead.
+      contactEmail: 'jane@gmail.com',
       caseType: 'DUI',
       sopState: buildSOPStateWithWhen(null),
     }));
@@ -882,7 +888,7 @@ describe('updateLeadSOPState — onFinish backfill helper', () => {
       .get();
     expect(row.classification).toBe('HOT');
     expect(row.name).toBe('Jane Doe');
-    expect(row.contact_email).toBe('jane@example.com');
+    expect(row.contact_email).toBe('jane@gmail.com');
     expect(row.case_type).toBe('DUI');
   });
 
@@ -1779,5 +1785,156 @@ describe('updateLeadSOPState — structured lead_classified log emission (spec 0
     expect(allLogs.length).toBe(1);
     expect(allLogs[0].scoring_path).toBe('rule_based');
     expect(allLogs[0].classification).toBe('HOT');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 015 T064 — hard-override integration via captureLead
+//
+// These tests exercise the end-to-end wiring added in
+// `apply-hard-overrides-to-lead.ts`: captureLead persists a row,
+// applyAndPersistHardOverrides runs, and rows where any rule fires
+// land on disk with classification='SPAM' and the rule names appended
+// to score_reasons_json.
+// ---------------------------------------------------------------------------
+
+describe('captureLead — hard-override integration (spec 015 T064)', () => {
+  it('downgrades classification to SPAM when fake_info fires (test@ email)', async () => {
+    const result = await captureLead(
+      makeLeadInput({
+        classification: 'HOT',
+        contactEmail: 'test@gmail.com',
+      }),
+    );
+    expect(result.classification).toBe('SPAM');
+
+    const row = (db as any)
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.id, result.leadId))
+      .get();
+    expect(row.classification).toBe('SPAM');
+    const reasons = JSON.parse(row.score_reasons_json ?? '[]') as string[];
+    expect(reasons).toContain('fake_info');
+  });
+
+  it('downgrades to SPAM when missing_contact fires (no email AND no phone after row creation)', async () => {
+    // captureLead refuses both null at the public API per FR-002b, so
+    // we exercise missing_contact via the UPDATE path instead: insert
+    // first with valid contact, then call again with both null.
+    // FR-002b's throw guards inserts; updates can carry empty contact
+    // (the FR-002b guard at leads.ts:453 only fires on the INSERT
+    // branch, not UPDATE). The override then kicks in.
+    await captureLead(makeLeadInput({ classification: 'WARM' }));
+    // Wipe contact via direct DB update so the second captureLead call
+    // sees the lead without contact info but reuses the session.
+    (db as any)
+      .update(schema.leads)
+      .set({ contact_email: null, contact_phone: null })
+      .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+      .run();
+
+    const result = await captureLead(
+      makeLeadInput({
+        classification: 'HOT',
+        contactEmail: null,
+        contactPhone: null,
+      }),
+    );
+    // captureLead's FR-002b guard only applies to first-time inserts;
+    // updates pass through. The override fires post-update and returns
+    // SPAM.
+    expect(result.classification).toBe('SPAM');
+
+    const row = (db as any)
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.id, result.leadId))
+      .get();
+    const reasons = JSON.parse(row.score_reasons_json ?? '[]') as string[];
+    expect(reasons).toContain('missing_contact');
+  });
+
+  it('does NOT downgrade when no rule fires (clean lead)', async () => {
+    const result = await captureLead(
+      makeLeadInput({
+        classification: 'HOT',
+        name: 'Clean Lead',
+        contactEmail: 'lead@gmail.com',
+        contactPhone: '+15555550100',
+      }),
+    );
+    expect(result.classification).toBe('HOT');
+
+    const row = (db as any)
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.id, result.leadId))
+      .get();
+    expect(row.classification).toBe('HOT');
+    const reasons = JSON.parse(row.score_reasons_json ?? '[]') as string[];
+    expect(reasons).not.toContain('fake_info');
+    expect(reasons).not.toContain('missing_contact');
+    expect(reasons).not.toContain('out_of_scope');
+    expect(reasons).not.toContain('no_injury_no_treatment');
+  });
+
+  it('appended override rule appears in fixed evaluation order in reasons', async () => {
+    // Trigger fake_info AND no-injury-no-treatment via fake_info-style
+    // name + missing-contact-style empty fields after first insert.
+    await captureLead(makeLeadInput({ classification: 'WARM' }));
+    (db as any)
+      .update(schema.leads)
+      .set({ contact_email: null, contact_phone: null })
+      .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+      .run();
+
+    const result = await captureLead(
+      makeLeadInput({
+        classification: 'HOT',
+        name: 'Test User', // trips fake_info
+        contactEmail: null,
+        contactPhone: null,
+      }),
+    );
+    expect(result.classification).toBe('SPAM');
+
+    const row = (db as any)
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.id, result.leadId))
+      .get();
+    const reasons = JSON.parse(row.score_reasons_json ?? '[]') as string[];
+    // FIXED_ORDER puts missing_contact before fake_info.
+    const missingIdx = reasons.indexOf('missing_contact');
+    const fakeIdx = reasons.indexOf('fake_info');
+    expect(missingIdx).toBeGreaterThanOrEqual(0);
+    expect(fakeIdx).toBeGreaterThanOrEqual(0);
+    expect(missingIdx).toBeLessThan(fakeIdx);
+  });
+
+  it('idempotent: second call to applyAndPersistHardOverrides does not duplicate rule names', async () => {
+    // Run captureLead twice (UPDATE path) — both runs should land
+    // with the same rule list, no duplicates.
+    await captureLead(
+      makeLeadInput({
+        classification: 'HOT',
+        contactEmail: 'test@gmail.com', // trips fake_info
+      }),
+    );
+    const result = await captureLead(
+      makeLeadInput({
+        classification: 'HOT',
+        contactEmail: 'test@gmail.com',
+      }),
+    );
+
+    const row = (db as any)
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.id, result.leadId))
+      .get();
+    const reasons = JSON.parse(row.score_reasons_json ?? '[]') as string[];
+    expect(reasons.filter((r) => r === 'fake_info')).toHaveLength(1);
   });
 });

@@ -13,6 +13,7 @@ import {
 } from '../../../lib/session';
 import { searchContext, fetchManifest } from '../../../lib/context-search';
 import { captureLead, updateLeadSOPState } from '../../../lib/leads';
+import { applyAndPersistHardOverrides } from '../../../lib/scoring/apply-hard-overrides-to-lead';
 import { extractPartialLeadData, savePartialLead } from '../../../lib/partial-lead';
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { initSOPState } from '../../../lib/sop/state-machine';
@@ -469,7 +470,7 @@ export async function POST(req: Request) {
       // No-op when this turn didn't finalize a branch.
       if (branchFinalizationPayload) {
         const reasonsJson = JSON.stringify(branchFinalizationPayload.reasons);
-        await db
+        const branchUpdateResult = await db
           .update(schema.leads)
           .set({
             branch_snapshot_json: JSON.stringify(branchFinalizationPayload.snapshot),
@@ -478,7 +479,23 @@ export async function POST(req: Request) {
             classification: branchFinalizationPayload.classification,
             score_reasons_json: reasonsJson,
           })
-          .where(eq(schema.leads.session_id, sessionId!));
+          .where(eq(schema.leads.session_id, sessionId!))
+          .returning({ id: schema.leads.id });
+
+        // Spec 015 T064 — apply hard-override rules to the
+        // freshly-branch-scored lead. Critical because the branch
+        // orchestrator's score / classification stage operates on
+        // chip weights only — it doesn't know about missing_contact,
+        // out_of_scope, no_injury_no_treatment, or fake_info. The
+        // override step is a downgrade-only safety net per FR-009.
+        const branchedLeadId = branchUpdateResult[0]?.id ?? null;
+        if (branchedLeadId) {
+          await applyAndPersistHardOverrides({
+            accountId: auth.accountId,
+            leadId: branchedLeadId,
+            sopState,
+          });
+        }
       }
 
       // Extract and save partial lead data from the conversation so that

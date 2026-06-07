@@ -65,8 +65,45 @@ export function checkOutOfScope(caseType: CaseType | null): boolean {
  * Either alone is not a trigger (e.g., "Yes injured, no treatment yet"
  * is still a viable PI lead). Both together signals the matter doesn't
  * meet the firm's intake threshold for a personal injury case.
+ *
+ * In spec 015's data shape, `injury` and `medical_treatment` were
+ * default SOP steps and the captures lived on `sopState.steps[]`. In
+ * spec 016+ those questions live on the branch and the captures live
+ * on `sopState.branch_state.captured_chips[]` keyed by question_id.
+ * This predicate handles both shapes:
+ *   1. Try the branch-state path first (current production shape).
+ *   2. Fall back to the legacy steps[] path so spec-015-shaped leads
+ *      and existing unit-test fixtures continue to work unchanged.
  */
 export function checkNoInjuryNoTreatment(sopState: SOPState): boolean {
+  // Branch-flow path (spec 016+): read from branch_state.captured_chips
+  // where each entry is { question_id, chip_slugs: string[] }.
+  const branchChips = sopState.branch_state?.captured_chips;
+  if (branchChips && branchChips.length > 0) {
+    const injuryCapture = branchChips.find((c) => c.question_id === 'injury');
+    const treatmentCapture = branchChips.find(
+      (c) => c.question_id === 'medical_treatment',
+    );
+    if (
+      injuryCapture?.chip_slugs.includes('injury_no') &&
+      treatmentCapture?.chip_slugs.includes('no_treatment')
+    ) {
+      return true;
+    }
+    // If the branch has captures but the specific chips aren't
+    // present, the override doesn't fire (the visitor answered the
+    // questions differently). Don't fall through to the legacy path
+    // — the branch-state captures are authoritative when present.
+    if (
+      branchChips.some((c) => c.question_id === 'injury') ||
+      branchChips.some((c) => c.question_id === 'medical_treatment')
+    ) {
+      return false;
+    }
+  }
+
+  // Legacy spec-015 path (default-SOP-step shape): read from steps[].
+  // Preserves existing unit-test fixtures and any pre-spec-016 leads.
   const injuryStep = sopState.steps.find((s) => s.slug === 'injury');
   const treatmentStep = sopState.steps.find(
     (s) => s.slug === 'medical_treatment',
@@ -179,4 +216,45 @@ export function applyHardOverrides(
 
   if (fired.length === 0) return null;
   return { classification: 'SPAM', firedRules: fired };
+}
+
+// ---------------------------------------------------------------------------
+// Reasons-list merge helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Merge fired override rule names into an existing `score_reasons_json`
+ * payload. Used by callers that have already persisted a lead row with
+ * a reasons list and now need to append override-fired rule names per
+ * FR-010a. Idempotent: if the same rule is already in the list it
+ * isn't appended again.
+ *
+ * `prevReasonsJson` may be null (LLM-fallback path didn't persist a
+ * reasons list), an empty JSON array, or a JSON array of strings. Any
+ * malformed payload is treated as the empty case.
+ */
+export function appendOverrideReasons(
+  prevReasonsJson: string | null,
+  firedRules: HardOverrideName[],
+): string {
+  let prev: string[] = [];
+  if (prevReasonsJson) {
+    try {
+      const parsed = JSON.parse(prevReasonsJson);
+      if (Array.isArray(parsed)) {
+        prev = parsed.filter((x): x is string => typeof x === 'string');
+      }
+    } catch {
+      // Malformed — start from empty.
+    }
+  }
+  const seen = new Set(prev);
+  const merged = [...prev];
+  for (const rule of firedRules) {
+    if (!seen.has(rule)) {
+      merged.push(rule);
+      seen.add(rule);
+    }
+  }
+  return JSON.stringify(merged);
 }
