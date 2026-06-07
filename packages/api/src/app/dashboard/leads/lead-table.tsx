@@ -18,10 +18,13 @@ interface Lead {
   created_at: string | null;
 }
 
+// Spec 015 / spec 016 — 4-value classification vocabulary:
+//   HOT (76-100) / WARM (51-75) / COLD (26-50) / SPAM (0-25)
 const classificationStyles: Record<string, { dot: string; bg: string; text: string }> = {
-  urgent: { dot: 'bg-[#DC2626]', bg: 'bg-[#FEF2F2]', text: 'text-[#991B1B]' },
-  normal: { dot: 'bg-[#2563EB]', bg: 'bg-[#EFF6FF]', text: 'text-[#1E40AF]' },
-  unqualified: { dot: 'bg-[#A3A3A3]', bg: 'bg-[#F5F5F5]', text: 'text-[#525252]' },
+  HOT: { dot: 'bg-[#DC2626]', bg: 'bg-[#FEF2F2]', text: 'text-[#991B1B]' },
+  WARM: { dot: 'bg-[#EA580C]', bg: 'bg-[#FFF7ED]', text: 'text-[#9A3412]' },
+  COLD: { dot: 'bg-[#2563EB]', bg: 'bg-[#EFF6FF]', text: 'text-[#1E40AF]' },
+  SPAM: { dot: 'bg-[#A3A3A3]', bg: 'bg-[#F5F5F5]', text: 'text-[#525252]' },
 };
 
 const statusStyles: Record<string, { dot: string; text: string }> = {
@@ -60,9 +63,10 @@ function formatRelativeTime(dateStr: string): string {
 
 const filterOptions = [
   { key: 'all', label: 'All' },
-  { key: 'urgent', label: 'Urgent' },
-  { key: 'normal', label: 'Normal' },
-  { key: 'unqualified', label: 'Unqualified' },
+  { key: 'HOT', label: 'HOT' },
+  { key: 'WARM', label: 'WARM' },
+  { key: 'COLD', label: 'COLD' },
+  { key: 'SPAM', label: 'SPAM' },
 ];
 
 export function LeadTable({ leads }: { leads: Lead[] }) {
@@ -130,7 +134,7 @@ export function LeadTable({ leads }: { leads: Lead[] }) {
               </thead>
               <tbody>
                 {filtered.map((lead) => {
-                  const cls = classificationStyles[lead.classification || 'normal'] ?? classificationStyles.normal;
+                  const cls = classificationStyles[lead.classification ?? 'SPAM'] ?? classificationStyles.SPAM;
                   const sts = statusStyles[lead.status || 'new'] ?? statusStyles.new;
                   const actionSlug = (lead.follow_up_action ?? null) as LeadAction | null;
                   const actionStyle = actionSlug ? actionStyles[actionSlug] : null;
@@ -211,7 +215,7 @@ export function LeadTable({ leads }: { leads: Lead[] }) {
           {/* Mobile Cards */}
           <div className="md:hidden space-y-3">
             {filtered.map((lead) => {
-              const cls = classificationStyles[lead.classification || 'normal'] ?? classificationStyles.normal;
+              const cls = classificationStyles[lead.classification ?? 'SPAM'] ?? classificationStyles.SPAM;
               const sts = statusStyles[lead.status || 'new'] ?? statusStyles.new;
               return (
                 <a

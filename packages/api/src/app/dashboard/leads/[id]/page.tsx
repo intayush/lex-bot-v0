@@ -6,10 +6,13 @@ import { getAuthSession } from '../../../../lib/dashboard-session';
 import { ActionPicker } from './action-picker';
 import type { LeadAction } from '@legal-chatbot/shared';
 
+// Spec 015 / spec 016 — 4-value classification vocabulary:
+//   HOT (76-100) / WARM (51-75) / COLD (26-50) / SPAM (0-25)
 const classificationStyles: Record<string, { dot: string; bg: string; text: string }> = {
-  urgent: { dot: 'bg-[#DC2626]', bg: 'bg-[#FEF2F2]', text: 'text-[#991B1B]' },
-  normal: { dot: 'bg-[#2563EB]', bg: 'bg-[#EFF6FF]', text: 'text-[#1E40AF]' },
-  unqualified: { dot: 'bg-[#A3A3A3]', bg: 'bg-[#F5F5F5]', text: 'text-[#525252]' },
+  HOT: { dot: 'bg-[#DC2626]', bg: 'bg-[#FEF2F2]', text: 'text-[#991B1B]' },
+  WARM: { dot: 'bg-[#EA580C]', bg: 'bg-[#FFF7ED]', text: 'text-[#9A3412]' },
+  COLD: { dot: 'bg-[#2563EB]', bg: 'bg-[#EFF6FF]', text: 'text-[#1E40AF]' },
+  SPAM: { dot: 'bg-[#A3A3A3]', bg: 'bg-[#F5F5F5]', text: 'text-[#525252]' },
 };
 
 const statusStyles: Record<string, { dot: string; text: string }> = {
@@ -83,7 +86,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     ? (JSON.parse(lead.branch_snapshot_json) as BranchSnapshotShape)
     : null;
 
-  const cls = classificationStyles[lead.classification || 'normal'] ?? classificationStyles.normal;
+  const cls = classificationStyles[lead.classification ?? 'SPAM'] ?? classificationStyles.SPAM;
   const sts = statusStyles[lead.status || 'new'] ?? statusStyles.new;
 
   return (

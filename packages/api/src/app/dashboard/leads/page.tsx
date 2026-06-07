@@ -15,10 +15,13 @@ export default async function LeadsPage() {
     .where(eq(leads.account_id, session.accountId))
     .orderBy(desc(leads.created_at));
 
+  // Spec 015 / spec 016 — 4-value classification vocabulary:
+  //   HOT (76-100) / WARM (51-75) / COLD (26-50) / SPAM (0-25)
   const totalCount = allLeads.length;
-  const urgentCount = allLeads.filter((l) => l.classification === 'urgent').length;
-  const normalCount = allLeads.filter((l) => l.classification === 'normal').length;
-  const unqualifiedCount = allLeads.filter((l) => l.classification === 'unqualified').length;
+  const hotCount = allLeads.filter((l) => l.classification === 'HOT').length;
+  const warmCount = allLeads.filter((l) => l.classification === 'WARM').length;
+  const coldCount = allLeads.filter((l) => l.classification === 'COLD').length;
+  const spamCount = allLeads.filter((l) => l.classification === 'SPAM').length;
 
   return (
     <div>
@@ -29,22 +32,26 @@ export default async function LeadsPage() {
       </div>
 
       {/* Stats Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-8">
         <div className="bg-white rounded-xl border border-[#E5E5E5] px-5 py-4">
           <p className="text-xs font-medium uppercase tracking-wide text-[#737373]">Total Leads</p>
           <p className="text-2xl font-semibold text-[#171717] mt-1">{totalCount}</p>
         </div>
         <div className="bg-white rounded-xl border border-[#E5E5E5] px-5 py-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-[#737373]">Urgent</p>
-          <p className="text-2xl font-semibold text-[#DC2626] mt-1">{urgentCount}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-[#737373]">HOT</p>
+          <p className="text-2xl font-semibold text-[#DC2626] mt-1">{hotCount}</p>
         </div>
         <div className="bg-white rounded-xl border border-[#E5E5E5] px-5 py-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-[#737373]">Normal</p>
-          <p className="text-2xl font-semibold text-[#2563EB] mt-1">{normalCount}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-[#737373]">WARM</p>
+          <p className="text-2xl font-semibold text-[#EA580C] mt-1">{warmCount}</p>
         </div>
         <div className="bg-white rounded-xl border border-[#E5E5E5] px-5 py-4">
-          <p className="text-xs font-medium uppercase tracking-wide text-[#737373]">Unqualified</p>
-          <p className="text-2xl font-semibold text-[#737373] mt-1">{unqualifiedCount}</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-[#737373]">COLD</p>
+          <p className="text-2xl font-semibold text-[#2563EB] mt-1">{coldCount}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-[#E5E5E5] px-5 py-4">
+          <p className="text-xs font-medium uppercase tracking-wide text-[#737373]">SPAM</p>
+          <p className="text-2xl font-semibold text-[#737373] mt-1">{spamCount}</p>
         </div>
       </div>
 
