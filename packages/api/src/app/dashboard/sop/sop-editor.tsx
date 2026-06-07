@@ -73,15 +73,18 @@ export function SopEditor({
         <TabButton active={activeTab === 'branches'} onClick={() => setActiveTab('branches')}>
           Branches
         </TabButton>
+        {/* Goodbye Phrases temporarily hidden — re-enable by un-commenting
+            this TabButton and the corresponding panel render below.
         <TabButton active={activeTab === 'goodbye_phrases'} onClick={() => setActiveTab('goodbye_phrases')}>
           Goodbye Phrases
         </TabButton>
+        */}
       </div>
 
       {activeTab === 'steps' && <StepsTab initialSop={initialSop} />}
       {activeTab === 'case_types' && <CaseTypesTab initialCaseTypes={initialCaseTypes} />}
       {activeTab === 'branches' && <BranchesTab initialPairs={initialBranchPairs} />}
-      {activeTab === 'goodbye_phrases' && <GoodbyePhrasesTab initialPhrases={initialGoodbyePhrases} />}
+      {/* {activeTab === 'goodbye_phrases' && <GoodbyePhrasesTab initialPhrases={initialGoodbyePhrases} />} */}
     </div>
   );
 }
