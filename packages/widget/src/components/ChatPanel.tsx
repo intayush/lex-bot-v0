@@ -22,6 +22,21 @@ interface ChatPanelProps {
   onCloseRequest: () => void;
   /** Called after the close animation completes (parent unmounts). */
   onClosed: () => void;
+  /**
+   * Spec 017 + dashboard preview parity. `'embedded'` renders the
+   * panel inline inside its parent's flow (no fixed positioning,
+   * no animation, no scroll-lock, role="region" instead of dialog).
+   * Defaults to `'floating'` for the production widget. See
+   * `PanelShell` JSDoc for the full mode contract.
+   */
+  mode?: 'floating' | 'embedded';
+  /**
+   * Extra headers merged into BOTH the /api/config fetch and the
+   * /api/chat useChat call. The dashboard preview uses this to inject
+   * `x-preview: true` so the server returns the latest (unpublished)
+   * SOP / config draft. Embedding firms typically don't need this.
+   */
+  extraHeaders?: Record<string, string>;
 }
 
 function getSessionId(): string | undefined {
@@ -62,7 +77,14 @@ interface WidgetConfig {
  * state (active chips, contact-form pending) and passes everything
  * down as props.
  */
-export function ChatPanel({ apiKey, apiUrl, onCloseRequest, onClosed }: ChatPanelProps) {
+export function ChatPanel({
+  apiKey,
+  apiUrl,
+  onCloseRequest,
+  onClosed,
+  mode = 'floating',
+  extraHeaders,
+}: ChatPanelProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [widgetConfig, setWidgetConfig] = useState<WidgetConfig | null>(null);
 
@@ -70,7 +92,10 @@ export function ChatPanel({ apiKey, apiUrl, onCloseRequest, onClosed }: ChatPane
     const baseUrl = apiUrl.replace(/\/api\/chat\/?$/, '');
     const configUrl = `${baseUrl}/api/config`;
     fetch(configUrl, {
-      headers: { 'x-api-key': apiKey },
+      headers: {
+        'x-api-key': apiKey,
+        ...(extraHeaders ?? {}),
+      },
     })
       .then((res) => {
         if (res.ok) return res.json();
@@ -82,6 +107,10 @@ export function ChatPanel({ apiKey, apiUrl, onCloseRequest, onClosed }: ChatPane
       .catch(() => {
         // Silently fall back to defaults
       });
+    // extraHeaders intentionally NOT in deps: refetching when the parent
+    // passes a new object reference each render would loop. Embedded
+    // hosts should keep the headers stable (memoize at the call site).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiUrl, apiKey]);
 
   const { sopState, onResponse: onSOPResponse } = useSOPState();
@@ -103,6 +132,7 @@ export function ChatPanel({ apiKey, apiUrl, onCloseRequest, onClosed }: ChatPane
     fetch: sessionAwareFetch,
     headers: {
       'x-api-key': apiKey,
+      ...(extraHeaders ?? {}),
     },
     onResponse(response) {
       const newSessionId = response.headers.get('x-session-id');
@@ -240,6 +270,7 @@ export function ChatPanel({ apiKey, apiUrl, onCloseRequest, onClosed }: ChatPane
   return (
     <PanelShell
       isOpen={isOpen}
+      mode={mode}
       onClosed={onClosed}
       onCloseRequest={requestClose}
       ariaLabel={`Chat with ${widgetConfig?.chatbot_name ?? 'LexBot'}`}
@@ -260,25 +291,27 @@ export function ChatPanel({ apiKey, apiUrl, onCloseRequest, onClosed }: ChatPane
           <div style={{ fontWeight: 600, fontSize: '16px' }}>{widgetConfig?.chatbot_name ?? 'LexBot'}</div>
           <div style={{ fontSize: '12px', opacity: 0.8 }}>Virtual Assistant</div>
         </div>
-        <button
-          onClick={requestClose}
-          aria-label="Close chat"
-          style={{
-            background: 'none',
-            border: 'none',
-            color: 'inherit',
-            cursor: 'pointer',
-            fontSize: '20px',
-            padding: '8px',
-            minWidth: '44px',
-            minHeight: '44px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          ✕
-        </button>
+        {mode === 'floating' && (
+          <button
+            onClick={requestClose}
+            aria-label="Close chat"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'inherit',
+              cursor: 'pointer',
+              fontSize: '20px',
+              padding: '8px',
+              minWidth: '44px',
+              minHeight: '44px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       {/* 2. Messages region */}

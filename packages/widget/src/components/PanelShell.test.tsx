@@ -370,3 +370,115 @@ describe('PanelShell — close on non-mobile breakpoints (regression)', () => {
     expect(onClosed).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('PanelShell — embedded mode', () => {
+  // Embedded mode is for hosts that want to render the chat surface
+  // INLINE inside their own layout (e.g., the dashboard's Preview Chat
+  // sidebar) rather than as a fixed overlay. The grid layout, glass
+  // surface, ARIA, and child-track placement are preserved; the
+  // floating-only behaviors are dropped:
+  //
+  //   - position: fixed             → static (parent positions it)
+  //   - slide animation             → no entry/exit animation
+  //   - scroll-lock on mobile       → off (host page should scroll)
+  //   - aria-modal on mobile        → off (not a modal takeover)
+  //   - backdrop scrim on mobile    → off
+  //
+  // The phase machine is short-circuited: mount jumps to 'open',
+  // close fires onClosed synchronously regardless of breakpoint.
+
+  beforeEach(() => {
+    setReducedMotion(false);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('renders without role="dialog" (embedded surfaces are not dialogs)', () => {
+    setLayout('desktop');
+    render(
+      <PanelShell isOpen mode="embedded" onClosed={() => {}} onCloseRequest={() => {}}>
+        <div>x</div>
+      </PanelShell>,
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('exposes a region via data-mode="embedded" + role="region"', () => {
+    setLayout('desktop');
+    render(
+      <PanelShell isOpen mode="embedded" onClosed={() => {}} onCloseRequest={() => {}}>
+        <div>x</div>
+      </PanelShell>,
+    );
+    const region = screen.getByRole('region');
+    expect(region.getAttribute('data-mode')).toBe('embedded');
+  });
+
+  it('does NOT engage scroll-lock on mobile when embedded', () => {
+    setLayout('mobile');
+    document.body.style.position = 'relative';
+    Object.defineProperty(window, 'scrollY', {
+      value: 100,
+      writable: true,
+      configurable: true,
+    });
+    render(
+      <PanelShell isOpen mode="embedded" onClosed={() => {}} onCloseRequest={() => {}}>
+        <div>x</div>
+      </PanelShell>,
+    );
+    // Floating mode would set this to 'fixed'; embedded must not.
+    expect(document.body.style.position).toBe('relative');
+  });
+
+  it('does NOT render a backdrop scrim on mobile', () => {
+    setLayout('mobile');
+    const { container } = render(
+      <PanelShell isOpen mode="embedded" onClosed={() => {}} onCloseRequest={() => {}}>
+        <div>x</div>
+      </PanelShell>,
+    );
+    expect(container.querySelector('.lc-backdrop')).toBeNull();
+  });
+
+  it('jumps straight to data-phase="open" on mount (no entry animation)', () => {
+    setLayout('mobile');
+    render(
+      <PanelShell isOpen mode="embedded" onClosed={() => {}} onCloseRequest={() => {}}>
+        <div>x</div>
+      </PanelShell>,
+    );
+    const region = screen.getByRole('region');
+    expect(region.getAttribute('data-phase')).toBe('open');
+  });
+
+  it('close fires onClosed synchronously on every breakpoint', () => {
+    setLayout('mobile');
+    const onClosed = vi.fn();
+    const { rerender } = render(
+      <PanelShell isOpen mode="embedded" onClosed={onClosed} onCloseRequest={() => {}}>
+        <div>x</div>
+      </PanelShell>,
+    );
+    rerender(
+      <PanelShell isOpen={false} mode="embedded" onClosed={onClosed} onCloseRequest={() => {}}>
+        <div>x</div>
+      </PanelShell>,
+    );
+    expect(onClosed).toHaveBeenCalledTimes(1);
+  });
+
+  it('default mode is "floating" (back-compat for existing widget usage)', () => {
+    // No `mode` prop → existing role="dialog" path is preserved.
+    setLayout('desktop');
+    render(
+      <PanelShell isOpen onClosed={() => {}} onCloseRequest={() => {}}>
+        <div>x</div>
+      </PanelShell>,
+    );
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
+

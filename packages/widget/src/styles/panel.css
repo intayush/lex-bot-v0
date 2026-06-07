@@ -138,6 +138,48 @@
   box-shadow: var(--lc-shadow);
 }
 
+/* ─────────────────────────────────────────────────────────────────
+ * Embedded mode (Spec 017 + dashboard preview parity)
+ *
+ * Render INLINE inside the parent's flow. The parent owns the
+ * containing dimensions (e.g., the dashboard sidebar pins the
+ * preview to 540px tall via its own height). All `data-breakpoint`
+ * positioning rules above (which assume position: fixed) are
+ * overridden here back to defaults so the panel sits in the normal
+ * document flow.
+ *
+ * Important: the [data-mode='embedded'] selector is deliberately
+ * specific enough to override the [data-breakpoint='...']
+ * floating rules above without needing !important — both selectors
+ * have the same specificity (one attribute), so source order
+ * matters: this block must come AFTER the breakpoint rules.
+ *
+ * Embedded mode is responsible for its own height via the parent's
+ * styles. We supply 100% so it fills whatever the parent gives it.
+ * ───────────────────────────────────────────────────────────────── */
+.lc-panel[data-mode='embedded'] {
+  position: static;
+  inset: auto;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  border-radius: var(--lc-panel-radius);
+  box-shadow: none;
+  z-index: auto;
+}
+
+/* Re-disable the slide-up/down keyframes for embedded surfaces:
+ * the [data-breakpoint='mobile'][data-phase='...'] rules below
+ * would otherwise still match. */
+.lc-panel[data-mode='embedded'][data-breakpoint='mobile'][data-phase='entering'],
+.lc-panel[data-mode='embedded'][data-breakpoint='mobile'][data-phase='exiting'] {
+  animation: none;
+}
+
 /* Children grid placement. The PanelShell delegates ordering to
  * children but most parents will follow header/content/progress/
  * composer; we pin them to the named tracks via :nth-child for the

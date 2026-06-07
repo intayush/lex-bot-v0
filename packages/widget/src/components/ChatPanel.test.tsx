@@ -258,3 +258,85 @@ describe('ChatPanel — contact-form path (T046)', () => {
     expect(screen.getByLabelText(/phone/i)).toBeInTheDocument();
   });
 });
+
+describe('ChatPanel — embedded mode + extraHeaders (dashboard preview parity)', () => {
+  // The dashboard's Preview Chat sidebar mounts ChatPanel directly
+  // inside a layout slot (no bubble, no overlay). It needs:
+  //   1. mode="embedded" to render inline (no fixed positioning)
+  //   2. extraHeaders to inject `x-preview: true` into both the
+  //      /api/config fetch AND the /api/chat useChat call so the
+  //      server returns the latest (unpublished) SOP for preview.
+  //
+  // These tests cover the prop wiring in ChatPanel; the embedded
+  // visual contract is covered by PanelShell.test.tsx.
+
+  it('renders the panel with role="region" when mode="embedded"', async () => {
+    const { ChatPanel } = await import('./ChatPanel');
+    render(
+      <ChatPanel
+        apiKey="test"
+        apiUrl="http://localhost/api/chat"
+        mode="embedded"
+        onCloseRequest={() => {}}
+        onClosed={() => {}}
+      />,
+    );
+    expect(screen.getByRole('region')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('forwards extraHeaders to the /api/config fetch', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          chatbot_name: 'LexBot',
+          greeting_message: 'Hi',
+          practice_areas: [],
+          phone: '(555) 000-0000',
+          sop: null,
+          case_types: [],
+        }),
+      headers: new Headers(),
+    } as Response);
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const { ChatPanel } = await import('./ChatPanel');
+    render(
+      <ChatPanel
+        apiKey="test"
+        apiUrl="http://localhost/api/chat"
+        extraHeaders={{ 'x-preview': 'true' }}
+        onCloseRequest={() => {}}
+        onClosed={() => {}}
+      />,
+    );
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // The /api/config call must include x-preview alongside x-api-key.
+    const configCall = fetchSpy.mock.calls.find((c) =>
+      String(c[0]).includes('/api/config'),
+    );
+    expect(configCall, 'expected /api/config to be fetched').toBeTruthy();
+    const init = configCall![1] as RequestInit;
+    expect((init.headers as Record<string, string>)['x-preview']).toBe('true');
+    expect((init.headers as Record<string, string>)['x-api-key']).toBe('test');
+  });
+
+  it('mode prop defaults to "floating" (back-compat for production widget)', async () => {
+    const { ChatPanel } = await import('./ChatPanel');
+    render(
+      <ChatPanel
+        apiKey="test"
+        apiUrl="http://localhost/api/chat"
+        onCloseRequest={() => {}}
+        onClosed={() => {}}
+      />,
+    );
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+});
+

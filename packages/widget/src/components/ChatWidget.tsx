@@ -7,7 +7,23 @@ interface ChatWidgetProps {
   apiUrl?: string;
 }
 
-const DEFAULT_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/chat';
+// Read VITE_API_URL only when running under Vite (the playground demo).
+// Other consumers (e.g., the dashboard preview compiled by Next.js'
+// SWC) don't expose `import.meta.env`; accessing it unconditionally
+// would crash the build. We probe via `as any` so both type contexts
+// (widget's vite types + api's Next.js types) accept the call.
+function readDefaultApiUrl(): string {
+  try {
+    const meta = import.meta as { env?: { VITE_API_URL?: string } };
+    const value = meta.env?.VITE_API_URL;
+    if (typeof value === 'string' && value.length > 0) return value;
+  } catch {
+    // import.meta.env access threw — fall through to the default.
+  }
+  return 'http://localhost:3000/api/chat';
+}
+
+const DEFAULT_API_URL = readDefaultApiUrl();
 
 /**
  * Spec 017 — top-level widget container. Owns:

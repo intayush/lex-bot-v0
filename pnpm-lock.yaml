@@ -41,6 +41,9 @@ importers:
       '@legal-chatbot/shared':
         specifier: workspace:*
         version: link:../shared
+      '@legal-chatbot/widget':
+        specifier: workspace:*
+        version: link:../widget
       '@neondatabase/serverless':
         specifier: ^1.1.0
         version: 1.1.0

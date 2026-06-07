@@ -59,6 +59,25 @@ export interface PanelShellProps {
 
   /** ARIA label for the dialog region. Defaults to "Chat". */
   ariaLabel?: string;
+
+  /**
+   * Rendering mode (Spec 017 + dashboard-preview parity):
+   *
+   *   - `'floating'` (default): the production widget surface. Fixed
+   *     positioning, slide-up/down animation on mobile, mobile scroll-
+   *     lock + backdrop scrim, role="dialog" + aria-modal on mobile.
+   *
+   *   - `'embedded'`: the dashboard Preview Chat surface. Rendered
+   *     inline inside its parent's flow with no fixed positioning,
+   *     no animation, no scroll-lock, no backdrop. Exposes role=
+   *     "region" instead of dialog so screen readers don't announce
+   *     it as a modal.
+   *
+   * Both modes share the same grid layout, glass surface tokens, and
+   * child-track placement, so consumers see consistent behavior at
+   * the slot level.
+   */
+  mode?: 'floating' | 'embedded';
 }
 
 type Phase = 'entering' | 'open' | 'exiting';
@@ -69,44 +88,50 @@ export function PanelShell({
   onCloseRequest,
   children,
   ariaLabel = 'Chat',
+  mode = 'floating',
 }: PanelShellProps) {
   const layout = usePanelLayout();
   const reducedMotion = useReducedMotion();
+  const isEmbedded = mode === 'embedded';
   const rootRef = useRef<HTMLDivElement>(null);
 
   // Reduced-motion short-circuit: jump straight to 'open' on mount,
   // and on close fire onClosed synchronously without waiting for the
   // (already 0ms) animation to end. With motion enabled, mount starts
   // in 'entering' and advances on animationend.
-  const [phase, setPhase] = useState<Phase>(reducedMotion ? 'open' : 'entering');
+  // Embedded mode also jumps straight to 'open' — no entry animation
+  // is attached when embedded, so waiting for animationend would
+  // hang the close path the same way it did pre-fix on desktop.
+  const [phase, setPhase] = useState<Phase>(
+    reducedMotion || isEmbedded ? 'open' : 'entering',
+  );
 
   // When isOpen flips false, transition to 'exiting'. Fire onClosed
   // immediately when there is no exit animation to wait for:
   //
   //   - reduced motion: animation duration is 0ms by CSS rule
+  //   - embedded mode: no animation attached at any breakpoint
   //   - non-mobile breakpoints: panel.css does NOT attach a slide-down
   //     keyframe to tablet/desktop/desktop-clamped, so `animationend`
   //     would never fire. Without this guard the close X button does
   //     nothing on desktop (the panel stays mounted forever).
   //
-  // On mobile with motion, the slide-down keyframe runs and the
-  // animationend handler below fires onClosed.
+  // On mobile floating mode with motion, the slide-down keyframe runs
+  // and the animationend handler below fires onClosed.
   useEffect(() => {
     if (!isOpen) {
       setPhase('exiting');
-      const noAnimation = reducedMotion || layout !== 'mobile';
+      const noAnimation = reducedMotion || isEmbedded || layout !== 'mobile';
       if (noAnimation) {
         onClosed();
       }
     }
-  }, [isOpen, reducedMotion, layout, onClosed]);
+  }, [isOpen, reducedMotion, isEmbedded, layout, onClosed]);
 
-  // Engage scroll-lock only when (a) we're on mobile AND (b) the panel
-  // is mounted (any phase). The hook handles snapshot/restore. Keep
-  // lock engaged through 'exiting' so the host page doesn't briefly
-  // jump during the slide-down animation; the unmount-on-onClosed
-  // path triggers the hook's cleanup which restores the host page.
-  const shouldLock = layout === 'mobile';
+  // Engage scroll-lock only when floating AND on mobile. Embedded mode
+  // intentionally never locks the host page — the dashboard sidebar
+  // host expects normal scroll behavior around the preview pane.
+  const shouldLock = !isEmbedded && layout === 'mobile';
   useScrollLock(shouldLock);
 
   // Focus the panel root on mount + after entry so keyboard users
@@ -163,7 +188,7 @@ export function PanelShell({
 
   return (
     <>
-      {layout === 'mobile' ? (
+      {!isEmbedded && layout === 'mobile' ? (
         <div
           className="lc-backdrop"
           aria-hidden="true"
@@ -174,12 +199,16 @@ export function PanelShell({
       <div
         ref={rootRef}
         className="lc-panel"
-        role="dialog"
+        // Embedded surfaces are NOT dialogs (they're inline regions
+        // hosted inside their parent's flow). Floating surfaces remain
+        // dialogs as before.
+        role={isEmbedded ? 'region' : 'dialog'}
         aria-label={ariaLabel}
-        // aria-modal only applies on mobile (full-viewport takeover).
-        // Desktop / tablet panels are non-modal floating widgets that
-        // intentionally let the host page keep its semantics.
-        {...(layout === 'mobile' ? { 'aria-modal': 'true' } : {})}
+        // aria-modal only applies in floating mode on mobile (full-
+        // viewport takeover). Desktop floating panels and embedded
+        // surfaces are non-modal.
+        {...(!isEmbedded && layout === 'mobile' ? { 'aria-modal': 'true' } : {})}
+        data-mode={mode}
         data-phase={phase}
         data-breakpoint={layout}
         tabIndex={-1}
