@@ -14,7 +14,10 @@
  *      `seedSopForAccount` (no-ops when an SOP already exists),
  *      then `ensureContactStepForAccount` (no-ops when contact step
  *      already in place), then `ensureCarAccidentBranchForAccount`
- *      (no-ops when the branch already exists).
+ *      (no-ops when the branch already exists), then
+ *      `ensureDefaultBranchesForAccount` (spec 017 follow-up — seeds
+ *      DUI / Criminal Defense / non-car-accident PI / Drug Crime
+ *      branches; no-ops per sub-type when the branch already exists).
  *
  * Usage:
  *
@@ -38,6 +41,7 @@ import { runMultiBranchSopDataMigration } from './migrations/0004-multi-branch-s
 import { seedSopForAccount } from './seed.js';
 import { ensureContactStepForAccount } from './ensure-contact-step.js';
 import { ensureCarAccidentBranchForAccount } from './ensure-car-accident-branch.js';
+import { ensureDefaultBranchesForAccount } from './ensure-default-branches.js';
 import { db, schema } from './index.js';
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -98,6 +102,21 @@ for (const acct of accounts) {
     // current spec 016 published payload. No-ops when branch already exists.
     const branchResult = await ensureCarAccidentBranchForAccount(acct.id);
     console.log(`[bootstrap]     ensureCarAccidentBranch: ${branchResult.outcome}`);
+
+    // 3d: ensure every other default sub-type Branch (DUI, Criminal Defense,
+    // non-car-accident PI, Drug Crime) exists with the current spec 017
+    // published payload. No-ops per (account, sub-type) tuple when already
+    // present. Family Law and Estate Planning sub-types are intentionally
+    // excluded (no entries in DEFAULT_BRANCH_SEEDS).
+    const defaultBranchResults = await ensureDefaultBranchesForAccount(acct.id);
+    const dbInserted = defaultBranchResults.filter((r) => r.outcome === 'inserted').length;
+    const dbSkipped = defaultBranchResults.filter((r) => r.outcome === 'skipped_already_present').length;
+    const dbMissing = defaultBranchResults.filter((r) => r.outcome === 'no_sub_type').length;
+    console.log(
+      `[bootstrap]     ensureDefaultBranches: ${dbInserted} inserted, ` +
+        `${dbSkipped} skipped, ${dbMissing} missing sub_type ` +
+        `(${defaultBranchResults.length} total).`,
+    );
   } catch (err) {
     console.error(`[bootstrap]   FAILED for ${acct.email}:`, err);
     process.exit(1);

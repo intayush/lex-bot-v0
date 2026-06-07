@@ -17,6 +17,7 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:ensure-car-accident-branch": "tsx src/db/ensure-car-accident-branch.ts",
+    "db:ensure-default-branches": "tsx src/db/ensure-default-branches.ts",
     "db:bootstrap-prod": "tsx src/db/bootstrap-prod.ts"
   },
   "dependencies": {
