@@ -163,7 +163,7 @@ function BranchRow({ pair, isEditing, onEdit, onClose, onAfterMutation }: Branch
       } bg-white px-4 py-3 transition`}
     >
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-3 min-w-0 flex-wrap">
           <span className="text-sm font-medium text-[#171717] truncate">
             {pair.sub_type_label}
           </span>
@@ -186,17 +186,28 @@ function BranchRow({ pair, isEditing, onEdit, onClose, onAfterMutation }: Branch
             <button
               type="button"
               onClick={onEdit}
-              className="text-xs font-medium text-[#171717] hover:underline"
+              aria-label={pair.branch ? 'Edit branch' : 'Add branch'}
+              title={pair.branch ? 'Edit branch' : 'Add branch'}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-[#171717] hover:bg-[#F5F5F5] rounded px-2 py-1 transition"
             >
-              {pair.branch ? 'Edit branch' : 'Add branch'}
+              {/* Pencil icon for Edit; plus icon for Add. Visible label
+                  collapses to icon-only on mobile so the row doesn't
+                  overflow. */}
+              {pair.branch ? <PencilIcon /> : <PlusIcon />}
+              <span className="hidden sm:inline">
+                {pair.branch ? 'Edit branch' : 'Add branch'}
+              </span>
             </button>
           ) : (
             <button
               type="button"
               onClick={onClose}
-              className="text-xs font-medium text-[#737373] hover:text-[#171717]"
+              aria-label="Close editor"
+              title="Close editor"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-[#737373] hover:text-[#171717] hover:bg-[#F5F5F5] rounded px-2 py-1 transition"
             >
-              Close
+              <CloseIcon />
+              <span className="hidden sm:inline">Close</span>
             </button>
           )}
         </div>
@@ -218,5 +229,66 @@ function BranchRow({ pair, isEditing, onEdit, onClose, onAfterMutation }: Branch
         </div>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Icons (inline SVGs to avoid adding an icon-library dependency).
+// Each ships at 14×14 with currentColor so the parent's text color
+// drives the stroke. aria-hidden because the parent button carries
+// the accessible label.
+// ---------------------------------------------------------------------------
+
+function PencilIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M11.5 2.5l2 2L5 13H3v-2L11.5 2.5z" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M8 3v10M3 8h10" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
+    </svg>
   );
 }

@@ -320,3 +320,19 @@ tbody tr {
 tbody tr:hover {
   background-color: rgba(0, 0, 0, 0.015);
 }
+
+/*
+ * Branch editor chip-row grid template.
+ *
+ * Mobile (default): chips render in a single-column grid (each chip
+ * field stacks). Desktop (>=640px / Tailwind `sm:`): four columns
+ * with the label growing, slug + weight fixed, remove button
+ * compact. Used by the chip-edit grid AND the column header in
+ * `branch-editor.tsx`.
+ */
+@media (min-width: 640px) {
+  .chip-grid-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 7rem 4rem 1rem;
+  }
+}

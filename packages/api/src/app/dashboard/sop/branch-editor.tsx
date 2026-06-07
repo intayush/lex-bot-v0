@@ -286,7 +286,7 @@ export function BranchEditor({
   return (
     <div className="space-y-5">
       {/* Active toggle */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5">
         <input
           id={`branch-active-${caseTypeSlug}-${subTypeSlug}`}
           type="checkbox"
@@ -304,16 +304,19 @@ export function BranchEditor({
 
       {/* Questions */}
       <div>
-        <div className="flex items-baseline justify-between mb-2">
+        <div className="flex items-baseline justify-between mb-2 gap-2">
           <h4 className="text-sm font-semibold text-[#171717]">
             Questions ({questions.length})
           </h4>
           <button
             type="button"
             onClick={addQuestion}
-            className="text-xs font-medium text-[#171717] hover:underline"
+            aria-label="Add question"
+            title="Add question"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-[#171717] hover:bg-[#F5F5F5] rounded px-2 py-1 transition"
           >
-            + Add question
+            <PlusIcon />
+            <span className="hidden sm:inline">Add question</span>
           </button>
         </div>
         <div className="space-y-3">
@@ -350,9 +353,12 @@ export function BranchEditor({
         <h4 className="text-sm font-semibold text-[#171717] mb-2">
           Hard-override SPAM rules
         </h4>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {(Object.keys(overrides) as Array<keyof typeof overrides>).map((k) => (
-            <label key={k} className="flex items-center gap-2 text-sm text-[#171717]">
+            <label
+              key={k}
+              className="flex items-center gap-2.5 text-sm text-[#171717]"
+            >
               <input
                 type="checkbox"
                 checked={overrides[k]}
@@ -367,13 +373,17 @@ export function BranchEditor({
         </div>
       </div>
 
-      {/* Action bar */}
-      <div className="flex items-center gap-2 pt-3 border-t border-[#E5E5E5]">
+      {/* Action bar — buttons share the same shape and size, and the
+          row wraps onto multiple lines on narrow viewports so labels
+          aren't truncated. The Delete button moves below the
+          Save / Publish pair on mobile (no `ml-auto`); on sm:+ it
+          right-aligns. */}
+      <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-[#E5E5E5]">
         <button
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="px-3 py-1.5 rounded-md bg-[#171717] text-white text-sm font-medium hover:bg-[#404040] disabled:opacity-60"
+          className="flex-1 sm:flex-none min-w-[7rem] px-4 py-2 rounded-md bg-[#171717] text-white text-sm font-medium hover:bg-[#404040] disabled:opacity-60 transition"
         >
           {saving ? 'Saving…' : 'Save draft'}
         </button>
@@ -382,7 +392,7 @@ export function BranchEditor({
           onClick={handlePublish}
           disabled={publishing || !hasDraft}
           title={hasDraft ? 'Make draft live' : 'No draft to publish'}
-          className="px-3 py-1.5 rounded-md bg-[#059669] text-white text-sm font-medium hover:bg-[#047857] disabled:opacity-60"
+          className="flex-1 sm:flex-none min-w-[7rem] px-4 py-2 rounded-md bg-[#059669] text-white text-sm font-medium hover:bg-[#047857] disabled:opacity-60 transition"
         >
           {publishing ? 'Publishing…' : 'Publish'}
         </button>
@@ -391,7 +401,7 @@ export function BranchEditor({
             type="button"
             onClick={handleDelete}
             disabled={deleting}
-            className="ml-auto px-3 py-1.5 rounded-md border border-[#FECACA] text-[#991B1B] text-sm font-medium hover:bg-[#FEF2F2] disabled:opacity-60"
+            className="flex-1 sm:flex-none sm:ml-auto min-w-[7rem] px-4 py-2 rounded-md border border-[#FECACA] text-[#991B1B] text-sm font-medium hover:bg-[#FEF2F2] disabled:opacity-60 transition"
           >
             {deleting ? 'Deleting…' : 'Delete branch'}
           </button>
@@ -473,7 +483,8 @@ function QuestionRow({
             type="button"
             onClick={onMoveUp}
             disabled={index === 0}
-            className="text-xs text-[#737373] hover:text-[#171717] disabled:opacity-30"
+            aria-label="Move up"
+            className="text-xs text-[#737373] hover:text-[#171717] disabled:opacity-30 px-1.5 py-1 rounded hover:bg-[#F5F5F5]"
             title="Move up"
           >
             ↑
@@ -482,7 +493,8 @@ function QuestionRow({
             type="button"
             onClick={onMoveDown}
             disabled={index === total - 1}
-            className="text-xs text-[#737373] hover:text-[#171717] disabled:opacity-30"
+            aria-label="Move down"
+            className="text-xs text-[#737373] hover:text-[#171717] disabled:opacity-30 px-1.5 py-1 rounded hover:bg-[#F5F5F5]"
             title="Move down"
           >
             ↓
@@ -490,9 +502,12 @@ function QuestionRow({
           <button
             type="button"
             onClick={onRemove}
-            className="ml-2 text-xs text-[#991B1B] hover:underline"
+            aria-label="Remove question"
+            title="Remove question"
+            className="ml-2 inline-flex items-center gap-1.5 text-xs text-[#991B1B] hover:bg-[#FEF2F2] rounded px-2 py-1 transition"
           >
-            Remove
+            <TrashIcon />
+            <span className="hidden sm:inline">Remove</span>
           </button>
         </div>
       </div>
@@ -506,22 +521,22 @@ function QuestionRow({
         className="w-full px-2 py-1.5 text-sm rounded border border-[#E5E5E5] bg-white text-[#171717] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-2 focus:ring-[#171717] focus:border-[#171717] mb-2"
       />
 
-      <div className="flex items-center gap-3 mb-2 text-xs text-[#737373]">
-        <label className="flex items-center gap-1.5">
+      <div className="flex items-center gap-4 mb-2 text-xs text-[#737373] flex-wrap">
+        <label className="flex items-center gap-2">
           <input
             type="checkbox"
             checked={question.free_text_allowed}
             onChange={(e) => onChange({ free_text_allowed: e.target.checked })}
-            className="h-3 w-3"
+            className="h-3.5 w-3.5"
           />
           Allow free-text
         </label>
-        <label className="flex items-center gap-1.5">
+        <label className="flex items-center gap-2">
           <input
             type="checkbox"
             checked={question.multi_select}
             onChange={(e) => onChange({ multi_select: e.target.checked })}
-            className="h-3 w-3"
+            className="h-3.5 w-3.5"
           />
           Multi-select
         </label>
@@ -529,11 +544,11 @@ function QuestionRow({
 
       <div className="space-y-1.5">
         <div className="text-xs font-medium text-[#737373]">Chips</div>
+        {/* Header row visible only at sm: and up where chips render
+            in a 4-column grid. On mobile each chip stacks its fields
+            with their own visible labels (see field labels below). */}
         {question.chips.length > 0 && (
-          <div
-            className="grid items-center gap-1.5 px-2 text-[10px] uppercase tracking-wide text-[#A3A3A3]"
-            style={{ gridTemplateColumns: 'minmax(0, 1fr) 7rem 4rem 1rem' }}
-          >
+          <div className="hidden sm:grid sm:items-center sm:gap-1.5 px-2 text-[10px] uppercase tracking-wide text-[#A3A3A3] chip-grid-row">
             <div>Label (visible)</div>
             <div>Slug (machine id)</div>
             <div className="text-right">Weight</div>
@@ -543,54 +558,91 @@ function QuestionRow({
         {question.chips.map((chip, chipIdx) => (
           <div
             key={chipIdx}
-            className="grid items-center gap-1.5"
-            style={{ gridTemplateColumns: 'minmax(0, 1fr) 7rem 4rem 1rem' }}
+            className="rounded border border-transparent sm:border-0 sm:bg-transparent bg-white sm:p-0 p-2"
           >
-            <input
-              type="text"
-              value={chip.label}
-              onChange={(e) => updateChip(chipIdx, { label: e.target.value })}
-              placeholder="Display label (e.g. Myself)"
-              aria-label={`Chip ${chipIdx + 1} label`}
-              className="w-full px-2 py-1.5 text-sm rounded border border-[#E5E5E5] bg-white text-[#171717] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-2 focus:ring-[#171717] focus:border-[#171717]"
-            />
-            <input
-              type="text"
-              value={chip.slug}
-              onChange={(e) => updateChip(chipIdx, { slug: e.target.value })}
-              placeholder="slug"
-              pattern="[a-z0-9_-]+"
-              aria-label={`Chip ${chipIdx + 1} slug`}
-              className="w-full px-2 py-1.5 text-xs rounded border border-[#E5E5E5] bg-white font-mono text-[#171717] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-2 focus:ring-[#171717] focus:border-[#171717]"
-            />
-            <input
-              type="number"
-              value={chip.score_weight}
-              onChange={(e) =>
-                updateChip(chipIdx, { score_weight: Number(e.target.value) })
-              }
-              step={1}
-              min={-50}
-              max={50}
-              aria-label={`Chip ${chipIdx + 1} score weight`}
-              className="w-full px-2 py-1.5 text-xs rounded border border-[#E5E5E5] bg-white text-right text-[#171717] focus:outline-none focus:ring-2 focus:ring-[#171717] focus:border-[#171717]"
-            />
-            <button
-              type="button"
-              onClick={() => removeChip(chipIdx)}
-              className="text-xs text-[#991B1B] hover:underline"
-              title="Remove chip"
+            {/*
+              Mobile (default): each chip's fields stack vertically
+              with their own visible labels so Label / Slug / Weight
+              each get full width and aren't crammed into a 30%
+              column.
+              Desktop (sm:+): collapse back to the original 4-column
+              grid via inline `gridTemplateColumns` (Tailwind's
+              arbitrary-value `grid-cols-[…]` syntax doesn't reliably
+              accept `minmax(0,1fr)` so the inline style is the most
+              robust path).
+            */}
+            <div
+              className="grid grid-cols-1 sm:items-center gap-2 sm:gap-1.5 chip-grid-row"
             >
-              ×
-            </button>
+              <label className="block sm:contents">
+                <span className="block text-[10px] uppercase tracking-wide text-[#A3A3A3] mb-1 sm:hidden">
+                  Label
+                </span>
+                <input
+                  type="text"
+                  value={chip.label}
+                  onChange={(e) => updateChip(chipIdx, { label: e.target.value })}
+                  placeholder="Display label (e.g. Myself)"
+                  aria-label={`Chip ${chipIdx + 1} label`}
+                  className="w-full px-2 py-1.5 text-sm rounded border border-[#E5E5E5] bg-white text-[#171717] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-2 focus:ring-[#171717] focus:border-[#171717]"
+                />
+              </label>
+              <label className="block sm:contents">
+                <span className="block text-[10px] uppercase tracking-wide text-[#A3A3A3] mb-1 sm:hidden">
+                  Slug
+                </span>
+                <input
+                  type="text"
+                  value={chip.slug}
+                  onChange={(e) => updateChip(chipIdx, { slug: e.target.value })}
+                  placeholder="slug"
+                  pattern="[a-z0-9_-]+"
+                  aria-label={`Chip ${chipIdx + 1} slug`}
+                  className="w-full px-2 py-1.5 text-xs rounded border border-[#E5E5E5] bg-white font-mono text-[#171717] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-2 focus:ring-[#171717] focus:border-[#171717]"
+                />
+              </label>
+              <label className="block sm:contents">
+                <span className="block text-[10px] uppercase tracking-wide text-[#A3A3A3] mb-1 sm:hidden">
+                  Weight
+                </span>
+                <input
+                  type="number"
+                  value={chip.score_weight}
+                  onChange={(e) =>
+                    updateChip(chipIdx, { score_weight: Number(e.target.value) })
+                  }
+                  step={1}
+                  min={-50}
+                  max={50}
+                  aria-label={`Chip ${chipIdx + 1} score weight`}
+                  className="w-full px-2 py-1.5 text-xs rounded border border-[#E5E5E5] bg-white text-right text-[#171717] focus:outline-none focus:ring-2 focus:ring-[#171717] focus:border-[#171717]"
+                />
+              </label>
+              {/* Remove button — right-aligned full-width row on
+                  mobile, single column on desktop. */}
+              <div className="flex justify-end sm:block">
+                <button
+                  type="button"
+                  onClick={() => removeChip(chipIdx)}
+                  aria-label={`Remove chip ${chipIdx + 1}`}
+                  title="Remove chip"
+                  className="text-base leading-none text-[#991B1B] hover:bg-[#FEF2F2] rounded px-2 py-1 transition"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
           </div>
         ))}
         <button
           type="button"
           onClick={addChip}
-          className="text-xs text-[#171717] hover:underline"
+          aria-label="Add chip"
+          title="Add chip"
+          className="inline-flex items-center gap-1.5 text-xs text-[#171717] hover:bg-[#F5F5F5] rounded px-2 py-1 transition"
         >
-          + Add chip
+          <PlusIcon />
+          <span>Add chip</span>
         </button>
       </div>
     </div>
@@ -624,7 +676,7 @@ function ThresholdEditor({
         classification. Both tables MUST cover [0, 100] without gaps or
         overlaps.
       </p>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <ThresholdTable
           title="Self"
           buckets={[
@@ -663,10 +715,13 @@ function ThresholdTable({ title, buckets, onChange }: ThresholdTableProps) {
   return (
     <div>
       <div className="text-xs font-medium text-[#737373] mb-1.5">{title}</div>
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {buckets.map((b) => (
-          <div key={b.name} className="flex items-center gap-1.5 text-xs">
-            <span className="w-12 text-[#171717]">{b.label}</span>
+          <div
+            key={b.name}
+            className="flex items-center gap-2 text-xs flex-wrap"
+          >
+            <span className="w-14 text-[#171717] flex-shrink-0">{b.label}</span>
             <input
               type="number"
               value={b.range[0]}
@@ -676,7 +731,8 @@ function ThresholdTable({ title, buckets, onChange }: ThresholdTableProps) {
               onChange={(e) =>
                 onChange(b.name, [Number(e.target.value), b.range[1]])
               }
-              className="w-14 px-1.5 py-1 rounded border border-[#E5E5E5] bg-white text-right"
+              aria-label={`${b.label} lower bound`}
+              className="w-16 min-w-0 px-1.5 py-1 rounded border border-[#E5E5E5] bg-white text-right"
             />
             <span className="text-[#737373]">–</span>
             <input
@@ -688,11 +744,54 @@ function ThresholdTable({ title, buckets, onChange }: ThresholdTableProps) {
               onChange={(e) =>
                 onChange(b.name, [b.range[0], Number(e.target.value)])
               }
-              className="w-14 px-1.5 py-1 rounded border border-[#E5E5E5] bg-white text-right"
+              aria-label={`${b.label} upper bound`}
+              className="w-16 min-w-0 px-1.5 py-1 rounded border border-[#E5E5E5] bg-white text-right"
             />
           </div>
         ))}
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Icons (inline SVGs to avoid adding an icon-library dependency).
+// 14×14, currentColor stroke, aria-hidden because the parent button
+// carries the accessible label.
+// ---------------------------------------------------------------------------
+
+function PlusIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M8 3v10M3 8h10" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 4h10M6.5 4V2.5h3V4M5 4l.5 9h5l.5-9M7 7v4M9 7v4" />
+    </svg>
   );
 }
