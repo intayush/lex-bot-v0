@@ -25,3 +25,6 @@ chatbot-redesign-*.png
 
 # macOS Finder metadata
 .DS_Store
+
+# Generated test-matrix reports (regeneratable from /tmp/seed-run.log + DB).
+packages/api/scripts/reports/
