@@ -288,7 +288,10 @@ export function ChatPanel({
       <div
         style={{
           padding: '16px 20px',
-          backgroundColor: 'var(--lc-primary-color, #4338ca)',
+          // `background` shorthand so the header strip accepts a
+          // gradient via --lc-primary-bg. `backgroundColor` cannot
+          // hold a gradient.
+          background: 'var(--lc-primary-bg, #4338ca)',
           color: 'var(--lc-primary-text, #ffffff)',
           display: 'flex',
           alignItems: 'center',

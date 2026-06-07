@@ -74,9 +74,12 @@ export function MessageList({
               maxWidth: '80%',
               fontSize: '14px',
               lineHeight: '1.5',
-              backgroundColor:
+              // Use `background` (shorthand) so the primary surface accepts
+              // either a solid color OR a gradient via --lc-primary-bg.
+              // `backgroundColor` cannot hold a gradient value.
+              background:
                 m.role === 'user'
-                  ? 'var(--lc-primary-color, #4338ca)'
+                  ? 'var(--lc-primary-bg, #4338ca)'
                   : 'var(--lc-message-bg-assistant, #f5f1e8)',
               color:
                 m.role === 'user'

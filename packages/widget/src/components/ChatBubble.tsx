@@ -28,7 +28,9 @@ export const ChatBubble = forwardRef<HTMLButtonElement, ChatBubbleProps>(
           width: '60px',
           height: '60px',
           borderRadius: '50%',
-          backgroundColor: 'var(--lc-primary-color, #4338ca)',
+          // `background` shorthand so the bubble accepts a gradient via
+          // --lc-primary-bg. `backgroundColor` cannot hold a gradient.
+          background: 'var(--lc-primary-bg, #4338ca)',
           color: 'var(--lc-primary-text, #ffffff)',
           border: 'none',
           cursor: 'pointer',

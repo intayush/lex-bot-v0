@@ -124,8 +124,11 @@ export function ContactForm({ onSubmit }: ContactFormProps): ReactElement {
           padding: '10px 16px',
           borderRadius: '12px',
           border: 'none',
-          backgroundColor: canSubmit
-            ? 'var(--lc-primary-color, #4338ca)'
+          // `background` shorthand so a gradient set via --lc-primary-bg
+          // paints correctly when the button is enabled. The disabled
+          // state stays a flat scrim color.
+          background: canSubmit
+            ? 'var(--lc-primary-bg, #4338ca)'
             : 'rgba(31,27,22,0.12)',
           color: 'var(--lc-primary-text, #ffffff)',
           fontSize: '14px',

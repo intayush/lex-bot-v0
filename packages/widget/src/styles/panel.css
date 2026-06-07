@@ -20,6 +20,24 @@
   /* Public — preserve names; embedding firms override these. */
   --lc-primary-color: #4338ca;
   --lc-primary-text: #ffffff;
+  /*
+   * --lc-primary-bg is the paintable background variant of the primary
+   * brand color. May hold either a solid color OR a CSS gradient (any
+   * `background-image` value: linear-gradient, radial-gradient, etc.).
+   *
+   * Components that paint a background using the brand color use this
+   * token via the `background:` shorthand (gradients are NOT valid
+   * `background-color` values; only `background` / `background-image`).
+   * Components that use the brand color for a border or text color
+   * continue to use --lc-primary-color (which must remain a solid
+   * color so it can paint a border/foreground).
+   *
+   * Defaults to --lc-primary-color so existing solid-color overrides
+   * cascade unchanged. Embedding hosts setting a gradient should set
+   * BOTH tokens: --lc-primary-color to a representative solid color
+   * for borders, and --lc-primary-bg to the gradient.
+   */
+  --lc-primary-bg: var(--lc-primary-color);
   --lc-background: #fcfaf5;
   --lc-border-radius: 20px;
   --lc-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",

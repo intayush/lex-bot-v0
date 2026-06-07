@@ -132,7 +132,10 @@ export function Composer({
             style={{
               padding: '12px 18px',
               borderRadius: '12px',
-              backgroundColor: 'var(--lc-primary-color, #4338ca)',
+              // `background` (shorthand) so a gradient set via
+              // --lc-primary-bg paints correctly. `backgroundColor`
+              // cannot hold a gradient value.
+              background: 'var(--lc-primary-bg, #4338ca)',
               color: 'var(--lc-primary-text, #ffffff)',
               border: 'none',
               cursor: disabled || !inputValue.trim() ? 'not-allowed' : 'pointer',

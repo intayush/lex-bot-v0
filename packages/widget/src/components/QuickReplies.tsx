@@ -36,8 +36,11 @@ export function QuickReplies({ onSelect, options }: QuickRepliesProps) {
           style={{
             padding: '8px 14px',
             borderRadius: 'var(--lc-message-radius, 16px)',
+            // Border stays on --lc-primary-color (solid). Background
+            // uses --lc-primary-bg via `background` shorthand so a
+            // gradient paints on hover.
             border: '1px solid var(--lc-primary-color, #4338ca)',
-            backgroundColor: 'transparent',
+            background: 'transparent',
             color: 'var(--lc-primary-color, #4338ca)',
             fontSize: '13px',
             cursor: 'pointer',
@@ -45,11 +48,11 @@ export function QuickReplies({ onSelect, options }: QuickRepliesProps) {
             whiteSpace: 'nowrap',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = 'var(--lc-primary-color, #4338ca)';
+            e.currentTarget.style.background = 'var(--lc-primary-bg, #4338ca)';
             e.currentTarget.style.color = 'var(--lc-primary-text, #ffffff)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.background = 'transparent';
             e.currentTarget.style.color = 'var(--lc-primary-color, #4338ca)';
           }}
         >
