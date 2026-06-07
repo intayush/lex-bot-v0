@@ -242,6 +242,31 @@ export async function POST(req: Request) {
           return {};
         }
       })(),
+      // Companion to `whenChipWeights` keyed by lowercased chip
+      // label. Required because the default SOP advancer's
+      // date-inferer overwrites the captured chip slug with an
+      // ISO date — the chip slug is unrecoverable from the SOP
+      // state at branch-finalize-time, but the chip label is
+      // preserved on `state.steps[when].captured_label`.
+      whenChipWeightsByLabel: (() => {
+        const whenStep = sopBundle.sop?.steps.find((s) => s.slug === 'when');
+        if (!whenStep?.inline_chips_json) return {};
+        try {
+          const chips = JSON.parse(whenStep.inline_chips_json) as Array<{
+            label?: string;
+            score_weight?: number;
+          }>;
+          const map: Record<string, number> = {};
+          for (const c of chips) {
+            if (typeof c.score_weight === 'number' && typeof c.label === 'string') {
+              map[c.label.toLowerCase()] = c.score_weight;
+            }
+          }
+          return map;
+        } catch {
+          return {};
+        }
+      })(),
     };
     const userText =
       typeof newUserMessage?.content === 'string' ? newUserMessage.content : '';
@@ -389,7 +414,21 @@ export async function POST(req: Request) {
           urgencyFactors,
           // 010-sop-workflow: snapshot SOP state at capture time.
           sopState,
+        }).catch((err: Error) => {
+          // FR-002b throws when the partial-gate (one of email/phone)
+          // isn't met. The LLM can call captureLead before the contact
+          // form has been completed if it thinks it has enough info
+          // from the conversation; rather than crashing the stream
+          // with a 500, return success:false so the LLM can keep the
+          // conversation going and retry once contact is on file.
+          if (err.message?.includes('captureLead refused')) {
+            return { leadId: null, classification: 'COLD' as const, error: 'missing_contact' };
+          }
+          throw err;
         });
+        if ('error' in result && result.error) {
+          return { success: false, error: result.error };
+        }
         return { success: true, leadId: result.leadId, classification: result.classification };
       },
     }),
@@ -456,7 +495,17 @@ export async function POST(req: Request) {
   headers.set('x-session-id', sessionId);
   const sopHeaderPayload = buildSOPStateHeader(sopState, sopBundle.caseTypes, branchActiveQuestion);
   if (sopHeaderPayload) {
-    headers.set('x-sop-state', JSON.stringify(sopHeaderPayload));
+    // HTTP headers are ByteString — non-ASCII characters cause
+    // `Headers.set` to throw. Branch chip labels can contain typographic
+    // punctuation (en-dash for ranges like "8–30 days", smart quotes,
+    // currency symbols) so we escape every non-ASCII character to its
+    // \uXXXX form. JSON.parse on the widget side restores the original
+    // characters transparently — zero behavior change.
+    const json = JSON.stringify(sopHeaderPayload);
+    const ascii = json.replace(/[\u0080-\uffff]/g, (ch) => {
+      return '\\u' + ch.charCodeAt(0).toString(16).padStart(4, '0');
+    });
+    headers.set('x-sop-state', ascii);
   }
   Object.entries(corsHeaders).forEach(([key, value]) => {
     headers.set(key, value);

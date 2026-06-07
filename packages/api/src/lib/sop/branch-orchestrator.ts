@@ -67,6 +67,16 @@ export interface BranchOrchestratorDeps {
    * +0 contribution).
    */
   whenChipWeights?: Record<string, number>;
+  /**
+   * Companion of `whenChipWeights` keyed by lowercased chip label.
+   * Required at runtime because the default SOP advancer's
+   * date-inferer overwrites `state.steps[when].captured_value` with
+   * an ISO date string (`"2026-05-31"`), making the slug-keyed
+   * lookup miss. The chip's `captured_label` is preserved through
+   * date inference and is the recoverable identifier post-
+   * normalisation.
+   */
+  whenChipWeightsByLabel?: Record<string, number>;
 }
 
 export interface BranchOrchestratorInput {
@@ -162,10 +172,38 @@ function captureRequestType(state: SOPState): LeadRequestType | null {
  *     doesn't yield a chip slug, so we'd need a separate ISO-date-to-
  *     bucket mapper for full coverage; deferred to follow-up).
  */
-function computeWhenChipBonus(state: SOPState, whenChipWeights: Record<string, number>): number {
+/**
+ * Compute the weight contribution from the default SOP `when`
+ * step's selected chip. Looks up the chip in the configured
+ * `whenChipWeights` map by the captured chip slug.
+ *
+ * IMPORTANT: the default SOP advancer's date-inferer normalises the
+ * captured chip slug into an ISO date string (e.g. `last_week` →
+ * `"2026-05-31"`) and overwrites `captured_value`. The chip's slug
+ * is therefore unreachable from `captured_value` at finalize-time.
+ * To recover the bonus we ALSO accept a label→weight map: the
+ * inline-chip path preserves the chip's label in `captured_label`,
+ * which we can look up directly. If both paths fail, the bonus is 0.
+ */
+function computeWhenChipBonus(
+  state: SOPState,
+  whenChipWeightsBySlug: Record<string, number>,
+  whenChipWeightsByLabel: Record<string, number>,
+): number {
   const whenStep = state.steps.find((s) => s.slug === 'when');
-  if (!whenStep || whenStep.captured_value === null) return 0;
-  return whenChipWeights[whenStep.captured_value] ?? 0;
+  if (!whenStep) return 0;
+  // Slug path (kept for back-compat — fires when the date-inferer
+  // didn't run, e.g. unit tests that skip inference).
+  if (whenStep.captured_value !== null) {
+    const bySlug = whenChipWeightsBySlug[whenStep.captured_value];
+    if (typeof bySlug === 'number') return bySlug;
+  }
+  // Label path (the production hot-path post date-inference).
+  if (whenStep.captured_label !== null) {
+    const byLabel = whenChipWeightsByLabel[whenStep.captured_label.toLowerCase()];
+    if (typeof byLabel === 'number') return byLabel;
+  }
+  return 0;
 }
 
 function computeContactBonus(state: SOPState): number {
@@ -386,6 +424,7 @@ export async function runBranchOrchestrator(
       computeWhenChipBonus(
         { ...sopState, branch_state: advanceResult.updatedState },
         deps.whenChipWeights ?? {},
+        deps.whenChipWeightsByLabel ?? {},
       ),
   });
   const snapshot = freezeBranchSnapshot({

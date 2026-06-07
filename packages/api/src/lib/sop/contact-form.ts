@@ -21,7 +21,14 @@
 import type { ContactFormPayload } from '@legal-chatbot/shared';
 import { contactFormPayloadSchema } from '@legal-chatbot/shared';
 
-const EMAIL_RE = /[\w.-]+@[\w.-]+\.\w+/;
+// RFC 5322 doesn't allow every printable, but the common subset
+// real-world users type includes `+` (sub-addressing), `_`, `.`, and
+// `-`. The pre-fix regex `/[\w.-]+@…/` rejected `+`, silently
+// truncating addresses like `fixture+1@example.com` to
+// `1@example.com` and breaking idempotent partial-gate retries that
+// depended on the full address. Adding `+` to the local-part character
+// class is a strict superset of the prior behaviour.
+const EMAIL_RE = /[\w.+\-]+@[\w.\-]+\.\w+/;
 const PHONE_RE = /\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/;
 const NAME_RE = /(?:my name is|i'm|i am|this is)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i;
 
