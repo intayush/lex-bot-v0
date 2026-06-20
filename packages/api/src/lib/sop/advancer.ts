@@ -1,16 +1,15 @@
 /**
- * SOP advancer (010-sop-workflow T041 — Phase 4 US2 wiring).
+ * SOP advancer (018-forward-only-sop).
  *
- * Thin layer that calls the skip-detector to find which SOP steps the
- * visitor's message answers, then applies each match as a `capture_step`
- * action via the state machine. Handles out-of-scope termination as a
- * special case after all captures land.
+ * Forward-only model: processes only the current pending step each turn.
+ * No multi-step skip detection; no correction-signal back-fill.
  *
- * Was the v0 advancer (Phase 3 T031) that had its own chip-matching
- * logic; that logic now lives in skip-detector.ts and supports
- * multi-step matches per FR-016.
+ * When the pending step receives no usable answer, the re-ask counter for
+ * that step increments. After SOP_REASK_LIMIT consecutive unanswered turns
+ * the step is skipped and the SOP advances to the next pending step.
  */
 import type { CaseType, SOPConfiguration, SOPState } from '@legal-chatbot/shared';
+import { SOP_REASK_LIMIT } from '@legal-chatbot/shared';
 import { advanceSOP, nextPendingStep } from './state-machine';
 import { detectSkippedSteps, type SkipDetectorMatch } from './skip-detector';
 import { inferDate } from './date-inferer';
@@ -29,7 +28,7 @@ export interface AdvanceForVisitorMessageInput {
 export interface AdvanceForVisitorMessageResult {
   /** New SOP state after applying detected captures. */
   state: SOPState;
-  /** Skip-detector matches found for this message (empty if none). */
+  /** The single match applied this turn, or empty when no capture. */
   matches: SkipDetectorMatch[];
   /**
    * The pending step BEFORE this turn's advancement, captured for
@@ -51,19 +50,19 @@ export async function advanceForVisitorMessage(
     return { state: input.state, matches: [], pendingStepBefore };
   }
 
-  // Contact-form short-circuit: when the pending step is a contact_form
-  // step (e.g., the default SOP's 'contact' step at position 6), try to
-  // extract a structured contact payload from the visitor's message.
-  // The widget normally dispatches a well-formed sentence ('My name is
-  // Jane, my email is jane@example.com') after the visitor fills the
-  // form, so extraction succeeds reliably. Free-text "I'm Jane,
-  // jane@x.com" also works (same regex patterns).
-  //
-  // On success: capture the step with the JSON-stringified payload and
-  // skip the regular skip-detector pass — the contact step is the
-  // explicit answer to the pending question and shouldn't be diluted
-  // with case_type/sub_type/when re-detection.
-  if (pendingStepBefore?.chip_source === 'contact_form') {
+  if (!pendingStepBefore) {
+    return { state: input.state, matches: [], pendingStepBefore };
+  }
+
+  // Empty or whitespace-only messages do not count as unanswered turns.
+  if (message.trim().length === 0) {
+    return { state: input.state, matches: [], pendingStepBefore };
+  }
+
+  // Contact-form short-circuit: when the pending step is a contact_form step,
+  // try to extract a structured contact payload from the visitor's message.
+  // On success: capture the step and skip the skip-detector pass.
+  if (pendingStepBefore.chip_source === 'contact_form') {
     const payload = extractContactPayload(message);
     if (payload) {
       let next = advanceSOP(
@@ -91,14 +90,18 @@ export async function advanceForVisitorMessage(
         pendingStepBefore,
       };
     }
-    // Extraction failed: leave step pending. The widget keeps the
-    // form rendered; the visitor can re-submit. We DON'T fall through
-    // to skip-detector because that would risk capturing the message
-    // into some other step incorrectly.
-    return { state: input.state, matches: [], pendingStepBefore };
+    // Extraction failed: increment re-ask counter and leave step pending.
+    return {
+      state: incrementReaskCount(input.state, pendingStepBefore.id, sopConfig),
+      matches: [],
+      pendingStepBefore,
+    };
   }
 
-  const matches = await detectSkippedSteps({
+  // Run the detector for ALL pending steps so chip/date matching works
+  // correctly (it needs the full pending context to resolve case_type →
+  // sub_type relationships). Then filter to the single current pending step.
+  const allMatches = await detectSkippedSteps({
     message,
     state: input.state,
     sopConfig,
@@ -106,88 +109,82 @@ export async function advanceForVisitorMessage(
     inferDateImpl: input.inferDateImpl,
   });
 
-  if (matches.length === 0) {
-    return { state: input.state, matches, pendingStepBefore };
+  const currentMatch = allMatches.find((m) => m.step_id === pendingStepBefore.id) ?? null;
+
+  if (currentMatch === null) {
+    // No capture for the current pending step — increment re-ask counter.
+    return {
+      state: incrementReaskCount(input.state, pendingStepBefore.id, sopConfig),
+      matches: [],
+      pendingStepBefore,
+    };
   }
 
-  // Detect change-of-mind on case_type. If the visitor corrected the
-  // case_type (matches contains a 'correction' match for case_type)
-  // AND a sub_type was previously captured, that sub_type is scoped
-  // to the OLD case_type and is now stale — reset it to pending so
-  // the agent re-asks on the next turn.
-  const caseTypeCorrection = matches.find(
-    (m) => m.slug === 'case_type' && m.source === 'correction',
+  let next = advanceSOP(
+    input.state,
+    {
+      type: 'capture_step',
+      step_id: currentMatch.step_id,
+      value: currentMatch.captured_value,
+      capturedAt,
+      inferred: currentMatch.source !== 'free_text',
+      capturedLabel: currentMatch.captured_label,
+    },
+    sopConfig,
   );
-  const subTypeAlsoCorrected = matches.some(
-    (m) => m.slug === 'sub_type' && m.source === 'correction',
-  );
 
-  // Apply each match as a capture_step action. Skip-detector already
-  // de-duplicates per step; applying in match order is safe.
-  let next = input.state;
-  let anyOutOfScope = false;
-  for (const m of matches) {
-    next = advanceSOP(
-      next,
-      {
-        type: 'capture_step',
-        step_id: m.step_id,
-        value: m.captured_value,
-        capturedAt,
-        // Multi-step / pattern-derived captures are "inferred" from the
-        // user's perspective. Single-step explicit chip taps are also
-        // marked inferred=true here for simplicity; consumers (logging,
-        // dashboard) treat all skip-detector captures uniformly.
-        inferred: m.source !== 'free_text',
-        // 014-fix-sop-case-subtypes T018 / FR-022: forward the chip's
-        // label snapshot from skip-detector to the state-machine so the
-        // capture preserves a stable display value.
-        capturedLabel: m.captured_label,
-      },
-      sopConfig,
-    );
-    if (m.out_of_scope) anyOutOfScope = true;
-  }
-
-  // After captures land: if case_type was just corrected AND no new
-  // sub_type was captured in the same turn, reset the (now-stale)
-  // sub_type step so the agent re-asks it.
-  if (caseTypeCorrection && !subTypeAlsoCorrected) {
-    const subTypeStep = sopConfig.steps.find((s) => s.slug === 'sub_type');
-    if (subTypeStep) {
-      const subTypeState = next.steps.find((s) => s.step_id === subTypeStep.id);
-      if (subTypeState?.status === 'complete') {
-        next = advanceSOP(next, { type: 'reset_step', step_id: subTypeStep.id }, sopConfig);
-      }
-    }
-  }
-
-  if (anyOutOfScope) {
+  if (currentMatch.out_of_scope) {
     next = advanceSOP(next, { type: 'finalize_out_of_scope' }, sopConfig);
   } else {
     next = autoFinalizeIfReady(next, sopConfig);
   }
 
-  return { state: next, matches, pendingStepBefore };
+  return { state: next, matches: [currentMatch], pendingStepBefore };
 }
 
+// ---------------------------------------------------------------------------
+// Re-ask counter
+// ---------------------------------------------------------------------------
+
 /**
- * Auto-finalize the SOP state when:
- *   (a) `current_progress` has reached `qualified_lead_threshold`, AND
- *   (b) no required step is still pending.
- *
- * This is the missing link from the spec's "set is_finalized=true on
- * Step 6 finalize" rule (data-model.md). Without it, the runtime would
- * stay forever at `current=N, total=N, is_finalized=false`, which
- * confuses the widget (contact form keeps showing) and breaks the
- * captureLead flow.
- *
- * No-op when already finalized OR when conditions aren't met.
+ * Increment the re-ask counter for the given step. When the counter reaches
+ * SOP_REASK_LIMIT the step is skipped and the SOP advances to the next
+ * pending step (018-forward-only-sop FR-006 to FR-009).
+ */
+function incrementReaskCount(
+  state: SOPState,
+  stepId: string,
+  sopConfig: SOPConfiguration,
+): SOPState {
+  const idx = state.steps.findIndex((s) => s.step_id === stepId);
+  if (idx === -1) return state;
+
+  const currentCount = state.steps[idx]!.reask_count ?? 0;
+  const newCount = currentCount + 1;
+
+  const updatedSteps = state.steps.map((s, i) =>
+    i === idx ? { ...s, reask_count: newCount } : s,
+  );
+  const stateWithCount: SOPState = { ...state, steps: updatedSteps };
+
+  if (newCount >= SOP_REASK_LIMIT) {
+    return advanceSOP(stateWithCount, { type: 'skip_step', step_id: stepId }, sopConfig);
+  }
+
+  return stateWithCount;
+}
+
+// ---------------------------------------------------------------------------
+// Auto-finalize
+// ---------------------------------------------------------------------------
+
+/**
+ * Auto-finalize the SOP state when current_progress reaches
+ * qualified_lead_threshold and no required step is still pending.
  */
 function autoFinalizeIfReady(state: SOPState, sopConfig: SOPConfiguration): SOPState {
   if (state.is_finalized) return state;
   if (state.current_progress < state.qualified_lead_threshold) return state;
-  // Confirm no required step is still pending.
   const requiredPending = state.steps.some((s) => {
     if (s.status !== 'pending') return false;
     const cfgStep = sopConfig.steps.find((cs) => cs.id === s.step_id);
@@ -199,8 +196,7 @@ function autoFinalizeIfReady(state: SOPState, sopConfig: SOPConfiguration): SOPS
 
 /**
  * Convenience wrapper that returns just the new SOPState. Used by tests
- * (which don't care about matches / pendingStepBefore). Production
- * callers should use advanceForVisitorMessage to retain the full result.
+ * that don't need matches or pendingStepBefore.
  */
 export async function advanceStateForVisitorMessage(
   input: AdvanceForVisitorMessageInput,

@@ -1,13 +1,9 @@
 /**
- * Tests for the SOP advancer v0 (010-sop-workflow T031 sidecar).
+ * Tests for the SOP advancer (018-forward-only-sop).
  *
  * Async to accommodate the date-inferer call when the pending step's
  * slug is 'when'. Uses an injected mock inferDate so tests don't hit
  * the real Gemini provider.
- *
- * Phase 4 (US2) replaces this with the full skip-detector, but until
- * then v0 must work for the US1 happy path including ISO-date capture
- * for the when step.
  */
 import { describe, it, expect } from 'vitest';
 import type { CaseType, SOPConfiguration } from '@legal-chatbot/shared';
@@ -277,9 +273,8 @@ describe('advanceForVisitorMessage — when step (date inference)', () => {
     const whenStep = after.steps.find((st) => st.slug === 'when')!;
     expect(whenStep.status).toBe('pending');
     expect(whenStep.captured_value).toBeNull();
-    // Same reference returned — no work done so the route handler can
-    // detect "no advancement".
-    expect(after).toBe(before);
+    // Re-ask counter increments on the unanswered turn.
+    expect(whenStep.reask_count).toBeGreaterThanOrEqual(1);
   });
 
   it('inline-chip path uses deterministic chip→ISO mapper without calling inferDate', async () => {
@@ -368,53 +363,59 @@ describe('advanceForVisitorMessage — defensive', () => {
   });
 });
 
+
 // ---------------------------------------------------------------------------
-// Multi-step capture (Phase 4 US2 — exercises the full skip-detector +
-// advancer path)
+// Forward-only progression (018-forward-only-sop US1)
 // ---------------------------------------------------------------------------
 
-describe('advanceForVisitorMessage — multi-step capture (US2)', () => {
-  it('"I had a DUI yesterday" advances both case_type and when in one turn', async () => {
+describe('advanceForVisitorMessage — forward-only (US1)', () => {
+  it('does not apply future-step matches — bar advances by 1 only', async () => {
+    // Message contains case_type (step 1), where (step 3), and a date (step 5).
+    // Only step 1 (the current pending step) should be captured.
     const sopConfig = buildSOPConfig();
     const initial = initSOPState(sopConfig, ANCHOR);
     const after = await advanceForVisitorMessage({
       state: initial, sopConfig, caseTypes: CASE_TYPES,
-      message: 'I had a DUI yesterday', capturedAt: T1,
+      message: 'I had a DUI at 5th and Main yesterday', capturedAt: T1,
       inferDateImpl: ALWAYS_YESTERDAY,
     });
-
-    const caseTypeStep = after.steps.find((s) => s.slug === 'case_type')!;
-    expect(caseTypeStep.status).toBe('complete');
-    expect(caseTypeStep.captured_value).toBe('dui');
-    expect(caseTypeStep.inferred).toBe(true);
-
-    const whenStep = after.steps.find((s) => s.slug === 'when')!;
-    expect(whenStep.status).toBe('complete');
-    expect(whenStep.captured_value).toBe('2026-05-22');
-
-    // current_progress should reflect both captures.
-    expect(after.current_progress).toBeGreaterThanOrEqual(2);
+    expect(after.steps[0]!.status).toBe('complete'); // case_type
+    expect(after.steps[0]!.captured_value).toBe('dui');
+    expect(after.steps[2]!.status).toBe('pending'); // where — NOT captured
+    expect(after.steps[4]!.status).toBe('pending'); // when — NOT captured
+    expect(after.current_progress).toBe(1);
   });
 
-  it('out-of-scope case_type in a multi-step message still triggers finalize_out_of_scope', async () => {
+  it('off-SOP turn does not capture future steps', async () => {
+    // Message mentions a date phrase but step 1 (case_type) is still pending.
+    // The skip-detector would see the date and normally infer the when step,
+    // but the forward-only filter discards anything not matching step 1.
     const sopConfig = buildSOPConfig();
     const initial = initSOPState(sopConfig, ANCHOR);
     const after = await advanceForVisitorMessage({
       state: initial, sopConfig, caseTypes: CASE_TYPES,
-      message: 'I need help with estate planning', capturedAt: T1,
-      inferDateImpl: ALWAYS_NULL,
+      message: 'What are your office hours? It happened last Tuesday.',
+      capturedAt: T1, inferDateImpl: ALWAYS_YESTERDAY,
+    });
+    // case_type still pending (no chip match for the generic message).
+    expect(after.steps[0]!.status).toBe('pending');
+    // when step NOT captured even though the message contained a date.
+    expect(after.steps[4]!.status).toBe('pending');
+  });
+
+  it('out-of-scope case_type still triggers finalize_out_of_scope', async () => {
+    const sopConfig = buildSOPConfig();
+    const initial = initSOPState(sopConfig, ANCHOR);
+    const after = await advanceForVisitorMessage({
+      state: initial, sopConfig, caseTypes: CASE_TYPES,
+      message: 'estate planning', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
     });
     expect(after.is_finalized).toBe(true);
     expect(after.out_of_scope_termination).toBe(true);
   });
-});
 
-// ---------------------------------------------------------------------------
-// Change-of-mind via correction signal (Phase 6 follow-up after live testing)
-// ---------------------------------------------------------------------------
-
-describe('advanceForVisitorMessage — change-of-mind correction', () => {
-  it('"actually personal injury" overrides previously-captured case_type=dui', async () => {
+  it('does NOT re-capture a completed step on a subsequent turn', async () => {
+    // Under the forward-only model, a completed step is never reconsidered.
     const sopConfig = buildSOPConfig();
     let s = initSOPState(sopConfig, ANCHOR);
     s = await advanceForVisitorMessage({
@@ -422,91 +423,77 @@ describe('advanceForVisitorMessage — change-of-mind correction', () => {
       message: 'DUI', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
     });
     expect(s.steps[0]!.captured_value).toBe('dui');
-
+    // Next turn mentions personal injury — case_type stays as dui.
     s = await advanceForVisitorMessage({
       state: s, sopConfig, caseTypes: CASE_TYPES,
       message: 'actually personal injury', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
     });
-    expect(s.steps[0]!.captured_value).toBe('personal_injury');
-    expect(s.steps[0]!.status).toBe('complete');
-    // current_progress unchanged at 1 (re-capture, not new step).
-    expect(s.current_progress).toBe(1);
-  });
-
-  it('case_type correction resets a stale sub_type back to pending', async () => {
-    // Walk: DUI \u2192 first_offense (DUI sub-type). Then "actually personal
-    // injury". The sub_type 'first_offense' is now stale (not a valid
-    // sub_type of personal_injury). Advancer must reset sub_type to
-    // pending so the agent re-asks.
-    const sopConfig = buildSOPConfig();
-    let s = initSOPState(sopConfig, ANCHOR);
-    // Use the smaller fixture's step layout: case_type, sub_type, where, when
-    s = await advanceForVisitorMessage({
-      state: s, sopConfig, caseTypes: CASE_TYPES,
-      message: 'DUI', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
-    });
-    s = await advanceForVisitorMessage({
-      state: s, sopConfig, caseTypes: CASE_TYPES,
-      message: 'first offense', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
-    });
-    // Both case_type and sub_type complete now.
-    expect(s.steps[0]!.status).toBe('complete');
-    expect(s.steps[1]!.status).toBe('complete');
-    expect(s.current_progress).toBe(2);
-
-    s = await advanceForVisitorMessage({
-      state: s, sopConfig, caseTypes: CASE_TYPES,
-      message: 'actually personal injury', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
-    });
-
-    expect(s.steps[0]!.captured_value).toBe('personal_injury');
-    expect(s.steps[0]!.status).toBe('complete');
-    // sub_type was reset to pending — stale value cleared.
-    expect(s.steps[1]!.status).toBe('pending');
-    expect(s.steps[1]!.captured_value).toBeNull();
-    // current_progress decremented from 2 to 1 (case_type still counted,
-    // sub_type reset).
-    expect(s.current_progress).toBe(1);
-  });
-
-  it('does NOT re-capture without an explicit correction signal', async () => {
-    // Visitor mentions "personal injury" without a correction phrase.
-    // The conservative rule: case_type stays as DUI.
-    const sopConfig = buildSOPConfig();
-    let s = initSOPState(sopConfig, ANCHOR);
-    s = await advanceForVisitorMessage({
-      state: s, sopConfig, caseTypes: CASE_TYPES,
-      message: 'DUI', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
-    });
-
-    s = await advanceForVisitorMessage({
-      state: s, sopConfig, caseTypes: CASE_TYPES,
-      message: 'personal injury', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
-    });
     expect(s.steps[0]!.captured_value).toBe('dui'); // unchanged
-  });
-
-  it('correction within same case_type changes only the sub_type', async () => {
-    const sopConfig = buildSOPConfig();
-    let s = initSOPState(sopConfig, ANCHOR);
-    s = await advanceForVisitorMessage({
-      state: s, sopConfig, caseTypes: CASE_TYPES,
-      message: 'DUI', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
-    });
-    s = await advanceForVisitorMessage({
-      state: s, sopConfig, caseTypes: CASE_TYPES,
-      message: 'first offense', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
-    });
-
-    s = await advanceForVisitorMessage({
-      state: s, sopConfig, caseTypes: CASE_TYPES,
-      message: 'actually it was a repeat offense', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
-    });
-    expect(s.steps[0]!.captured_value).toBe('dui'); // unchanged
-    expect(s.steps[1]!.captured_value).toBe('repeat_offense');
-    expect(s.current_progress).toBe(2); // both still complete
   });
 });
+
+// ---------------------------------------------------------------------------
+// Re-ask counter (018-forward-only-sop US2)
+// ---------------------------------------------------------------------------
+
+describe('advanceForVisitorMessage — re-ask counter (US2)', () => {
+  it('increments reask_count on unanswered turn', async () => {
+    const sopConfig = buildSOPConfig();
+    const initial = initSOPState(sopConfig, ANCHOR);
+    const after = await advanceForVisitorMessage({
+      state: initial, sopConfig, caseTypes: CASE_TYPES,
+      message: 'hello world', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+    expect(after.steps[0]!.status).toBe('pending');
+    expect(after.steps[0]!.reask_count).toBe(1);
+  });
+
+  it('skips step after reask_count reaches SOP_REASK_LIMIT (3)', async () => {
+    const sopConfig = buildSOPConfig();
+    let s = initSOPState(sopConfig, ANCHOR);
+    for (let i = 0; i < 3; i++) {
+      s = await advanceForVisitorMessage({
+        state: s, sopConfig, caseTypes: CASE_TYPES,
+        message: `non-answer turn ${i + 1}`, capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+      });
+    }
+    expect(s.steps[0]!.status).toBe('skipped');
+    const sub = s.steps.find((st) => st.slug === 'sub_type');
+    expect(sub?.status).toBe('pending');
+  });
+
+  it('resets reask_count to 0 on step completion', async () => {
+    const sopConfig = buildSOPConfig();
+    let s = initSOPState(sopConfig, ANCHOR);
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: 'no answer 1', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: 'no answer 2', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+    expect(s.steps[0]!.reask_count).toBe(2);
+    s = await advanceForVisitorMessage({
+      state: s, sopConfig, caseTypes: CASE_TYPES,
+      message: 'dui', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+    expect(s.steps[0]!.status).toBe('complete');
+    expect(s.steps[0]!.reask_count).toBe(0);
+  });
+
+  it('does not increment reask_count on empty message', async () => {
+    const sopConfig = buildSOPConfig();
+    const initial = initSOPState(sopConfig, ANCHOR);
+    const after = await advanceForVisitorMessage({
+      state: initial, sopConfig, caseTypes: CASE_TYPES,
+      message: '   ', capturedAt: T1, inferDateImpl: ALWAYS_NULL,
+    });
+    expect(after).toBe(initial); // same reference — no work done
+    expect(after.steps[0]!.reask_count).toBe(0);
+  });
+});
+
 
 // ---------------------------------------------------------------------------
 // Contact-form short-circuit (010-sop-workflow contact step)
@@ -584,7 +571,10 @@ describe('advanceForVisitorMessage — contact-form step', () => {
       message: "I'd rather not say",
       capturedAt: T1, inferDateImpl: ALWAYS_NULL,
     });
-    expect(after).toBe(before); // same reference; no-op
+    // Contact step stays pending; re-ask counter increments.
+    const contactStep = after.steps.find((st) => st.slug === 'contact')!;
+    expect(contactStep.status).toBe('pending');
+    expect(contactStep.reask_count).toBeGreaterThanOrEqual(1);
   });
 
   it('captures email-only payloads (spec 016 partial-gate)', async () => {

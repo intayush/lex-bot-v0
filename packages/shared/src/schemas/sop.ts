@@ -232,6 +232,15 @@ export const sopStateStepSchema = z.object({
    * existed; older states deserialize cleanly with `captured_label = null`.
    */
   captured_label: z.string().nullable().optional().default(null),
+  /**
+   * Number of assistant turns in which this step has been re-asked without
+   * receiving a usable answer (018-forward-only-sop FR-014). Initialized to
+   * 0 when the step becomes current. Increments on each unanswered turn.
+   * Resets to 0 on step completion. When it reaches SOP_REASK_LIMIT the step
+   * is skipped. Optional + default(0) for backwards compatibility with
+   * sessions serialized before this field existed.
+   */
+  reask_count: z.number().int().min(0).optional().default(0),
 });
 export type SOPStateStep = z.infer<typeof sopStateStepSchema>;
 
