@@ -164,17 +164,27 @@ export function ChatPanel({
     },
   });
 
+  // When sopState is null (fresh session, no chat turn yet), derive the
+  // initial pending step from the SOP config directly so chips appear
+  // alongside the greeting without needing a round-trip first.
+  const initialPendingStepSlug = useMemo(() => {
+    if (sopState !== null) return null;  // server state takes over once a turn fires
+    if (!widgetConfig?.sop?.steps?.length) return null;
+    const first = [...widgetConfig.sop.steps].sort((a, b) => a.position - b.position)[0];
+    return first?.slug ?? null;
+  }, [sopState, widgetConfig?.sop]);
+
   const activeChips = useMemo(
     () =>
       computeActiveChips({
         sop: widgetConfig?.sop ?? null,
         caseTypes: widgetConfig?.case_types ?? [],
         capturedCaseTypeSlug: sopState?.captured_case_type_slug ?? null,
-        pendingStepSlug: sopState?.pending_step_slug ?? null,
+        pendingStepSlug: sopState?.pending_step_slug ?? initialPendingStepSlug,
         isFinalized: sopState?.is_finalized ?? false,
         branchActiveChips: sopState?.branch_active_chips ?? null,
       }),
-    [widgetConfig, sopState],
+    [widgetConfig, sopState, initialPendingStepSlug],
   );
 
   const pendingStepIsContactForm = useMemo(() => {
@@ -184,21 +194,6 @@ export function ChatPanel({
     const step = widgetConfig.sop.steps.find((s) => s.slug === sopState.pending_step_slug);
     return step?.chip_source === 'contact_form';
   }, [widgetConfig, sopState]);
-
-  // Initial greeting turn: fire a silent empty-content message as soon as
-  // widgetConfig is loaded and there is no persisted sopState (fresh session).
-  // The server initializes SOP state and returns the x-sop-state header,
-  // which populates pending_step_slug='case_type' so chips appear immediately
-  // alongside the LLM's greeting response — no chip flash after the first turn.
-  useEffect(() => {
-    if (!widgetConfig?.sop) return;       // no SOP configured — skip
-    if (sopState !== null) return;         // resuming an existing session — skip
-    if (messages.length > 0) return;       // already have messages — skip
-    append({ role: 'user', content: '' });
-    // append and sopState are stable references; widgetConfig.sop identity
-    // may change on hot-reload but that's acceptable (re-fires once at most).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [widgetConfig?.sop]);
 
   // Clear preflight phrase as soon as the assistant's first token streams.
   useEffect(() => {
@@ -231,12 +226,15 @@ export function ChatPanel({
     return activeChips.map((c) => c.label);
   }, [activeChips]);
 
-  // Derived: is the assistant the most recent speaker AND not still
-  // streaming? Used to gate the chip + contact-form trailing slots.
+  // Derived: show chips/contact-form trailing slot when either:
+  // (a) the assistant just spoke (normal mid-SOP state), OR
+  // (b) no messages yet but we have chips ready (greeting screen).
   const showSOPTrailing =
     !isLoading
-    && messages.length > 0
-    && messages[messages.length - 1]?.role === 'assistant';
+    && (
+      (messages.length > 0 && messages[messages.length - 1]?.role === 'assistant')
+      || (messages.length === 0 && activeChips.length > 0)
+    );
 
   // SOP chips render in the conversation trailing slot (NOT the
   // composer chips row) so they're visually anchored to the most
