@@ -90,7 +90,7 @@ beforeEach(() => {
         Promise.resolve({
           chatbot_name: 'LexBot',
           greeting_message: 'Hello, how can I help?',
-          practice_areas: [],
+          in_scope_case_types: [],
           phone: '(555) 000-0000',
           sop: null,
           case_types: [],
@@ -208,7 +208,7 @@ describe('ChatPanel — contact-form path (T046)', () => {
           Promise.resolve({
             chatbot_name: 'LexBot',
             greeting_message: 'Hi',
-            practice_areas: [],
+            in_scope_case_types: [],
             phone: '(555) 000-0000',
             sop: {
               steps: [
@@ -292,7 +292,7 @@ describe('ChatPanel — embedded mode + extraHeaders (dashboard preview parity)'
         Promise.resolve({
           chatbot_name: 'LexBot',
           greeting_message: 'Hi',
-          practice_areas: [],
+          in_scope_case_types: [],
           phone: '(555) 000-0000',
           sop: null,
           case_types: [],
@@ -393,7 +393,7 @@ describe('ChatPanel — greeting flash regression', () => {
         Promise.resolve({
           chatbot_name: 'LexBot',
           greeting_message: 'Configured greeting',
-          practice_areas: ['Personal Injury'],
+          in_scope_case_types: ['Personal Injury'],
           phone: '(555) 000-0000',
           sop: null,
           case_types: [],
@@ -405,7 +405,7 @@ describe('ChatPanel — greeting flash regression', () => {
     });
   });
 
-  it('renders the configured greeting + chips once /api/config resolves', async () => {
+  it('renders the configured greeting (no chips) once /api/config resolves', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -414,7 +414,7 @@ describe('ChatPanel — greeting flash regression', () => {
           Promise.resolve({
             chatbot_name: 'LexBot',
             greeting_message: 'Configured greeting from /api/config',
-            practice_areas: ['Personal Injury', 'Family Law'],
+            in_scope_case_types: ['Personal Injury', 'Family Law'],
             phone: '(555) 000-0000',
             sop: null,
             case_types: [],
@@ -445,11 +445,10 @@ describe('ChatPanel — greeting flash regression', () => {
       screen.queryByText(/Hi! I'm LexBot, a virtual assistant/i),
     ).toBeNull();
 
-    // QuickReplies must render the configured practice areas (plus the
-    // appended "Schedule a Consultation" tail per QuickReplies.tsx).
-    expect(screen.getByText('Personal Injury')).toBeInTheDocument();
-    expect(screen.getByText('Family Law')).toBeInTheDocument();
-    expect(screen.getByText('Schedule a Consultation')).toBeInTheDocument();
+    // No greeting chips — case type chips appear only in SOP Step 1.
+    expect(screen.queryByText('Personal Injury')).toBeNull();
+    expect(screen.queryByText('Family Law')).toBeNull();
+    expect(screen.queryByText('Schedule a Consultation')).toBeNull();
   });
 });
 

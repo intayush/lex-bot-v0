@@ -51,7 +51,10 @@ export async function GET(req: Request) {
     {
       chatbot_name: config.persona.chatbot_name,
       greeting_message: config.persona.greeting_message,
-      practice_areas: [...config.practice_areas.active, ...config.practice_areas.custom.filter(Boolean)],
+      in_scope_case_types: caseTypes
+        .filter((ct) => ct.is_in_scope)
+        .sort((a, b) => a.position - b.position)
+        .map((ct) => ct.label),
       phone: config.contact.phone,
       // Optional widget theme (per-firm branding). When absent the
       // widget keeps the indigo defaults from panel.css. When present

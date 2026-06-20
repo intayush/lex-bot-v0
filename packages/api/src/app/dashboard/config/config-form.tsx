@@ -3,18 +3,13 @@
 import { useState } from 'react';
 import type { Configuration } from '@legal-chatbot/shared';
 
-const DEFAULT_PRACTICE_AREAS = [
-  'Personal Injury', 'Family Law', 'Estate Planning', 'Criminal Defense',
-  'Immigration', 'Employment Law', 'Real Estate', 'Business Law',
-];
-
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 const defaultConfig: Configuration = {
   version: 0,
   saved_at: '',
   persona: { firm_name: '', chatbot_name: '', greeting_message: '', tone: 'friendly', language: 'English' },
-  practice_areas: { active: [], custom: [], out_of_scope_response: '' },
+  out_of_scope_response: '',
   qualifying_questions: [{ question: '', required: true, order: 1 }],
   boundaries: { never_say: [''] },
   escalation: { triggers: [''], message: '' },
@@ -30,7 +25,7 @@ export function ConfigForm({ initialConfig }: { initialConfig: Configuration | n
   const [saveResult, setSaveResult] = useState<{ success?: boolean; error?: string } | null>(null);
   const [pubResult, setPubResult] = useState<{ success?: boolean; error?: string } | null>(null);
 
-  const tabs = ['Persona', 'Practice Areas', 'Questions', 'Boundaries', 'Escalation', 'Contact', 'Custom'];
+  const tabs = ['Persona', 'Questions', 'Boundaries', 'Escalation', 'Contact', 'Custom'];
 
   async function handleSave() {
     setSaving(true);
@@ -97,12 +92,11 @@ export function ConfigForm({ initialConfig }: { initialConfig: Configuration | n
       {/* Tab Content */}
       <div className="bg-white rounded-xl border border-[#E5E5E5] p-8">
         {activeTab === 0 && <PersonaSection config={config} setConfig={setConfig} />}
-        {activeTab === 1 && <PracticeAreasSection config={config} setConfig={setConfig} />}
-        {activeTab === 2 && <QuestionsSection config={config} setConfig={setConfig} />}
-        {activeTab === 3 && <BoundariesSection config={config} setConfig={setConfig} />}
-        {activeTab === 4 && <EscalationSection config={config} setConfig={setConfig} />}
-        {activeTab === 5 && <ContactSection config={config} setConfig={setConfig} />}
-        {activeTab === 6 && <CustomSection config={config} setConfig={setConfig} />}
+        {activeTab === 1 && <QuestionsSection config={config} setConfig={setConfig} />}
+        {activeTab === 2 && <BoundariesSection config={config} setConfig={setConfig} />}
+        {activeTab === 3 && <EscalationSection config={config} setConfig={setConfig} />}
+        {activeTab === 4 && <ContactSection config={config} setConfig={setConfig} />}
+        {activeTab === 5 && <CustomSection config={config} setConfig={setConfig} />}
       </div>
 
       {/* Actions */}
@@ -163,69 +157,6 @@ function PersonaSection({ config, setConfig }: SectionProps) {
         </select>
       </div>
       <Field label="Language" value={p.language} onChange={(v) => update({ language: v })} />
-    </div>
-  );
-}
-
-function PracticeAreasSection({ config, setConfig }: SectionProps) {
-  const pa = config.practice_areas;
-  const update = (fields: Partial<typeof pa>) => setConfig({ ...config, practice_areas: { ...pa, ...fields } });
-
-  const toggleArea = (area: string) => {
-    const active = pa.active.includes(area) ? pa.active.filter((a) => a !== area) : [...pa.active, area];
-    update({ active });
-  };
-
-  const addCustom = () => update({ custom: [...pa.custom, ''] });
-  const removeCustom = (i: number) => update({ custom: pa.custom.filter((_, idx) => idx !== i) });
-  const setCustom = (i: number, v: string) => {
-    const custom = [...pa.custom];
-    custom[i] = v;
-    update({ custom });
-  };
-
-  return (
-    <div className="space-y-5">
-      <div>
-        <label className="block text-sm font-medium text-[#171717] mb-2">Active Practice Areas</label>
-        <div className="grid grid-cols-2 gap-3">
-          {DEFAULT_PRACTICE_AREAS.map((area) => (
-            <label key={area} className="cursor-pointer group text-sm" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <input
-                type="checkbox"
-                checked={pa.active.includes(area)}
-                onChange={() => toggleArea(area)}
-                style={{ width: '18px', height: '18px', accentColor: '#2563EB', margin: 0, flexShrink: 0, verticalAlign: 'middle' }}
-              />
-              <span style={{ lineHeight: '18px', verticalAlign: 'middle' }}>{area}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-[#171717] mb-1.5">Custom Practice Areas</label>
-        <div className="space-y-2">
-          {pa.custom.map((c, i) => (
-            <div key={i} className="bg-[#FAFAFA] rounded-lg p-3 border border-[#F5F5F5] border-l-2 border-l-[#2563EB] flex gap-2.5 items-center">
-              <input
-                value={c}
-                onChange={(e) => setCustom(i, e.target.value)}
-                className="flex-1 border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm bg-white focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
-              />
-              <button onClick={() => removeCustom(i)} className="text-[#A3A3A3] hover:text-[#DC2626] text-xs transition">Remove</button>
-            </div>
-          ))}
-        </div>
-        <button onClick={addCustom} className="text-[#2563EB] text-sm font-medium hover:text-[#1D4ED8] mt-2.5 transition">+ Add custom area</button>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-[#171717] mb-1.5">Out-of-Scope Response</label>
-        <textarea
-          value={pa.out_of_scope_response}
-          onChange={(e) => update({ out_of_scope_response: e.target.value })}
-          className="w-full border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm h-24 focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
-        />
-      </div>
     </div>
   );
 }
@@ -303,6 +234,16 @@ function BoundariesSection({ config, setConfig }: SectionProps) {
         ))}
       </div>
       <button onClick={add} className="text-[#2563EB] text-sm font-medium hover:text-[#1D4ED8] transition">+ Add rule</button>
+      <div className="pt-2">
+        <label className="block text-sm font-medium text-[#171717] mb-1.5">Out-of-Scope Response</label>
+        <p className="text-xs text-[#737373] mb-2">Sent when a visitor asks about a legal area outside your firm&apos;s scope.</p>
+        <textarea
+          value={config.out_of_scope_response}
+          onChange={(e) => setConfig({ ...config, out_of_scope_response: e.target.value })}
+          className="w-full border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm h-24 focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
+          placeholder="We don't handle that type of matter — please consult a specialist."
+        />
+      </div>
     </div>
   );
 }

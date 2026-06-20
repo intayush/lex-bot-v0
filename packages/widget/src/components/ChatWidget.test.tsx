@@ -61,7 +61,7 @@ beforeEach(() => {
         Promise.resolve({
           chatbot_name: 'Alex',
           greeting_message: 'Hi',
-          practice_areas: [],
+          in_scope_case_types: [],
           phone: '(555) 000-0000',
           sop: null,
           case_types: [],
