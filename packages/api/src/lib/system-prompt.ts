@@ -16,13 +16,10 @@ import { composeSopBlock } from './sop/system-prompt-extension';
  *   - When any SOP param is missing, the legacy block is rendered (preserves
  *     backward compatibility for accounts that haven't migrated to SOP yet).
  *
- * Practice-areas single-source-of-truth (post-2026-05-23 fix):
- *   When `sopState && sopConfig && caseTypes` are all provided, the
- *   "## Practice Areas (In Scope)" block is derived from `case_types`
- *   where `is_in_scope=true`, NOT from `config.practice_areas.active`.
- *   This eliminates the inconsistency where the SOP `case_types` table
- *   said one thing about scope while `Configuration.practice_areas` said
- *   another. Without `caseTypes`, the legacy behaviour is preserved.
+ * Practice-areas single-source-of-truth (019-remove-practice-areas):
+ *   The "## Practice Areas (In Scope)" block is always derived from
+ *   `case_types` where `is_in_scope=true`. The legacy fallback to
+ *   `config.practice_areas` has been removed.
  */
 export function composeSystemPrompt(
   config: Configuration,
@@ -37,7 +34,10 @@ export function composeSystemPrompt(
   void guardrailsMarkdown;
 
   const sopActive = !!(sopState && sopConfig && goodbyePhrases);
-  const inScopeAreas = computeInScopeAreas(config, sopActive, caseTypes);
+  const inScopeAreas = (caseTypes ?? [])
+    .filter((ct) => ct.is_in_scope)
+    .sort((a, b) => a.position - b.position)
+    .map((ct) => ct.label);
 
   const parts: string[] = [];
 
@@ -60,7 +60,7 @@ export function composeSystemPrompt(
   parts.push('');
 
   parts.push('## Out of Scope Response');
-  parts.push(`If asked about areas not listed above, respond with: "${config.practice_areas.out_of_scope_response}"`);
+  parts.push(`If asked about areas not listed above, respond with: "${config.out_of_scope_response}"`);
   parts.push('');
 
   parts.push('## Boundaries (Never Do)');
@@ -144,37 +144,3 @@ export function composeSystemPrompt(
   return parts.join('\n');
 }
 
-/**
- * Compute the in-scope practice-area list for the system prompt's
- * "Practice Areas (In Scope)" block.
- *
- * When SOP is active AND case_types are provided, the labels are
- * derived from `case_types` rows where `is_in_scope=true` — the SOP's
- * case-type table is the system of record for what the firm handles.
- * Otherwise (legacy / no SOP migration yet) the values come from
- * `config.practice_areas.active` plus non-empty `custom` entries.
- *
- * Returns at minimum the legacy values when caseTypes is empty or
- * undefined, so we never produce an empty in-scope list while a valid
- * legacy config exists.
- */
-function computeInScopeAreas(
-  config: Configuration,
-  sopActive: boolean,
-  caseTypes: CaseType[] | undefined,
-): string[] {
-  if (sopActive && caseTypes && caseTypes.length > 0) {
-    const inScope = caseTypes
-      .filter((ct) => ct.is_in_scope)
-      .sort((a, b) => a.position - b.position)
-      .map((ct) => ct.label);
-    if (inScope.length > 0) return inScope;
-    // Defensive: SOP active but every case_type is out-of-scope. Fall
-    // back to legacy practice_areas rather than show an empty list (the
-    // agent's out-of-scope deflection still works via the SOP block).
-  }
-  return [
-    ...config.practice_areas.active,
-    ...config.practice_areas.custom.filter(Boolean),
-  ];
-}

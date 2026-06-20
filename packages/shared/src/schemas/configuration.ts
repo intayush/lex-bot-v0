@@ -84,7 +84,16 @@ export const configurationSchema = z.object({
   version: z.number().int(),
   saved_at: z.string(),
   persona: personaSchema,
-  practice_areas: practiceAreasSchema,
+  /**
+   * Out-of-scope deflection message. Promoted from
+   * `practice_areas.out_of_scope_response` (019-remove-practice-areas).
+   * Old stored rows without this field default to empty string; the
+   * read-time migration in `lib/config.ts` backfills it from the
+   * nested path for accounts that haven't re-saved yet.
+   */
+  out_of_scope_response: z.string().default(''),
+  /** @deprecated Use SOP Case Types for in-scope area management (019-remove-practice-areas). */
+  practice_areas: practiceAreasSchema.optional(),
   qualifying_questions: z.array(qualifyingQuestionSchema),
   boundaries: boundariesSchema,
   escalation: escalationSchema,

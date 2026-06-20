@@ -49,17 +49,6 @@ export type SOPAction =
       step_id: string;
     }
   | {
-      /**
-       * Reset a previously-captured step back to `pending`. Used when a
-       * later capture invalidates an earlier one — e.g., the case_type
-       * changes via correction, so the sub_type that was scoped to the
-       * old case_type must be re-asked. current_progress decrements by
-       * 1 if the reset step's `counts_toward_threshold` was true.
-       */
-      type: 'reset_step';
-      step_id: string;
-    }
-  | {
       /** Mark the SOP complete normally (Step 6 finalize OR threshold met). */
       type: 'finalize';
     }
@@ -87,6 +76,7 @@ export function initSOPState(
     captured_at: null,
     inferred: false,
     captured_label: null,
+    reask_count: 0,
   }));
 
   return {
@@ -123,8 +113,6 @@ export function advanceSOP(
       return applyCapture(state, action, sopConfig);
     case 'skip_step':
       return applySkip(state, action.step_id);
-    case 'reset_step':
-      return applyReset(state, action.step_id, sopConfig);
     case 'finalize':
       return applyFinalize(state, false, sopConfig);
     case 'finalize_out_of_scope':
@@ -163,6 +151,8 @@ function applyCapture(
     // after later edits. `null` when the action didn't supply one
     // (free-text captures, date inference results, contact form).
     captured_label: action.capturedLabel ?? null,
+    // 018-forward-only-sop: reset re-ask counter on completion.
+    reask_count: 0,
   };
 
   const newSteps = [
@@ -207,51 +197,6 @@ function applySkip(state: SOPState, stepId: string): SOPState {
   ];
 
   return { ...state, steps: newSteps };
-}
-
-function applyReset(
-  state: SOPState,
-  stepId: string,
-  sopConfig: SOPConfiguration,
-): SOPState {
-  const idx = state.steps.findIndex((s) => s.step_id === stepId);
-  if (idx === -1) {
-    throw new Error(`unknown step id: ${stepId}`);
-  }
-  const cfgStep = sopConfig.steps.find((s) => s.id === stepId);
-  if (!cfgStep) {
-    throw new Error(`unknown step id: ${stepId} (not in config)`);
-  }
-  const previousStatus = state.steps[idx]!.status;
-
-  // Reset is a no-op for already-pending steps.
-  if (previousStatus === 'pending') return state;
-
-  const updatedStep: SOPStateStep = {
-    ...state.steps[idx]!,
-    status: 'pending',
-    captured_value: null,
-    captured_at: null,
-    inferred: false,
-  };
-
-  const newSteps = [
-    ...state.steps.slice(0, idx),
-    updatedStep,
-    ...state.steps.slice(idx + 1),
-  ];
-
-  // Decrement progress only if the reset step had been counted.
-  let progressDelta = 0;
-  if (previousStatus === 'complete' && cfgStep.counts_toward_threshold) {
-    progressDelta = -1;
-  }
-
-  return {
-    ...state,
-    steps: newSteps,
-    current_progress: Math.max(0, state.current_progress + progressDelta),
-  };
 }
 
 function applyFinalize(

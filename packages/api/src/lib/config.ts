@@ -66,6 +66,18 @@ export function __resetConfigCachesForTests(): void {
 }
 
 /**
+ * Read-time migration: backfill `out_of_scope_response` from the
+ * legacy nested path for rows saved before 019-remove-practice-areas.
+ * No-op for rows that already have the top-level field.
+ */
+function migrateConfig(config: Configuration): Configuration {
+  if (!config.out_of_scope_response && config.practice_areas?.out_of_scope_response) {
+    return { ...config, out_of_scope_response: config.practice_areas.out_of_scope_response };
+  }
+  return config;
+}
+
+/**
  * Production-callable cache invalidation. Drop both the published
  * and latest cache entries for an account so the next /api/config
  * read re-fetches from the DB.
@@ -102,7 +114,7 @@ export async function getPublishedConfig(accountId: string): Promise<Configurati
     putCached(publishedCache, accountId, null);
     return null;
   }
-  const config = JSON.parse(row.config_json) as Configuration;
+  const config = migrateConfig(JSON.parse(row.config_json) as Configuration);
   putCached(publishedCache, accountId, config);
   return config;
 }
@@ -127,7 +139,7 @@ export async function getLatestConfig(accountId: string): Promise<{ id: string; 
     id: row.id,
     version: row.version,
     isPublished: !!row.is_published,
-    config: JSON.parse(row.config_json) as Configuration,
+    config: migrateConfig(JSON.parse(row.config_json) as Configuration),
   };
   putCached(latestCache, accountId, value);
   return value;

@@ -81,7 +81,7 @@ test('@walk SMOKE 016 — Personal Injury / Car Accident HOT walk produces branc
   // Default 6-step SOP
   // ---------------------------------------------------------------------------
 
-  // Turn 1: case_type → Personal Injury (skip-detected from "car accident")
+  // Turn 1: case_type → Personal Injury (forward-only detection for pending case_type step)
   await sendMessage(page, 'I had a car accident and need help');
   await waitForSopProgress(sopLog, 1, 'case_type ≥ 1');
 

@@ -1,6 +1,5 @@
 import { useChat } from '@ai-sdk/react';
 import { useRef, useEffect, useState, useMemo } from 'react';
-import { QuickReplies } from './QuickReplies';
 import { Chips } from './Chips';
 import { ProgressBar } from './ProgressBar';
 import { PanelShell } from './PanelShell';
@@ -69,7 +68,7 @@ interface WidgetTheme {
 interface WidgetConfig {
   chatbot_name: string;
   greeting_message: string;
-  practice_areas: string[];
+  in_scope_case_types: string[];
   phone: string;
   /** SOP structure when the account has a published SOP, else null. */
   sop?: WidgetSOP | null;
@@ -272,14 +271,6 @@ export function ChatPanel({
       >
         {widgetConfig.greeting_message}
       </div>
-      <QuickReplies
-        onSelect={(text) => {
-          const message = `I need help with ${text}`;
-          startPreflight(message, sopState?.pending_step_slug ?? null);
-          append({ role: 'user', content: message });
-        }}
-        options={widgetConfig.practice_areas}
-      />
     </>
   ) : undefined;
 

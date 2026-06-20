@@ -26,7 +26,7 @@ describe('QuickReplies', () => {
     expect(result).toBeNull();
   });
 
-  it('returns null when options is an empty array (firm with no practice_areas)', () => {
+  it('returns null when options is an empty array (firm with no in_scope_case_types)', () => {
     const result = QuickReplies({ onSelect: noopSelect, options: [] });
     expect(result).toBeNull();
   });

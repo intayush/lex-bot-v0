@@ -14,11 +14,7 @@ const testConfig: Configuration = {
     tone: 'friendly',
     language: 'English',
   },
-  practice_areas: {
-    active: ['Criminal Defense', 'Immigration Law', 'DUI Defense'],
-    custom: [],
-    out_of_scope_response: "I'm not able to help with that area of law.",
-  },
+  out_of_scope_response: "I'm not able to help with that area of law.",
   qualifying_questions: [
     { question: 'What type of legal matter do you need help with?', order: 1, required: true },
     { question: 'When did this issue first arise?', order: 2, required: true },
@@ -67,10 +63,11 @@ describe('composeSystemPrompt', () => {
     expect(prompt).toContain('legal advice');
   });
 
-  it('lists all practice areas', () => {
-    expect(prompt).toContain('Criminal Defense');
-    expect(prompt).toContain('Immigration Law');
-    expect(prompt).toContain('DUI Defense');
+  it('includes Practice Areas block (empty when no caseTypes passed)', () => {
+    // In-scope areas come from caseTypes, not from config. When no caseTypes
+    // are passed the block is present but has no bullet items.
+    expect(prompt).toContain('## Practice Areas (In Scope)');
+    expect(prompt).not.toContain('Criminal Defense');
   });
 
   it('contains out-of-scope response', () => {
@@ -300,11 +297,10 @@ describe('composeSystemPrompt — SOP path (T030 wiring)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 010-sop-workflow: practice-areas single-source-of-truth
-// (post-2026-05-23 fix for the case_types vs config.practice_areas conflict)
+// 019-remove-practice-areas: case_types is always the in-scope source
 // ---------------------------------------------------------------------------
 
-describe('composeSystemPrompt — practice areas (case_types when SOP active)', () => {
+describe('composeSystemPrompt — practice areas (case_types always)', () => {
   function buildCaseTypes(): import('@legal-chatbot/shared').CaseType[] {
     return [
       {
@@ -325,7 +321,7 @@ describe('composeSystemPrompt — practice areas (case_types when SOP active)', 
     ];
   }
 
-  it('SOP path with case_types lists IN-SCOPE labels (not legacy practice_areas)', () => {
+  it('lists only IN-SCOPE case_type labels in position order', () => {
     const sopConfig = buildSampleSOPConfig();
     const sopState = buildSampleSOPState(sopConfig);
     const cts = buildCaseTypes();
@@ -333,46 +329,34 @@ describe('composeSystemPrompt — practice areas (case_types when SOP active)', 
 
     expect(prompt).toMatch(/^- DUI$/m);
     expect(prompt).toMatch(/^- Personal Injury$/m);
-    // Out-of-scope case_type MUST NOT be listed.
     expect(prompt).not.toMatch(/^- Estate Planning$/m);
-    // Legacy values from testConfig (e.g. "Immigration Law") MUST NOT be there.
-    expect(prompt).not.toMatch(/^- Immigration Law$/m);
   });
 
-  it('SOP path with empty case_types falls back to legacy practice_areas', () => {
-    // Defensive: SOP active but no case_types provided. Don't show an
-    // empty in-scope list.
-    const sopConfig = buildSampleSOPConfig();
-    const sopState = buildSampleSOPState(sopConfig);
-    const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES, false, []);
-    // testConfig.practice_areas.active starts with "Criminal Defense".
-    expect(prompt).toMatch(/^- Criminal Defense$/m);
-  });
-
-  it('SOP path with all case_types out-of-scope falls back to legacy', () => {
+  it('produces an empty in-scope block when all case_types are out-of-scope (no legacy fallback)', () => {
     const sopConfig = buildSampleSOPConfig();
     const sopState = buildSampleSOPState(sopConfig);
     const cts = buildCaseTypes().map((ct) => ({ ...ct, is_in_scope: false }));
     const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES, false, cts);
-    // Falls back to legacy because all case_types are out-of-scope.
-    expect(prompt).toMatch(/^- Criminal Defense$/m);
+    // No in-scope labels — block is present but empty.
+    expect(prompt).toMatch(/## Practice Areas \(In Scope\)/);
+    expect(prompt).not.toMatch(/^- DUI$/m);
+    expect(prompt).not.toMatch(/^- Personal Injury$/m);
   });
 
-  it('legacy path (no SOP) uses config.practice_areas regardless of caseTypes param', () => {
-    const cts = buildCaseTypes();
-    const prompt = composeSystemPrompt(testConfig, undefined, undefined, undefined, undefined, false, cts);
-    // case_types-derived labels MUST NOT appear; legacy MUST appear.
-    expect(prompt).not.toMatch(/^- DUI$/m); // case_types fixture label
-    expect(prompt).toMatch(/^- DUI Defense$/m); // testConfig value
+  it('produces an empty in-scope block when caseTypes is empty (no legacy fallback)', () => {
+    const sopConfig = buildSampleSOPConfig();
+    const sopState = buildSampleSOPState(sopConfig);
+    const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES, false, []);
+    expect(prompt).toMatch(/## Practice Areas \(In Scope\)/);
+    // Legacy values MUST NOT appear.
+    expect(prompt).not.toMatch(/^- Criminal Defense$/m);
   });
 
-  it('out-of-scope deflection text remains from config.practice_areas regardless of in-scope source', () => {
-    // The deflection message comes from config; only the in-scope LIST
-    // changes between legacy and SOP paths.
+  it('out-of-scope deflection text comes from config.out_of_scope_response', () => {
     const sopConfig = buildSampleSOPConfig();
     const sopState = buildSampleSOPState(sopConfig);
     const cts = buildCaseTypes();
     const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES, false, cts);
-    expect(prompt).toContain(testConfig.practice_areas.out_of_scope_response);
+    expect(prompt).toContain(testConfig.out_of_scope_response);
   });
 });

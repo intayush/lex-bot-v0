@@ -8,10 +8,10 @@ const CONSULTATION_OPTION = 'Schedule a Consultation';
 export function QuickReplies({ onSelect, options }: QuickRepliesProps) {
   // Spec 016 chip-list-flash fix: render nothing while the widget
   // config is still loading (`options` undefined) or when the firm
-  // has no configured practice_areas (empty array). Without this
-  // guard we briefly showed a hard-coded 3-item fallback that
-  // swapped to the real list once `/api/config` resolved — a
-  // visible glitch on every widget open.
+  // has no in_scope_case_types (empty array). Without this guard
+  // we briefly showed a hard-coded 3-item fallback that swapped to
+  // the real list once `/api/config` resolved — a visible glitch
+  // on every widget open.
   if (!options || options.length === 0) {
     return null;
   }
