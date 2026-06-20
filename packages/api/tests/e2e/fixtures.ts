@@ -83,6 +83,8 @@ export interface PublicConfig {
     qualified_lead_threshold: number;
     steps: Array<{ slug: string; position: number }>;
   } | null;
+  /** 019-remove-practice-areas: in-scope case type labels for the widget. */
+  in_scope_case_types?: string[];
 }
 
 export async function publicConfig(request: APIRequestContext): Promise<PublicConfig> {
