@@ -24,7 +24,7 @@
  * arrows keep the editor accessible without dnd-kit ceremony.
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   BranchDetailResponse,
   BranchQuestion,
@@ -104,6 +104,12 @@ export function BranchEditor({
   const [result, setResult] = useState<ResultMessage | null>(null);
   const [warnings, setWarnings] = useState<BranchSaveWarning[]>([]);
   const [hasDraft, setHasDraft] = useState(false);
+
+  // --- Import state (020-branch-csv-import) ---
+  const [importState, setImportState] = useState<'idle' | 'uploading' | 'error' | 'preview'>('idle');
+  const [importErrors, setImportErrors] = useState<Array<{ row: number; column: string; message: string }>>([]);
+  const [importedQuestions, setImportedQuestions] = useState<BranchQuestion[] | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     if (!existingBranchId) {
@@ -212,6 +218,92 @@ export function BranchEditor({
     } finally {
       setSaving(false);
     }
+  }
+
+  // --- Import handlers (020-branch-csv-import) ---
+
+  function handleImportClick() {
+    fileInputRef.current?.click();
+  }
+
+  async function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!e.target) return;
+    // Reset the input so the same file can be re-selected after an error fix.
+    (e.target as HTMLInputElement).value = '';
+    if (!file) return;
+
+    setImportState('uploading');
+    setImportErrors([]);
+    setImportedQuestions(null);
+
+    const fd = new FormData();
+    fd.append('file', file);
+
+    try {
+      const res = await fetch(
+        `/api/dashboard/branches/${encodeURIComponent(caseTypeSlug)}/${encodeURIComponent(subTypeSlug)}/import`,
+        { method: 'POST', body: fd },
+      );
+      const data = await res.json() as { ok: boolean; questions?: BranchQuestion[]; errors?: Array<{ row: number; column: string; message: string }> };
+      if (data.ok && data.questions) {
+        setImportedQuestions(data.questions);
+        setImportState('preview');
+      } else {
+        setImportErrors(data.errors ?? []);
+        setImportState('error');
+      }
+    } catch {
+      setImportErrors([{ row: 0, column: 'file', message: 'Network error — could not reach the server.' }]);
+      setImportState('error');
+    }
+  }
+
+  async function handleImportSaveAsDraft() {
+    if (!importedQuestions) return;
+    // Apply the imported questions, keep existing thresholds and overrides.
+    setQuestions(importedQuestions);
+    setImportState('idle');
+    setImportedQuestions(null);
+    // Trigger the regular save flow with the imported questions.
+    setSaving(true);
+    setResult(null);
+    setWarnings([]);
+    try {
+      const res = await fetch(
+        `/api/dashboard/branches/${encodeURIComponent(caseTypeSlug)}/${encodeURIComponent(subTypeSlug)}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            is_active: isActive,
+            questions: importedQuestions,
+            classification_thresholds: { self: thresholdsSelf, family_friend: thresholdsFamily },
+            hard_override_toggles: overrides,
+          }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        setResult({ ok: false, message: data?.message ?? `HTTP ${res.status}` });
+        return;
+      }
+      const saved = data as BranchSaveResponse;
+      setWarnings(saved.warnings);
+      setResult({ ok: true, message: `Imported and saved as draft v${saved.version_number}.` });
+      setHasDraft(existingBranchId !== null);
+      await onAfterMutation();
+    } catch (e) {
+      setResult({ ok: false, message: e instanceof Error ? e.message : 'Save failed' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleImportCancel() {
+    setImportState('idle');
+    setImportErrors([]);
+    setImportedQuestions(null);
   }
 
   async function handlePublish() {
@@ -373,12 +465,121 @@ export function BranchEditor({
         </div>
       </div>
 
+      {/* --- CSV Import UI (020-branch-csv-import) --- */}
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv"
+        style={{ display: 'none' }}
+        onChange={handleFileSelected}
+      />
+
+      {/* Import error panel */}
+      {importState === 'error' && (
+        <div className="mt-4 rounded-lg border border-[#FECACA] bg-[#FFF7F7] p-4">
+          <p className="text-sm font-semibold text-[#991B1B] mb-2">Import failed — fix the issues below and re-upload.</p>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-left text-[#6B7280]">
+                <th className="pr-4 pb-1">Row</th>
+                <th className="pr-4 pb-1">Column</th>
+                <th className="pb-1">Issue</th>
+              </tr>
+            </thead>
+            <tbody>
+              {importErrors.map((err, i) => (
+                <tr key={i} className="border-t border-[#FEE2E2]">
+                  <td className="pr-4 py-1 text-[#374151]">{err.row || '—'}</td>
+                  <td className="pr-4 py-1 font-mono text-[#374151]">{err.column}</td>
+                  <td className="py-1 text-[#374151]">{err.message}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button
+            type="button"
+            onClick={handleImportClick}
+            className="mt-3 px-3 py-1.5 rounded-md border border-[#E5E5E5] text-sm text-[#374151] hover:bg-[#F9FAFB] transition"
+          >
+            Re-upload fixed CSV
+          </button>
+        </div>
+      )}
+
+      {/* Import preview panel */}
+      {importState === 'preview' && importedQuestions && (
+        <div className="mt-4 rounded-lg border border-[#D1FAE5] bg-[#F0FDF4] p-4">
+          <p className="text-sm font-semibold text-[#065F46] mb-3">
+            Preview — {importedQuestions.length} question{importedQuestions.length !== 1 ? 's' : ''} parsed. Review and save as draft.
+          </p>
+          <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+            {importedQuestions.map((q, qi) => (
+              <div key={qi} className="rounded-md border border-[#BBF7D0] bg-white p-3">
+                <p className="text-xs font-semibold text-[#374151] mb-1">Q{qi + 1}: {q.text}</p>
+                <p className="text-xs text-[#6B7280] mb-1.5">
+                  Free text: {q.free_text_allowed ? 'Yes' : 'No'} · Multi-select: {q.multi_select ? 'Yes' : 'No'}
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {q.chips.map((c, ci) => (
+                    <span key={ci} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#ECFDF5] border border-[#6EE7B7] text-xs text-[#065F46]">
+                      {c.label}
+                      <span className="text-[#059669] font-medium">({c.score_weight >= 0 ? '+' : ''}{c.score_weight})</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button
+              type="button"
+              onClick={handleImportSaveAsDraft}
+              disabled={saving}
+              className="px-4 py-2 rounded-md bg-[#059669] text-white text-sm font-medium hover:bg-[#047857] disabled:opacity-60 transition"
+            >
+              {saving ? 'Saving…' : 'Save as Draft'}
+            </button>
+            <button
+              type="button"
+              onClick={handleImportCancel}
+              className="px-4 py-2 rounded-md border border-[#E5E5E5] text-sm text-[#374151] hover:bg-[#F9FAFB] transition"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Import loading indicator */}
+      {importState === 'uploading' && (
+        <div className="mt-4 text-sm text-[#6B7280] animate-pulse">Parsing CSV…</div>
+      )}
+
       {/* Action bar — buttons share the same shape and size, and the
           row wraps onto multiple lines on narrow viewports so labels
           aren't truncated. The Delete button moves below the
           Save / Publish pair on mobile (no `ml-auto`); on sm:+ it
           right-aligns. */}
       <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-[#E5E5E5]">
+        {/* Download CSV Template */}
+        <a
+          href={`/api/dashboard/branches/${encodeURIComponent(caseTypeSlug)}/${encodeURIComponent(subTypeSlug)}/template`}
+          download
+          className="flex-1 sm:flex-none min-w-[7rem] px-4 py-2 rounded-md border border-[#E5E5E5] text-[#374151] text-sm font-medium hover:bg-[#F9FAFB] transition text-center"
+        >
+          ↓ CSV Template
+        </a>
+        {/* Import from CSV */}
+        <button
+          type="button"
+          onClick={handleImportClick}
+          disabled={importState === 'uploading'}
+          className="flex-1 sm:flex-none min-w-[7rem] px-4 py-2 rounded-md border border-[#2563EB] text-[#2563EB] text-sm font-medium hover:bg-[#EFF6FF] disabled:opacity-60 transition"
+        >
+          ↑ Import CSV
+        </button>
         <button
           type="button"
           onClick={handleSave}
