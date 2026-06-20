@@ -185,6 +185,21 @@ export function ChatPanel({
     return step?.chip_source === 'contact_form';
   }, [widgetConfig, sopState]);
 
+  // Initial greeting turn: fire a silent empty-content message as soon as
+  // widgetConfig is loaded and there is no persisted sopState (fresh session).
+  // The server initializes SOP state and returns the x-sop-state header,
+  // which populates pending_step_slug='case_type' so chips appear immediately
+  // alongside the LLM's greeting response — no chip flash after the first turn.
+  useEffect(() => {
+    if (!widgetConfig?.sop) return;       // no SOP configured — skip
+    if (sopState !== null) return;         // resuming an existing session — skip
+    if (messages.length > 0) return;       // already have messages — skip
+    append({ role: 'user', content: '' });
+    // append and sopState are stable references; widgetConfig.sop identity
+    // may change on hot-reload but that's acceptable (re-fires once at most).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [widgetConfig?.sop]);
+
   // Clear preflight phrase as soon as the assistant's first token streams.
   useEffect(() => {
     const last = messages[messages.length - 1];
