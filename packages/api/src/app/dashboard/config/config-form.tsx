@@ -10,7 +10,6 @@ const defaultConfig: Configuration = {
   saved_at: '',
   persona: { firm_name: '', chatbot_name: '', greeting_message: '', tone: 'friendly', language: 'English' },
   out_of_scope_response: '',
-  qualifying_questions: [{ question: '', required: true, order: 1 }],
   boundaries: { never_say: [''] },
   escalation: { triggers: [''], message: '' },
   contact: { phone: '', email: '', office_hours: [{ day: 'Monday', open: '09:00', close: '17:00' }], after_hours_message: '' },
@@ -25,7 +24,7 @@ export function ConfigForm({ initialConfig }: { initialConfig: Configuration | n
   const [saveResult, setSaveResult] = useState<{ success?: boolean; error?: string } | null>(null);
   const [pubResult, setPubResult] = useState<{ success?: boolean; error?: string } | null>(null);
 
-  const tabs = ['Persona', 'Questions', 'Boundaries', 'Escalation', 'Contact', 'Custom'];
+  const tabs = ['Persona', 'Boundaries', 'Escalation', 'Contact', 'Custom'];
 
   async function handleSave() {
     setSaving(true);
@@ -92,11 +91,10 @@ export function ConfigForm({ initialConfig }: { initialConfig: Configuration | n
       {/* Tab Content */}
       <div className="bg-white rounded-xl border border-[#E5E5E5] p-8">
         {activeTab === 0 && <PersonaSection config={config} setConfig={setConfig} />}
-        {activeTab === 1 && <QuestionsSection config={config} setConfig={setConfig} />}
-        {activeTab === 2 && <BoundariesSection config={config} setConfig={setConfig} />}
-        {activeTab === 3 && <EscalationSection config={config} setConfig={setConfig} />}
-        {activeTab === 4 && <ContactSection config={config} setConfig={setConfig} />}
-        {activeTab === 5 && <CustomSection config={config} setConfig={setConfig} />}
+        {activeTab === 1 && <BoundariesSection config={config} setConfig={setConfig} />}
+        {activeTab === 2 && <EscalationSection config={config} setConfig={setConfig} />}
+        {activeTab === 3 && <ContactSection config={config} setConfig={setConfig} />}
+        {activeTab === 4 && <CustomSection config={config} setConfig={setConfig} />}
       </div>
 
       {/* Actions */}
@@ -157,54 +155,6 @@ function PersonaSection({ config, setConfig }: SectionProps) {
         </select>
       </div>
       <Field label="Language" value={p.language} onChange={(v) => update({ language: v })} />
-    </div>
-  );
-}
-
-function QuestionsSection({ config, setConfig }: SectionProps) {
-  const qs = config.qualifying_questions;
-  const update = (questions: typeof qs) => setConfig({ ...config, qualifying_questions: questions });
-
-  const add = () => update([...qs, { question: '', required: false, order: qs.length + 1 }]);
-  const remove = (i: number) => update(qs.filter((_, idx) => idx !== i).map((q, idx) => ({ ...q, order: idx + 1 })));
-  const set = (i: number, fields: Partial<(typeof qs)[0]>) => {
-    const updated = [...qs];
-    updated[i] = { ...updated[i], ...fields };
-    update(updated);
-  };
-
-  return (
-    <div className="space-y-4">
-      <label className="block text-sm font-medium text-[#171717]">Qualifying Questions (in order)</label>
-      <div className="space-y-2">
-        {qs.map((q, i) => (
-          <div key={i} className="bg-[#FAFAFA] rounded-lg p-3 border border-[#F5F5F5] border-l-2 border-l-[#2563EB]">
-            <div className="flex gap-2.5 items-start">
-              <span className="text-xs text-[#A3A3A3] pt-2.5 w-5 flex-shrink-0 font-medium">{i + 1}.</span>
-              <input
-                value={q.question}
-                onChange={(e) => set(i, { question: e.target.value })}
-                className="flex-1 min-w-0 border border-[#E5E5E5] rounded-lg px-3.5 py-2.5 text-sm bg-white focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] outline-none transition"
-                placeholder="Enter question..."
-              />
-            </div>
-            <div className="flex items-center gap-4 mt-2 ml-8 pl-1">
-              <label className="cursor-pointer group text-xs whitespace-nowrap" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <input
-                  type="checkbox"
-                  checked={q.required}
-                  onChange={(e) => set(i, { required: e.target.checked })}
-                  style={{ width: '16px', height: '16px', accentColor: '#2563EB', margin: 0, flexShrink: 0, verticalAlign: 'middle' }}
-                />
-                <span style={{ lineHeight: '16px', verticalAlign: 'middle' }}>Required</span>
-              </label>
-              <span className="text-[#E5E5E5]">|</span>
-              <button onClick={() => remove(i)} className="text-[#A3A3A3] hover:text-[#DC2626] text-xs transition" style={{ lineHeight: '16px' }}>Remove</button>
-            </div>
-          </div>
-        ))}
-      </div>
-      <button onClick={add} className="text-[#2563EB] text-sm font-medium hover:text-[#1D4ED8] transition">+ Add question</button>
     </div>
   );
 }

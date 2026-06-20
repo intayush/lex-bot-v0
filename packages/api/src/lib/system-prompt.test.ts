@@ -15,11 +15,6 @@ const testConfig: Configuration = {
     language: 'English',
   },
   out_of_scope_response: "I'm not able to help with that area of law.",
-  qualifying_questions: [
-    { question: 'What type of legal matter do you need help with?', order: 1, required: true },
-    { question: 'When did this issue first arise?', order: 2, required: true },
-    { question: 'What is your preferred method of contact?', order: 3, required: false },
-  ],
   boundaries: {
     never_say: [
       'Never provide specific legal advice',
@@ -93,17 +88,6 @@ describe('composeSystemPrompt', () => {
     expect(prompt).toContain('intake@demolaw.com');
   });
 
-  it('lists qualifying questions with order numbers', () => {
-    expect(prompt).toContain('1. What type of legal matter do you need help with?');
-    expect(prompt).toContain('2. When did this issue first arise?');
-    expect(prompt).toContain('3. What is your preferred method of contact?');
-  });
-
-  it('marks questions as required/optional', () => {
-    expect(prompt).toContain('1. What type of legal matter do you need help with? (required)');
-    expect(prompt).toContain('2. When did this issue first arise? (required)');
-    expect(prompt).toContain('3. What is your preferred method of contact? (optional)');
-  });
 
   it('contains context search instructions', () => {
     expect(prompt).toContain('searchContext');
@@ -216,28 +200,6 @@ describe('composeSystemPrompt — legacy path (no SOP)', () => {
     const promptUndefined = composeSystemPrompt(testConfig, undefined, undefined, undefined, undefined);
     expect(promptUndefined).toBe(promptDefault);
   });
-
-  it('renders the legacy Qualifying Questions block when no SOP params are provided', () => {
-    const prompt = composeSystemPrompt(testConfig);
-    expect(prompt).toContain('## Qualifying Questions');
-  });
-
-  it('renders the legacy Qualifying Questions block when only some SOP params are provided', () => {
-    // Defensive: the SOP path requires ALL three params (state + config +
-    // phrases). Missing any one falls back to legacy. Without this, the
-    // route handler accidentally activating partial SOP would produce a
-    // broken prompt.
-    const sopConfig = buildSampleSOPConfig();
-    const sopState = buildSampleSOPState(sopConfig);
-
-    // sopState only — no config
-    const promptStateOnly = composeSystemPrompt(testConfig, undefined, sopState, undefined, SAMPLE_GOODBYES);
-    expect(promptStateOnly).toContain('## Qualifying Questions');
-
-    // sopConfig only — no state
-    const promptConfigOnly = composeSystemPrompt(testConfig, undefined, undefined, sopConfig, SAMPLE_GOODBYES);
-    expect(promptConfigOnly).toContain('## Qualifying Questions');
-  });
 });
 
 describe('composeSystemPrompt — SOP path (T030 wiring)', () => {
@@ -264,18 +226,6 @@ describe('composeSystemPrompt — SOP path (T030 wiring)', () => {
     const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES);
     expect(prompt).toContain('"bye"');
     expect(prompt).toContain('"goodbye"');
-  });
-
-  it('does NOT include legacy qualifying-questions content even if config has them populated', () => {
-    // The legacy testConfig has 3 qualifying_questions defined. The SOP
-    // path MUST NOT leak any of them into the prompt — that was the bug
-    // verified live on 2026-05-23.
-    const sopConfig = buildSampleSOPConfig();
-    const sopState = buildSampleSOPState(sopConfig);
-    const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES);
-    for (const q of testConfig.qualifying_questions) {
-      expect(prompt).not.toContain(q.question);
-    }
   });
 
   it('instructs the agent to use the SOP-captured when value as incidentDate (when SOP active)', () => {

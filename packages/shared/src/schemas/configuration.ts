@@ -94,7 +94,8 @@ export const configurationSchema = z.object({
   out_of_scope_response: z.string().default(''),
   /** @deprecated Use SOP Case Types for in-scope area management (019-remove-practice-areas). */
   practice_areas: practiceAreasSchema.optional(),
-  qualifying_questions: z.array(qualifyingQuestionSchema),
+  /** @deprecated Use SOP via 010-sop-workflow. No longer written by the UI. Kept optional for backwards compatibility with stored config rows. */
+  qualifying_questions: z.array(qualifyingQuestionSchema).optional(),
   boundaries: boundariesSchema,
   escalation: escalationSchema,
   contact: contactSchema,

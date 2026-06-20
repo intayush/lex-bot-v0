@@ -98,20 +98,9 @@ export function composeSystemPrompt(
     parts.push('');
   }
 
-  // Block 4 — Intake state. SOP path (010-sop-workflow) replaces the
-  // legacy qualifying-questions block when SOP runtime is active for the
-  // account. Legacy path remains for accounts that haven't migrated yet
-  // OR whose request didn't pass full SOP context.
+  // Block 4 — SOP intake state (010-sop-workflow).
   if (sopActive) {
     parts.push(composeSopBlock(sopState!, sopConfig!, goodbyePhrases!, isOffTopicNow));
-    parts.push('');
-  } else {
-    parts.push('## Qualifying Questions');
-    parts.push('Ask these questions naturally during conversation to qualify the lead:');
-    for (const q of config.qualifying_questions) {
-      const marker = q.required ? '(required)' : '(optional)';
-      parts.push(`${q.order}. ${q.question} ${marker}`);
-    }
     parts.push('');
   }
 
