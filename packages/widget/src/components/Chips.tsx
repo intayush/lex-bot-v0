@@ -10,6 +10,15 @@
  */
 import type { Chip } from '@legal-chatbot/shared';
 
+// Inline radio-circle SVG — open circle matching the reference design
+function RadioCircle() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5"/>
+    </svg>
+  );
+}
+
 interface ChipsProps {
   chips: Chip[];
   onSelect: (label: string) => void;
@@ -23,12 +32,12 @@ export function Chips({ chips, onSelect, ariaLabel }: ChipsProps) {
   return (
     <div
       role="group"
-      aria-label={ariaLabel ?? 'Quick reply options'}
+      aria-label={ariaLabel ?? 'Choose an option'}
       style={{
         display: 'flex',
-        flexWrap: 'wrap',
-        gap: '8px',
-        marginTop: '8px',
+        flexDirection: 'column',
+        gap: '10px',
+        marginTop: '12px',
       }}
     >
       {chips.map((chip) => (
@@ -38,38 +47,33 @@ export function Chips({ chips, onSelect, ariaLabel }: ChipsProps) {
           aria-label={chip.label}
           onClick={() => onSelect(chip.label)}
           style={{
-            padding: '8px 14px',
-            borderRadius: 'var(--lc-message-radius, 16px)',
-            // The border stays on --lc-primary-color (must be a solid
-            // color; CSS borders cannot be gradients without
-            // background-clip tricks). The background uses the gradient-
-            // capable --lc-primary-bg via the `background` shorthand.
-            border: '1px solid var(--lc-primary-color, #4338ca)',
+            padding: '12px 20px 12px 14px',
+            borderRadius: '24px',
+            border: '2px solid var(--lc-primary-color, #4338ca)',
             background: 'transparent',
             color: 'var(--lc-primary-color, #4338ca)',
-            fontSize: '13px',
+            fontSize: '14px',
             cursor: 'pointer',
-            // background transitions only animate solid-color changes
-            // (CSS does not animate gradients). When --lc-primary-bg is
-            // a gradient the hover swap is instant; with a solid color
-            // it smoothly fades. Acceptable trade-off for gradient
-            // support.
-            transition: 'background-color 0.15s, color 0.15s',
-            whiteSpace: 'nowrap',
+            transition: 'background 0.15s, color 0.15s',
             fontFamily: 'inherit',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            textAlign: 'left',
+            alignSelf: 'flex-start',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background =
-              'var(--lc-primary-bg, #4338ca)';
-            e.currentTarget.style.color =
-              'var(--lc-primary-text, #ffffff)';
+            e.currentTarget.style.background = 'var(--lc-primary-bg, #4338ca)';
+            e.currentTarget.style.color = 'var(--lc-primary-text, #ffffff)';
+            e.currentTarget.style.borderColor = 'var(--lc-primary-color, #4338ca)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.color =
-              'var(--lc-primary-color, #4338ca)';
+            e.currentTarget.style.color = 'var(--lc-primary-color, #4338ca)';
+            e.currentTarget.style.borderColor = 'var(--lc-primary-color, #4338ca)';
           }}
         >
+          <RadioCircle />
           {chip.label}
         </button>
       ))}

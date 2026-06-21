@@ -14,6 +14,7 @@ import {
   type WidgetCaseType,
 } from '../hooks/computeActiveChips';
 import type { SOPStateHeaderPayload } from '@legal-chatbot/shared';
+import { RestartIcon, ExpandIcon, CollapseIcon, CloseIcon } from '../assets/icons';
 
 interface ChatPanelProps {
   apiKey: string;
@@ -204,6 +205,7 @@ function ChatPanelInner({
   isLoadingHistory,
 }: ChatPanelInnerProps) {
   const [isOpen, setIsOpen] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [widgetConfig, setWidgetConfig] = useState<WidgetConfig | null>(null);
 
   useEffect(() => {
@@ -246,7 +248,7 @@ function ChatPanelInner({
     return fetch(input, { ...init, headers });
   };
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, error, append } = useChat({
+  const { messages, setMessages, input, handleInputChange, handleSubmit, isLoading, error, append } = useChat({
     api: apiUrl,
     fetch: sessionAwareFetch,
     initialMessages,
@@ -315,6 +317,12 @@ function ChatPanelInner({
     onCloseRequest();
   };
 
+  // Undo: pop the last [user, assistant] message pair from local state.
+  // Client-side only — server session retains full history.
+  function handleUndo() {
+    setMessages((prev) => prev.length >= 2 ? prev.slice(0, -2) : prev);
+  }
+
   // The Composer's chips prop is a flat list of strings rather than the
   // ChipSpec object that <Chips> consumes. We pass the raw labels via
   // Composer (which renders its own chip buttons), AND keep <Chips>
@@ -371,21 +379,45 @@ function ChatPanelInner({
   // above the existing conversation.
   const greetingNode = widgetConfig && messages.length === 0 ? (
     <>
+      {/* Large bold heading — matches reference design */}
       <div
-        className="lc-message"
-        data-variant="assistant"
         style={{
-          backgroundColor: 'var(--lc-message-bg-assistant, #f5f1e8)',
-          padding: '12px 16px',
-          borderRadius: 'var(--lc-message-radius, 16px)',
-          maxWidth: '85%',
-          fontSize: '14px',
-          lineHeight: '1.5',
-          color: 'var(--lc-text-primary, #1f1b16)',
-          border: '1px solid var(--lc-border-subtle, rgba(31,27,22,0.06))',
+          fontSize: '22px',
+          fontWeight: 700,
+          color: '#111827',
+          lineHeight: '1.3',
+          marginBottom: '8px',
+          padding: '0 4px',
         }}
       >
         {widgetConfig.greeting_message}
+      </div>
+      {/* Bot avatar + timestamp row */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          marginBottom: '16px',
+        }}
+      >
+        <div
+          style={{
+            width: '28px',
+            height: '28px',
+            borderRadius: '6px',
+            background: '#F3F4F6',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '14px',
+            flexShrink: 0,
+          }}
+          aria-hidden="true"
+        >
+          👻
+        </div>
+        <span style={{ fontSize: '12px', color: '#9CA3AF' }}>a few seconds ago</span>
       </div>
     </>
   ) : undefined;
@@ -405,6 +437,21 @@ function ChatPanelInner({
     </div>
   ) : null;
 
+  const toolbarBtnStyle: React.CSSProperties = {
+    width: 'var(--lc-toolbar-icon-size, 36px)',
+    height: 'var(--lc-toolbar-icon-size, 36px)',
+    borderRadius: '50%',
+    border: '1px solid #E5E7EB',
+    background: 'transparent',
+    color: '#6B7280',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    transition: 'background 0.15s',
+  };
+
   return (
     <PanelShell
       isOpen={isOpen}
@@ -412,46 +459,59 @@ function ChatPanelInner({
       onClosed={onClosed}
       onCloseRequest={requestClose}
       ariaLabel={`Chat with ${widgetConfig?.chatbot_name ?? 'LexBot'}`}
+      isExpanded={isExpanded}
     >
-      {/* 1. Header */}
+      {/* 1. Header — transparent with floating toolbar top-right */}
       <div
         style={{
-          padding: '16px 20px',
-          // `background` shorthand so the header strip accepts a
-          // gradient via --lc-primary-bg. `backgroundColor` cannot
-          // hold a gradient.
-          background: 'var(--lc-primary-bg, #4338ca)',
-          color: 'var(--lc-primary-text, #ffffff)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          position: 'relative',
           flexShrink: 0,
+          height: '60px',
+          background: '#ffffff',
         }}
       >
-        <div>
-          <div style={{ fontWeight: 600, fontSize: '16px' }}>{widgetConfig?.chatbot_name ?? 'LexBot'}</div>
-          <div style={{ fontSize: '12px', opacity: 0.8 }}>Virtual Assistant</div>
-        </div>
         {mode === 'floating' && (
-          <button
-            onClick={requestClose}
-            aria-label="Close chat"
+          <div
             style={{
-              background: 'none',
-              border: 'none',
-              color: 'inherit',
-              cursor: 'pointer',
-              fontSize: '20px',
-              padding: '8px',
-              minWidth: '44px',
-              minHeight: '44px',
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              gap: '6px',
             }}
           >
-            ✕
-          </button>
+            <button
+              onClick={() => {
+                // Reset: clear session and reload
+                clearSessionId();
+                window.location.reload();
+              }}
+              aria-label="Restart chat"
+              style={toolbarBtnStyle}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#F3F4F6'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              <RestartIcon />
+            </button>
+            <button
+              onClick={() => setIsExpanded((v) => !v)}
+              aria-label={isExpanded ? 'Collapse chat' : 'Expand chat'}
+              style={toolbarBtnStyle}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#F3F4F6'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              {isExpanded ? <CollapseIcon /> : <ExpandIcon />}
+            </button>
+            <button
+              onClick={requestClose}
+              aria-label="Close chat"
+              style={toolbarBtnStyle}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#F3F4F6'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              <CloseIcon />
+            </button>
+          </div>
         )}
       </div>
 
@@ -466,6 +526,8 @@ function ChatPanelInner({
         isStreaming={isLoading}
         greeting={greetingNode}
         errorBanner={errorBanner}
+        onUndo={handleUndo}
+        isLoading={isLoading}
         trailing={
           <>
             {trailingNode}
