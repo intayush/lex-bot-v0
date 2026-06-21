@@ -37,7 +37,11 @@ export async function enqueueAttorneyRoutingNotifications(input: {
 }): Promise<void> {
   if (!input.caseTypeSlug) return;
 
-  const matchingAttorneys = await getAttorneysForCaseType(input.accountId, input.caseTypeSlug);
+  // Normalise: leads.case_type stores the LLM-captured label (e.g. "Personal Injury")
+  // but attorney assignments are stored by slug (e.g. "personal_injury").
+  const caseTypeSlug = input.caseTypeSlug.toLowerCase().replace(/[\s-]+/g, '_');
+
+  const matchingAttorneys = await getAttorneysForCaseType(input.accountId, caseTypeSlug);
   if (matchingAttorneys.length === 0) return;
 
   const now = new Date().toISOString();
