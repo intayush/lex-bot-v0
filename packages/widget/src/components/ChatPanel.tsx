@@ -13,6 +13,7 @@ import {
   type WidgetSOP,
   type WidgetCaseType,
 } from '../hooks/computeActiveChips';
+import type { SOPStateHeaderPayload } from '@legal-chatbot/shared';
 
 interface ChatPanelProps {
   apiKey: string;
@@ -49,6 +50,13 @@ function saveSessionId(id: string) {
   }
 }
 
+function clearSessionId() {
+  if (typeof sessionStorage !== 'undefined') {
+    sessionStorage.removeItem('lc_session_id');
+    sessionStorage.removeItem('lc_sop_state');
+  }
+}
+
 interface WidgetTheme {
   /** Stable preset id ('default' | 'sunset' | …). Display-only. */
   id: string;
@@ -82,6 +90,92 @@ interface WidgetConfig {
   theme?: WidgetTheme | null;
 }
 
+interface RestoredSession {
+  messages: Array<{ id: string; role: 'user' | 'assistant'; content: string }>;
+  sopState: SOPStateHeaderPayload | null;
+}
+
+/**
+ * Outer shell: fetches history for an existing session before mounting
+ * the inner panel. This ensures useChat receives initialMessages only
+ * once (the hook ignores changes to initialMessages after first render).
+ *
+ * Flow:
+ *   - No stored session ID → mount ChatPanelInner immediately with empty history
+ *   - Stored session ID → fetch /api/chat/history, then mount inner with restored messages
+ *   - 404 from server (session expired) → clear sessionStorage, mount fresh
+ */
+export function ChatPanel(props: ChatPanelProps) {
+  const { apiKey, apiUrl } = props;
+  const [restored, setRestored] = useState<RestoredSession | null>(null);
+  const [historyReady, setHistoryReady] = useState(false);
+
+  useEffect(() => {
+    const storedSessionId = getSessionId();
+    if (!storedSessionId) {
+      setHistoryReady(true);
+      return;
+    }
+
+    const baseUrl = apiUrl.replace(/\/api\/chat\/?$/, '');
+    fetch(`${baseUrl}/api/chat/history`, {
+      headers: {
+        'x-api-key': apiKey,
+        'x-session-id': storedSessionId,
+      },
+    })
+      .then((res) => {
+        if (res.status === 404) {
+          // Session expired on server — start fresh.
+          clearSessionId();
+          return null;
+        }
+        if (!res.ok) return null;
+        return res.json() as Promise<RestoredSession>;
+      })
+      .then((data) => {
+        if (data && data.messages.length > 0) {
+          setRestored(data);
+        }
+        setHistoryReady(true);
+      })
+      .catch(() => {
+        // Network error — start fresh rather than blocking the widget.
+        setHistoryReady(true);
+      });
+  // Run once on mount. apiUrl/apiKey are stable for the widget's lifetime.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (!historyReady) {
+    // Minimal loading state — keeps the panel shell present but empty
+    // so the user sees the panel open immediately.
+    return (
+      <ChatPanelInner
+        {...props}
+        initialMessages={[]}
+        restoredSopState={null}
+        isLoadingHistory={true}
+      />
+    );
+  }
+
+  return (
+    <ChatPanelInner
+      {...props}
+      initialMessages={restored?.messages ?? []}
+      restoredSopState={restored?.sopState ?? null}
+      isLoadingHistory={false}
+    />
+  );
+}
+
+interface ChatPanelInnerProps extends ChatPanelProps {
+  initialMessages: Array<{ id: string; role: 'user' | 'assistant'; content: string }>;
+  restoredSopState: SOPStateHeaderPayload | null;
+  isLoadingHistory: boolean;
+}
+
 /**
  * Spec 017 — `ChatPanel` is the chatbot orchestrator. It owns:
  *   - the AI SDK `useChat` (messages, streaming, send)
@@ -98,14 +192,17 @@ interface WidgetConfig {
  * state (active chips, contact-form pending) and passes everything
  * down as props.
  */
-export function ChatPanel({
+function ChatPanelInner({
   apiKey,
   apiUrl,
   onCloseRequest,
   onClosed,
   mode = 'floating',
   extraHeaders,
-}: ChatPanelProps) {
+  initialMessages,
+  restoredSopState,
+  isLoadingHistory,
+}: ChatPanelInnerProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [widgetConfig, setWidgetConfig] = useState<WidgetConfig | null>(null);
 
@@ -134,7 +231,8 @@ export function ChatPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiUrl, apiKey]);
 
-  const { sopState, onResponse: onSOPResponse } = useSOPState();
+  const { sopState: liveSopState, onResponse: onSOPResponse } = useSOPState(restoredSopState);
+  const sopState = liveSopState;
   const reducedMotion = useReducedMotion();
 
   const { phrase: preflightPhrase, start: startPreflight, clear: clearPreflight } = usePreflightPhrase();
@@ -151,6 +249,7 @@ export function ChatPanel({
   const { messages, input, handleInputChange, handleSubmit, isLoading, error, append } = useChat({
     api: apiUrl,
     fetch: sessionAwareFetch,
+    initialMessages,
     headers: {
       'x-api-key': apiKey,
       ...(extraHeaders ?? {}),
@@ -231,6 +330,7 @@ export function ChatPanel({
   // (b) no messages yet but we have chips ready (greeting screen).
   const showSOPTrailing =
     !isLoading
+    && !isLoadingHistory
     && (
       (messages.length > 0 && messages[messages.length - 1]?.role === 'assistant')
       || (messages.length === 0 && activeChips.length > 0)
@@ -266,7 +366,10 @@ export function ChatPanel({
   // MessageList renders an empty conversation area, then re-renders
   // with the full greeting once the config payload lands (single paint,
   // no transient fallback).
-  const greetingNode = widgetConfig ? (
+  //
+  // When history is restored, suppress the greeting so it doesn't appear
+  // above the existing conversation.
+  const greetingNode = widgetConfig && messages.length === 0 ? (
     <>
       <div
         className="lc-message"
@@ -403,7 +506,7 @@ export function ChatPanel({
         }}
         inputValue={input}
         onInputChange={handleInputChange}
-        disabled={isLoading}
+        disabled={isLoading || isLoadingHistory}
       />
     </PanelShell>
   );

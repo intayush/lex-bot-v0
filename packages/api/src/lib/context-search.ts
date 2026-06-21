@@ -127,18 +127,26 @@ export async function searchContext(
 
   if (scored.length === 0) return [];
 
-  const results: SearchResult[] = [];
-  let totalChars = 0;
   const maxChars = MAX_CONTEXT_TOKENS * AVG_CHARS_PER_TOKEN;
 
-  for (const { file, score } of scored) {
-    if (totalChars >= maxChars) break;
+  // Fetch all scored files concurrently — serial awaits were costing one
+  // round-trip per file (50-200ms × N files). Budget trimming happens
+  // after all fetches complete.
+  const fetched = await Promise.all(
+    scored.map(({ file, score }) =>
+      fetchFileContent(contextStoreUrl, file.path)
+        .then((content) => ({ file, score, content }))
+        .catch(() => null),
+    ),
+  );
 
-    const content = await fetchFileContent(contextStoreUrl, file.path);
-    const trimmedContent = content.slice(0, maxChars - totalChars);
+  const results: SearchResult[] = [];
+  let totalChars = 0;
+  for (const item of fetched) {
+    if (!item || totalChars >= maxChars) break;
+    const trimmedContent = item.content.slice(0, maxChars - totalChars);
     totalChars += trimmedContent.length;
-
-    results.push({ file, score, content: trimmedContent });
+    results.push({ file: item.file, score: item.score, content: trimmedContent });
   }
 
   return results;

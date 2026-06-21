@@ -49,10 +49,17 @@ function persist(payload: SOPStateHeaderPayload | null): void {
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
 }
 
-export function useSOPState(): UseSOPStateReturn {
-  const [sopState, setSOPState] = useState<SOPStateHeaderPayload | null>(() =>
-    readPersisted(),
-  );
+/**
+ * @param seedState — optional initial value from a history restore fetch.
+ *   When provided, it takes precedence over any sessionStorage value so
+ *   the server-authoritative SOP state is used. The sessionStorage value
+ *   is still updated on the next /api/chat response.
+ */
+export function useSOPState(seedState?: SOPStateHeaderPayload | null): UseSOPStateReturn {
+  const [sopState, setSOPState] = useState<SOPStateHeaderPayload | null>(() => {
+    if (seedState !== undefined) return seedState;
+    return readPersisted();
+  });
 
   const onResponse = useCallback((response: Response) => {
     const headerValue = response.headers.get('x-sop-state');

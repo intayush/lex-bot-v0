@@ -82,8 +82,16 @@ test('@walk US1 — default SOP happy path (DUI → First Offense → ... → co
   }
   await waitForSopProgress(sopLog, 2, 'after sub_type, current should be ≥2');
 
-  // -- Turn 3: where (free-text) -----------------------------------------------
-  await sendMessage(page, '5th and Main, downtown Pittsburgh');
+  // -- Turn 3: where (chip) ---------------------------------------------------
+  // The where step has inline chips "In Pittsburgh" / "Outside Pittsburgh".
+  // Prefer chip click (deterministic skip-detector match) over free-text to
+  // avoid keyword-overlap fragility (018-forward-only-sop removed multi-step
+  // skip detection; free-text now requires exact overlap with step question).
+  try {
+    await clickChip(page, 'In Pittsburgh');
+  } catch {
+    await sendMessage(page, 'In Pittsburgh');
+  }
   await waitForSopProgress(sopLog, 3, 'after where, current should be ≥3');
 
   // -- Turn 4: what (free-text) ------------------------------------------------
