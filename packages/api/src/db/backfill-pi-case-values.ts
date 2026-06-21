@@ -24,7 +24,7 @@
  *   pnpm --filter @legal-chatbot/api exec tsx src/db/backfill-pi-case-values.ts
  */
 
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { db, schema } from './index.js';
 
 // ---------------------------------------------------------------------------
@@ -36,21 +36,37 @@ const PI_CASE_VALUE_CONFIGS: Record<string, string> = {
     { score_min: 76, score_max: 100, value_min_usd: 75000,  value_max_usd: 250000, position: 0 },
     { score_min: 51, score_max: 75,  value_min_usd: 15000,  value_max_usd: 75000,  position: 1 },
     { score_min: 26, score_max: 50,  value_min_usd: 3000,   value_max_usd: 15000,  position: 2 },
+  ], classification_bands: [
+    { classification: 'HOT',  value_min_usd: 75000,  value_max_usd: 250000 },
+    { classification: 'WARM', value_min_usd: 15000,  value_max_usd: 75000  },
+    { classification: 'COLD', value_min_usd: 3000,   value_max_usd: 15000  },
   ]}),
   slip_fall: JSON.stringify({ bands: [
     { score_min: 76, score_max: 100, value_min_usd: 50000,  value_max_usd: 150000, position: 0 },
     { score_min: 51, score_max: 75,  value_min_usd: 10000,  value_max_usd: 50000,  position: 1 },
     { score_min: 26, score_max: 50,  value_min_usd: 2000,   value_max_usd: 10000,  position: 2 },
+  ], classification_bands: [
+    { classification: 'HOT',  value_min_usd: 50000,  value_max_usd: 150000 },
+    { classification: 'WARM', value_min_usd: 10000,  value_max_usd: 50000  },
+    { classification: 'COLD', value_min_usd: 2000,   value_max_usd: 10000  },
   ]}),
   medical_malpractice: JSON.stringify({ bands: [
     { score_min: 76, score_max: 100, value_min_usd: 200000,  value_max_usd: 1000000, position: 0 },
     { score_min: 51, score_max: 75,  value_min_usd: 50000,   value_max_usd: 200000,  position: 1 },
     { score_min: 26, score_max: 50,  value_min_usd: 10000,   value_max_usd: 50000,   position: 2 },
+  ], classification_bands: [
+    { classification: 'HOT',  value_min_usd: 200000, value_max_usd: 1000000 },
+    { classification: 'WARM', value_min_usd: 50000,  value_max_usd: 200000  },
+    { classification: 'COLD', value_min_usd: 10000,  value_max_usd: 50000   },
   ]}),
   dog_bite: JSON.stringify({ bands: [
     { score_min: 76, score_max: 100, value_min_usd: 30000,  value_max_usd: 100000, position: 0 },
     { score_min: 51, score_max: 75,  value_min_usd: 8000,   value_max_usd: 30000,  position: 1 },
     { score_min: 26, score_max: 50,  value_min_usd: 1500,   value_max_usd: 8000,   position: 2 },
+  ], classification_bands: [
+    { classification: 'HOT',  value_min_usd: 30000,  value_max_usd: 100000 },
+    { classification: 'WARM', value_min_usd: 8000,   value_max_usd: 30000  },
+    { classification: 'COLD', value_min_usd: 1500,   value_max_usd: 8000   },
   ]}),
 };
 
@@ -96,29 +112,37 @@ async function backfillPiCaseValues(): Promise<void> {
       continue;
     }
 
-    // Check if the current published version already has case value config.
+    // Check if the current published version already has classification_bands.
+    // If it has config but no classification_bands (old format), still update.
     const versionRows = await db
       .select({
         id: schema.branchVersions.id,
         case_value_config_json: schema.branchVersions.case_value_config_json,
       })
       .from(schema.branchVersions)
-      .where(
-        and(
-          eq(schema.branchVersions.id, branch.current_version_id),
-          isNull(schema.branchVersions.case_value_config_json),
-        ),
-      )
+      .where(eq(schema.branchVersions.id, branch.current_version_id))
       .limit(1);
 
     if (versionRows.length === 0) {
-      // Either version not found or already has config — skip.
-      console.log(`  [${branch.account_id}] ${branch.sub_type_slug}: already configured — skipping`);
-      results.push({ accountId: branch.account_id, subTypeSlug: branch.sub_type_slug, outcome: 'skipped_already_configured' });
+      console.log(`  [${branch.account_id}] ${branch.sub_type_slug}: version row not found — skipping`);
+      results.push({ accountId: branch.account_id, subTypeSlug: branch.sub_type_slug, outcome: 'skipped_no_published_version' });
       continue;
     }
 
-    const versionId = versionRows[0]!.id;
+    // If already has classification_bands, skip — idempotent
+    const existing = versionRows[0]!;
+    if (existing.case_value_config_json) {
+      try {
+        const parsed = JSON.parse(existing.case_value_config_json);
+        if (Array.isArray(parsed?.classification_bands) && parsed.classification_bands.length > 0) {
+          console.log(`  [${branch.account_id}] ${branch.sub_type_slug}: already has classification_bands — skipping`);
+          results.push({ accountId: branch.account_id, subTypeSlug: branch.sub_type_slug, outcome: 'skipped_already_configured' });
+          continue;
+        }
+      } catch { /* fall through to update */ }
+    }
+
+    const versionId = existing.id;
 
     // Write case value config to the published branch version.
     await db

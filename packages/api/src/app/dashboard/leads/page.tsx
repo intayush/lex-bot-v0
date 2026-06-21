@@ -75,7 +75,12 @@ export default async function LeadsPage() {
     const slug = lead.case_type ? toSlug(lead.case_type) : null;
     const config = slug ? caseValueMap.get(slug) ?? null : null;
     const isSpam = lead.classification === 'SPAM';
-    const badge = resolveCaseValueBadge(lead.lead_score ?? null, config, config !== null && !isSpam);
+    const badge = resolveCaseValueBadge(
+      lead.lead_score ?? null,
+      config,
+      config !== null && !isSpam,
+      lead.classification as 'HOT' | 'WARM' | 'COLD' | 'SPAM' | null,
+    );
     return { ...lead, case_value_badge: badge };
   });
 

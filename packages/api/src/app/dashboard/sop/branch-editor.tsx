@@ -31,6 +31,7 @@ import type {
   BranchSaveResponse,
   BranchSaveWarning,
   CaseValueBand,
+  ClassificationBand,
   CaseValueConfig,
   ThresholdsFamilyFriend,
   ThresholdsSelf,
@@ -97,6 +98,7 @@ export function BranchEditor({
   const [isActive, setIsActive] = useState(true);
   const [isCaseValueEnabled, setIsCaseValueEnabled] = useState(false);
   const [caseValueBands, setCaseValueBands] = useState<CaseValueBand[]>([]);
+  const [classificationBands, setClassificationBands] = useState<ClassificationBand[]>([]);
   const [questions, setQuestions] = useState<BranchQuestion[]>([]);
   const [thresholdsSelf, setThresholdsSelf] = useState<ThresholdsSelf>(DEFAULT_THRESHOLDS_SELF);
   const [thresholdsFamily, setThresholdsFamily] =
@@ -142,6 +144,7 @@ export function BranchEditor({
         setThresholdsFamily(v.classification_thresholds.family_friend);
         setOverrides(v.hard_override_toggles);
         setCaseValueBands(v.case_value_config?.bands ?? []);
+        setClassificationBands(v.case_value_config?.classification_bands ?? []);
       }
       setHasDraft(data.draft_version !== null);
     } catch (e) {
@@ -198,7 +201,9 @@ export function BranchEditor({
               family_friend: thresholdsFamily,
             },
             hard_override_toggles: overrides,
-            case_value_config: caseValueBands.length > 0 ? { bands: caseValueBands } : null,
+            case_value_config: (caseValueBands.length > 0 || classificationBands.length > 0)
+              ? { bands: caseValueBands, classification_bands: classificationBands }
+              : null,
           }),
         },
       );
@@ -301,7 +306,9 @@ export function BranchEditor({
             questions: importedQuestions,
             classification_thresholds: { self: thresholdsSelf, family_friend: thresholdsFamily },
             hard_override_toggles: overrides,
-            case_value_config: caseValueBands.length > 0 ? { bands: caseValueBands } : null,
+            case_value_config: (caseValueBands.length > 0 || classificationBands.length > 0)
+              ? { bands: caseValueBands, classification_bands: classificationBands }
+              : null,
           }),
         },
       );
@@ -570,6 +577,63 @@ export function BranchEditor({
             >
               + Add band
             </button>
+
+            {/* Classification fallback section */}
+            <div className="mt-4 pt-4 border-t border-[#E5E5E5]">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <p className="text-xs font-medium text-[#374151]">Fallback by classification</p>
+                  <p className="text-[11px] text-[#9CA3AF] mt-0.5">
+                    Shown when lead score is unavailable (LLM-only leads). Score bands take priority when present.
+                  </p>
+                </div>
+              </div>
+              {(['HOT', 'WARM', 'COLD'] as const).map((cls) => {
+                const existing = classificationBands.find((b) => b.classification === cls);
+                const clsColors: Record<string, string> = { HOT: '#DC2626', WARM: '#EA580C', COLD: '#2563EB' };
+                return (
+                  <div key={cls} className="flex items-center gap-2 mb-2">
+                    <span style={{ color: clsColors[cls], fontWeight: 600, fontSize: '11px', width: '36px' }}>{cls}</span>
+                    <span className="text-xs text-[#9CA3AF]">$</span>
+                    <input
+                      type="number" min={0} value={existing?.value_min_usd ?? ''}
+                      placeholder="min"
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setClassificationBands((bands) => {
+                          const filtered = bands.filter((b) => b.classification !== cls);
+                          return [...filtered, { classification: cls, value_min_usd: val, value_max_usd: existing?.value_max_usd ?? val }];
+                        });
+                      }}
+                      className="w-24 px-1.5 py-1 border border-[#E5E5E5] rounded text-xs"
+                    />
+                    <span className="text-xs text-[#9CA3AF]">–</span>
+                    <span className="text-xs text-[#9CA3AF]">$</span>
+                    <input
+                      type="number" min={0} value={existing?.value_max_usd ?? ''}
+                      placeholder="max"
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setClassificationBands((bands) => {
+                          const filtered = bands.filter((b) => b.classification !== cls);
+                          return [...filtered, { classification: cls, value_min_usd: existing?.value_min_usd ?? 0, value_max_usd: val }];
+                        });
+                      }}
+                      className="w-24 px-1.5 py-1 border border-[#E5E5E5] rounded text-xs"
+                    />
+                    {existing && (
+                      <button
+                        type="button"
+                        onClick={() => setClassificationBands((b) => b.filter((x) => x.classification !== cls))}
+                        className="text-[11px] text-[#9CA3AF] hover:text-[#EF4444]"
+                      >
+                        clear
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

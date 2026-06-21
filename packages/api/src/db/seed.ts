@@ -107,26 +107,43 @@ export async function seedSopForAccount(accountId: string): Promise<void> {
   const versionId = nanoid();
   // 025-case-value-estimator: case value configurations for Personal Injury branches.
   // Values are US industry-standard settlement estimates.
+  // 025-case-value-estimator: classification_bands added for LLM-only (unscored) leads.
   const PI_CASE_VALUE_CONFIGS: Record<string, string> = {
     car_accident: JSON.stringify({ bands: [
       { score_min: 76, score_max: 100, value_min_usd: 75000,  value_max_usd: 250000, position: 0 },
       { score_min: 51, score_max: 75,  value_min_usd: 15000,  value_max_usd: 75000,  position: 1 },
       { score_min: 26, score_max: 50,  value_min_usd: 3000,   value_max_usd: 15000,  position: 2 },
+    ], classification_bands: [
+      { classification: 'HOT',  value_min_usd: 75000,  value_max_usd: 250000 },
+      { classification: 'WARM', value_min_usd: 15000,  value_max_usd: 75000  },
+      { classification: 'COLD', value_min_usd: 3000,   value_max_usd: 15000  },
     ]}),
     slip_fall: JSON.stringify({ bands: [
       { score_min: 76, score_max: 100, value_min_usd: 50000,  value_max_usd: 150000, position: 0 },
       { score_min: 51, score_max: 75,  value_min_usd: 10000,  value_max_usd: 50000,  position: 1 },
       { score_min: 26, score_max: 50,  value_min_usd: 2000,   value_max_usd: 10000,  position: 2 },
+    ], classification_bands: [
+      { classification: 'HOT',  value_min_usd: 50000,  value_max_usd: 150000 },
+      { classification: 'WARM', value_min_usd: 10000,  value_max_usd: 50000  },
+      { classification: 'COLD', value_min_usd: 2000,   value_max_usd: 10000  },
     ]}),
     medical_malpractice: JSON.stringify({ bands: [
       { score_min: 76, score_max: 100, value_min_usd: 200000,  value_max_usd: 1000000, position: 0 },
       { score_min: 51, score_max: 75,  value_min_usd: 50000,   value_max_usd: 200000,  position: 1 },
       { score_min: 26, score_max: 50,  value_min_usd: 10000,   value_max_usd: 50000,   position: 2 },
+    ], classification_bands: [
+      { classification: 'HOT',  value_min_usd: 200000, value_max_usd: 1000000 },
+      { classification: 'WARM', value_min_usd: 50000,  value_max_usd: 200000  },
+      { classification: 'COLD', value_min_usd: 10000,  value_max_usd: 50000   },
     ]}),
     dog_bite: JSON.stringify({ bands: [
       { score_min: 76, score_max: 100, value_min_usd: 30000,  value_max_usd: 100000, position: 0 },
       { score_min: 51, score_max: 75,  value_min_usd: 8000,   value_max_usd: 30000,  position: 1 },
       { score_min: 26, score_max: 50,  value_min_usd: 1500,   value_max_usd: 8000,   position: 2 },
+    ], classification_bands: [
+      { classification: 'HOT',  value_min_usd: 30000,  value_max_usd: 100000 },
+      { classification: 'WARM', value_min_usd: 8000,   value_max_usd: 30000  },
+      { classification: 'COLD', value_min_usd: 1500,   value_max_usd: 8000   },
     ]}),
   };
 

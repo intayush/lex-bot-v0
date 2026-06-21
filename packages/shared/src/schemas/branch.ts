@@ -139,9 +139,31 @@ export const caseValueBandSchema = z
   });
 export type CaseValueBand = z.infer<typeof caseValueBandSchema>;
 
+/**
+ * Classification-level fallback band. When lead_score is null, the badge
+ * is resolved from the LLM-assigned classification instead of the score.
+ * Exactly one entry per classification (HOT / WARM / COLD).
+ */
+export const classificationBandSchema = z
+  .object({
+    classification: z.enum(['HOT', 'WARM', 'COLD']),
+    value_min_usd: z.number().int().min(0),
+    value_max_usd: z.number().int().min(0),
+  })
+  .refine((b) => b.value_min_usd <= b.value_max_usd, {
+    message: 'value_min_usd must be ≤ value_max_usd',
+    path: ['value_min_usd'],
+  });
+export type ClassificationBand = z.infer<typeof classificationBandSchema>;
+
 /** Full case value configuration stored on a branch version. */
 export const caseValueConfigSchema = z.object({
   bands: z.array(caseValueBandSchema),
+  /**
+   * Optional fallback bands keyed by classification. Used when lead_score
+   * is null (LLM-only path). Score bands take precedence when available.
+   */
+  classification_bands: z.array(classificationBandSchema).optional(),
 });
 export type CaseValueConfig = z.infer<typeof caseValueConfigSchema>;
 
