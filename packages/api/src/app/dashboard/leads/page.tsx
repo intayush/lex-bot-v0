@@ -65,9 +65,15 @@ export default async function LeadsPage() {
     } catch { /* ignore malformed */ }
   }
 
-  // Resolve value badge per lead
+  // Resolve value badge per lead.
+  // leads.case_type stores the raw LLM-captured string (e.g. "Personal Injury"),
+  // while the branch map is keyed by slug (e.g. "personal_injury"). Normalise
+  // the lookup key: lowercase + replace spaces/hyphens with underscores.
+  const toSlug = (s: string) => s.toLowerCase().replace(/[\s-]+/g, '_');
+
   const leadsWithBadge = allLeads.map((lead) => {
-    const config = lead.case_type ? caseValueMap.get(lead.case_type) ?? null : null;
+    const slug = lead.case_type ? toSlug(lead.case_type) : null;
+    const config = slug ? caseValueMap.get(slug) ?? null : null;
     const isSpam = lead.classification === 'SPAM';
     const badge = resolveCaseValueBadge(lead.lead_score ?? null, config, config !== null && !isSpam);
     return { ...lead, case_value_badge: badge };
