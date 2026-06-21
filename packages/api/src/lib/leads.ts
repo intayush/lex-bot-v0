@@ -2,6 +2,8 @@ import { nanoid } from 'nanoid';
 import { eq, and } from 'drizzle-orm';
 import { db } from '../db';
 import { leads, notifications, sopSteps, sopConfigurations, subTypes, caseTypes } from '../db/schema';
+import { enqueueAttorneyRoutingNotifications } from './attorney-routing';
+import { runAfterResponse } from './run-after-response';
 import type {
   Chip,
   ContactFormPayload,
@@ -461,6 +463,26 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
       sopVersion: input.sopState?.sop_version ?? null,
     });
 
+    // 024-attorney-routing: enqueue email routing for HOT leads (UPDATE branch).
+    if (isStillUrgent && input.caseType) {
+      runAfterResponse(
+        () => enqueueAttorneyRoutingNotifications({
+          accountId: input.accountId,
+          leadId: existingRow.id,
+          caseTypeSlug: input.caseType!,
+          leadName: input.name,
+          leadEmail: input.contactEmail,
+          leadPhone: input.contactPhone,
+          leadDescription: input.briefDescription,
+          capturedAt: now,
+        }),
+        (err) => console.error('[leads] attorney routing enqueue failed (update branch)', {
+          leadId: existingRow.id,
+          err: { name: (err as Error)?.name, message: (err as Error)?.message },
+        }),
+      );
+    }
+
     return { leadId: existingRow.id, classification: postOverrideClassification };
   }
 
@@ -548,6 +570,26 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
         : null,
     sopVersion: input.sopState?.sop_version ?? null,
   });
+
+  // 024-attorney-routing: enqueue email routing for HOT leads (INSERT branch).
+  if (postOverrideClassification === 'HOT' && input.caseType) {
+    runAfterResponse(
+      () => enqueueAttorneyRoutingNotifications({
+        accountId: input.accountId,
+        leadId,
+        caseTypeSlug: input.caseType!,
+        leadName: input.name,
+        leadEmail: input.contactEmail,
+        leadPhone: input.contactPhone,
+        leadDescription: input.briefDescription,
+        capturedAt: now,
+      }),
+      (err) => console.error('[leads] attorney routing enqueue failed (insert branch)', {
+        leadId,
+        err: { name: (err as Error)?.name, message: (err as Error)?.message },
+      }),
+    );
+  }
 
   return { leadId, classification: postOverrideClassification };
 }

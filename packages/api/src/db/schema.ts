@@ -163,7 +163,38 @@ export const notifications = pgTable('notifications', {
   delivery_channel: text('delivery_channel').notNull().default('dashboard'),
   delivered_at: text('delivered_at'),
   created_at: text('created_at').notNull(),
+  /**
+   * 024-attorney-routing: FK to the specific attorney this email-channel
+   * notification is addressed to. NULL for dashboard-channel rows.
+   */
+  attorney_id: text('attorney_id'),
 });
+
+// ---------------------------------------------------------------------------
+// 024-attorney-routing: attorney roster + case type assignments
+// ---------------------------------------------------------------------------
+
+export const attorneys = pgTable('attorneys', {
+  id: text('id').primaryKey(),
+  account_id: text('account_id').notNull().references(() => accounts.id),
+  name: text('name').notNull(),
+  email: text('email').notNull(),
+  mobile: text('mobile'),
+  created_at: text('created_at').notNull(),
+  updated_at: text('updated_at').notNull(),
+}, (table) => [
+  uniqueIndex('attorneys_account_email_unique').on(table.account_id, table.email),
+]);
+
+export const attorneyCaseTypeAssignments = pgTable('attorney_case_type_assignments', {
+  id: text('id').primaryKey(),
+  attorney_id: text('attorney_id').notNull().references(() => attorneys.id, { onDelete: 'cascade' }),
+  account_id: text('account_id').notNull().references(() => accounts.id),
+  case_type_slug: text('case_type_slug').notNull(),
+  created_at: text('created_at').notNull(),
+}, (table) => [
+  uniqueIndex('attorney_assignment_unique').on(table.attorney_id, table.case_type_slug),
+]);
 
 // ---------------------------------------------------------------------------
 // SOP Workflow tables (010-sop-workflow)

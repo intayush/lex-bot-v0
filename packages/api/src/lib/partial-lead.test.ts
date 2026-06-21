@@ -95,6 +95,7 @@ CREATE TABLE \`notifications\` (
   \`delivery_channel\` text DEFAULT 'dashboard' NOT NULL,
   \`delivered_at\` text,
   \`created_at\` text NOT NULL,
+  \`attorney_id\` text,
   FOREIGN KEY (\`account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE no action,
   FOREIGN KEY (\`lead_id\`) REFERENCES \`leads\`(\`id\`) ON UPDATE no action ON DELETE no action
 );
