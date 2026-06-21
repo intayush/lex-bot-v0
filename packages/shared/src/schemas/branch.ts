@@ -112,6 +112,39 @@ export const branchQuestionSchema = z
 export type BranchQuestion = z.infer<typeof branchQuestionSchema>;
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Case Value Estimator — 025-case-value-estimator
+// Versioned alongside branch questions/thresholds in branch_versions.
+// ---------------------------------------------------------------------------
+
+/**
+ * A single score-band-to-dollar-range mapping. Bands are ordered by
+ * `position` and the first matching band wins when resolving a badge.
+ */
+export const caseValueBandSchema = z
+  .object({
+    score_min: z.number().int().min(0).max(100),
+    score_max: z.number().int().min(0).max(100),
+    value_min_usd: z.number().int().min(0),
+    value_max_usd: z.number().int().min(0),
+    position: z.number().int().min(0),
+  })
+  .refine((b) => b.score_min <= b.score_max, {
+    message: 'score_min must be ≤ score_max',
+    path: ['score_min'],
+  })
+  .refine((b) => b.value_min_usd <= b.value_max_usd, {
+    message: 'value_min_usd must be ≤ value_max_usd',
+    path: ['value_min_usd'],
+  });
+export type CaseValueBand = z.infer<typeof caseValueBandSchema>;
+
+/** Full case value configuration stored on a branch version. */
+export const caseValueConfigSchema = z.object({
+  bands: z.array(caseValueBandSchema),
+});
+export type CaseValueConfig = z.infer<typeof caseValueConfigSchema>;
+
 // BranchVersion — an immutable snapshot of a Branch's configuration
 // ---------------------------------------------------------------------------
 
@@ -132,6 +165,8 @@ export const branchVersionSchema = z.object({
     family_friend: thresholdsFamilyFriendSchema,
   }),
   hard_override_toggles: hardOverridesEnabledSchema,
+  /** 025-case-value-estimator: optional case value config. Null when not configured. */
+  case_value_config: caseValueConfigSchema.nullable().optional(),
   published_at: z.number().int().nullable(),
   created_at: z.number().int(),
   created_by_user_id: z.string().min(1),

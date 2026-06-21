@@ -1,10 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
-import { db } from '../../../db';
+import { db, schema } from '../../../db';
 import { leads } from '../../../db/schema';
 import { getAuthSession } from '../../../lib/dashboard-session';
+import { resolveCaseValueBadge } from '../../../lib/case-value';
+import { caseValueConfigSchema } from '@legal-chatbot/shared';
 import { LeadTable } from './lead-table';
 
 /**
@@ -37,6 +39,39 @@ export default async function LeadsPage() {
     .from(leads)
     .where(eq(leads.account_id, session.accountId))
     .orderBy(desc(leads.created_at));
+
+  // 025-case-value-estimator: load active branch versions for accounts with
+  // is_case_value_enabled=true to resolve value badges at read-time.
+  const enabledBranchRows = await db
+    .select({
+      case_type_slug: schema.branches.case_type_slug,
+      sub_type_slug: schema.branches.sub_type_slug,
+      case_value_config_json: schema.branchVersions.case_value_config_json,
+    })
+    .from(schema.branches)
+    .innerJoin(schema.branchVersions, eq(schema.branchVersions.id, schema.branches.current_version_id))
+    .where(and(
+      eq(schema.branches.account_id, session.accountId),
+      eq(schema.branches.is_case_value_enabled, true),
+    ));
+
+  // Build case_type_slug → CaseValueConfig map (top-level slug only per spec)
+  const caseValueMap = new Map<string, import('@legal-chatbot/shared').CaseValueConfig>();
+  for (const row of enabledBranchRows) {
+    if (!row.case_value_config_json || caseValueMap.has(row.case_type_slug)) continue;
+    try {
+      const parsed = caseValueConfigSchema.safeParse(JSON.parse(row.case_value_config_json));
+      if (parsed.success) caseValueMap.set(row.case_type_slug, parsed.data);
+    } catch { /* ignore malformed */ }
+  }
+
+  // Resolve value badge per lead
+  const leadsWithBadge = allLeads.map((lead) => {
+    const config = lead.case_type ? caseValueMap.get(lead.case_type) ?? null : null;
+    const isSpam = lead.classification === 'SPAM';
+    const badge = resolveCaseValueBadge(lead.lead_score ?? null, config, config !== null && !isSpam);
+    return { ...lead, case_value_badge: badge };
+  });
 
   // Spec 015 / spec 016 — 4-value classification vocabulary:
   //   HOT (76-100) / WARM (51-75) / COLD (26-50) / SPAM (0-25)
@@ -111,7 +146,7 @@ export default async function LeadsPage() {
       </div>
 
       {/* Table */}
-      <LeadTable leads={allLeads} />
+      <LeadTable leads={leadsWithBadge} />
     </div>
   );
 }

@@ -16,6 +16,8 @@ interface Lead {
   /** Spec 016 — branch in flight when the session ended (FR-011a / FR-011b). */
   branch_incomplete?: boolean;
   created_at: string | null;
+  /** 025-case-value-estimator: resolved value range badge or null. */
+  case_value_badge?: string | null;
 }
 
 // Spec 015 / spec 016 — 4-value classification vocabulary:
@@ -126,6 +128,7 @@ export function LeadTable({ leads }: { leads: Lead[] }) {
                   <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#A3A3A3]">Name</th>
                   <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#A3A3A3]">Case Type</th>
                   <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#A3A3A3]">Classification</th>
+                  <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#A3A3A3]">Est. Value</th>
                   <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#A3A3A3]">Status</th>
                   <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#A3A3A3]">Action</th>
                   <th className="text-left px-5 py-3 text-xs font-medium uppercase tracking-wider text-[#A3A3A3]">Contact</th>
@@ -165,6 +168,16 @@ export function LeadTable({ leads }: { leads: Lead[] }) {
                             </span>
                           )}
                         </div>
+                      </td>
+                      {/* 025-case-value-estimator: value range badge */}
+                      <td className="px-5 py-4">
+                        {lead.case_value_badge ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[#ECFDF5] text-[#059669]">
+                            {lead.case_value_badge}
+                          </span>
+                        ) : (
+                          <span className="text-[#D4D4D4]">&mdash;</span>
+                        )}
                       </td>
                       <td className="px-5 py-4">
                         <span className={`inline-flex items-center gap-1.5 text-xs font-medium capitalize ${sts.text}`}>

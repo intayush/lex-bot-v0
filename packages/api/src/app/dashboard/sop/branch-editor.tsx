@@ -30,6 +30,8 @@ import type {
   BranchQuestion,
   BranchSaveResponse,
   BranchSaveWarning,
+  CaseValueBand,
+  CaseValueConfig,
   ThresholdsFamilyFriend,
   ThresholdsSelf,
 } from '@legal-chatbot/shared';
@@ -93,6 +95,8 @@ export function BranchEditor({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(true);
+  const [isCaseValueEnabled, setIsCaseValueEnabled] = useState(false);
+  const [caseValueBands, setCaseValueBands] = useState<CaseValueBand[]>([]);
   const [questions, setQuestions] = useState<BranchQuestion[]>([]);
   const [thresholdsSelf, setThresholdsSelf] = useState<ThresholdsSelf>(DEFAULT_THRESHOLDS_SELF);
   const [thresholdsFamily, setThresholdsFamily] =
@@ -128,6 +132,7 @@ export function BranchEditor({
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as BranchDetailResponse;
       setIsActive(data.branch.is_active);
+      setIsCaseValueEnabled((data.branch as { is_case_value_enabled?: boolean }).is_case_value_enabled ?? false);
       // Prefer draft over current_version in the editor (admins want
       // to keep iterating their pending edits).
       const v = data.draft_version ?? data.current_version;
@@ -136,6 +141,7 @@ export function BranchEditor({
         setThresholdsSelf(v.classification_thresholds.self);
         setThresholdsFamily(v.classification_thresholds.family_friend);
         setOverrides(v.hard_override_toggles);
+        setCaseValueBands(v.case_value_config?.bands ?? []);
       }
       setHasDraft(data.draft_version !== null);
     } catch (e) {
@@ -192,6 +198,7 @@ export function BranchEditor({
               family_friend: thresholdsFamily,
             },
             hard_override_toggles: overrides,
+            case_value_config: caseValueBands.length > 0 ? { bands: caseValueBands } : null,
           }),
         },
       );
@@ -463,6 +470,93 @@ export function BranchEditor({
             </label>
           ))}
         </div>
+      </div>
+
+      {/* --- Case Value Estimator (025-case-value-estimator) --- */}
+      <div>
+        <div className="flex items-center gap-3 mb-3">
+          <h4 className="text-sm font-semibold text-[#171717]">Case Value Estimator</h4>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isCaseValueEnabled}
+              onChange={async (e) => {
+                const enabled = e.target.checked;
+                setIsCaseValueEnabled(enabled);
+                if (existingBranchId) {
+                  await fetch(
+                    `/api/dashboard/branches/${encodeURIComponent(caseTypeSlug)}/${encodeURIComponent(subTypeSlug)}/toggle-case-value`,
+                    {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ enabled }),
+                    },
+                  );
+                }
+              }}
+              className="h-4 w-4"
+            />
+            <span className="text-xs text-[#737373]">{isCaseValueEnabled ? 'Enabled' : 'Disabled'}</span>
+          </label>
+        </div>
+        {isCaseValueEnabled && (
+          <div className="space-y-2">
+            <p className="text-xs text-[#737373] mb-2">
+              Define dollar ranges shown on HOT/WARM/COLD leads matching this branch. Score 0–100.
+            </p>
+            {caseValueBands.map((band, i) => (
+              <div key={i} className="flex flex-wrap items-center gap-2 p-3 rounded-lg border border-[#E5E5E5] bg-[#FAFAFA]">
+                <div className="flex items-center gap-1 text-xs text-[#737373]">
+                  <span>Score</span>
+                  <input
+                    type="number" min={0} max={100} value={band.score_min}
+                    onChange={(e) => setCaseValueBands((b) => b.map((x, j) => j === i ? { ...x, score_min: Number(e.target.value) } : x))}
+                    className="w-14 px-1.5 py-1 border border-[#E5E5E5] rounded text-xs"
+                  />
+                  <span>–</span>
+                  <input
+                    type="number" min={0} max={100} value={band.score_max}
+                    onChange={(e) => setCaseValueBands((b) => b.map((x, j) => j === i ? { ...x, score_max: Number(e.target.value) } : x))}
+                    className="w-14 px-1.5 py-1 border border-[#E5E5E5] rounded text-xs"
+                  />
+                </div>
+                <div className="flex items-center gap-1 text-xs text-[#737373]">
+                  <span>→ $</span>
+                  <input
+                    type="number" min={0} value={band.value_min_usd}
+                    onChange={(e) => setCaseValueBands((b) => b.map((x, j) => j === i ? { ...x, value_min_usd: Number(e.target.value) } : x))}
+                    className="w-24 px-1.5 py-1 border border-[#E5E5E5] rounded text-xs"
+                    placeholder="min USD"
+                  />
+                  <span>–</span>
+                  <input
+                    type="number" min={0} value={band.value_max_usd}
+                    onChange={(e) => setCaseValueBands((b) => b.map((x, j) => j === i ? { ...x, value_max_usd: Number(e.target.value) } : x))}
+                    className="w-24 px-1.5 py-1 border border-[#E5E5E5] rounded text-xs"
+                    placeholder="max USD"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCaseValueBands((b) => b.filter((_, j) => j !== i))}
+                  className="text-xs text-[#EF4444] hover:text-[#DC2626] ml-auto"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setCaseValueBands((b) => [
+                ...b,
+                { score_min: 0, score_max: 100, value_min_usd: 0, value_max_usd: 0, position: b.length },
+              ])}
+              className="text-xs text-[#4338ca] hover:text-[#3730a3] font-medium"
+            >
+              + Add band
+            </button>
+          </div>
+        )}
       </div>
 
       {/* --- CSV Import UI (020-branch-csv-import) --- */}
