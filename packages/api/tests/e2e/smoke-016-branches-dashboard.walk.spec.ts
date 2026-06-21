@@ -86,16 +86,15 @@ test('@walk SMOKE 016 US4 — Edit chip weight, save draft, publish, persist to 
 
   await navigateToBranchesTab(page);
 
-  // Find the Car Accident row's "Edit branch" action and click it.
-  const carAccidentRow = page
-    .locator('div', { hasText: 'Car Accident' })
-    .locator('div', { hasText: 'Configured · Active' })
-    .first();
-  await expect(carAccidentRow).toBeVisible();
-  await page
-    .getByRole('button', { name: 'Edit branch' })
-    .first()
-    .click();
+  // Find the Car Accident BranchRow and scope the Edit button to it.
+  // Each BranchRow is a div.rounded-lg.border whose first child span carries
+  // the sub_type_label "Car Accident". Scoping prevents clicking the first
+  // "Edit branch" on the page (which belongs to Theft in Criminal Defense).
+  const carAccidentRow = page.locator('div.rounded-lg.border', {
+    has: page.locator('span.font-medium', { hasText: 'Car Accident' }),
+  }).first();
+  await expect(carAccidentRow).toBeVisible({ timeout: 15_000 });
+  await carAccidentRow.getByRole('button', { name: 'Edit branch' }).click();
 
   // The inline editor renders below the row. Wait for the question
   // count header.
@@ -104,24 +103,45 @@ test('@walk SMOKE 016 US4 — Edit chip weight, save draft, publish, persist to 
   // The seeded car-accident branch has 9 questions.
   await expect(page.getByText('Questions (9)')).toBeVisible();
 
-  // Find the "Driver" chip's weight input. The chip row has 3
-  // textboxes (label, slug) + 1 number (weight). Filter by the
-  // 'driver' slug input then walk to the sibling number input.
-  const driverSlugInput = page.locator("input[value='driver']").first();
-  await expect(driverSlugInput).toBeVisible({ timeout: 5_000 });
-  // The weight input sits two siblings down — number type, narrow
-  // width (w-16 in branch-editor.tsx).
-  const driverWeightInput = driverSlugInput
-    .locator('xpath=following-sibling::input[@type="number"]')
-    .first();
-  await expect(driverWeightInput).toBeVisible();
-  const originalWeight = await driverWeightInput.inputValue();
+  // Locate the driver chip weight input directly by its aria-label.
+  // QuestionRow renders chip inputs as `aria-label="Chip {chipIdx+1} slug"` and
+  // `aria-label="Chip {chipIdx+1} score weight"`. These labels repeat across
+  // questions, so we can't use them alone — but we can filter by expected value.
+  // The driver chip (slug='driver', weight=5) is the unique combination we need.
+  // getByRole('spinbutton') matches number inputs; filter by value via .filter().
+  // Simpler: iterate all slug inputs to find the one with value 'driver', then
+  // get the sibling score-weight input by aria-label within the same chip row.
+  //
+  // Use Playwright's evaluate to find the chip row by its current JS .value
+  // (React controlled inputs set the JS property, not the HTML attribute).
+  // Find the driver chip's weight input. Each chip row is a .chip-grid-row div
+  // containing three <label>-wrapped inputs: label text, slug text, weight number.
+  // React sets input values as JS properties (not HTML attributes), so CSS
+  // attribute selectors don't work. Instead get all chip rows, find the one
+  // whose slug input has JS value 'driver', then get its number input.
+  const chipRows = page.locator('.chip-grid-row').filter({
+    has: page.locator('input[aria-label$="slug"]'),
+  });
+  await expect(chipRows.first()).toBeVisible({ timeout: 15_000 });
+  const allRows = await chipRows.all();
+  let driverWeightInput2: import('@playwright/test').Locator | null = null;
+  for (const row of allRows) {
+    const slugInput = row.locator('input[aria-label$="slug"]').first();
+    const val = await slugInput.inputValue();
+    if (val === 'driver') {
+      driverWeightInput2 = row.locator('input[type="number"]').first();
+      break;
+    }
+  }
+  expect(driverWeightInput2, 'expected to find chip row with slug "driver"').not.toBeNull();
+  await expect(driverWeightInput2!).toBeVisible();
+  const originalWeight = await driverWeightInput2!.inputValue();
   expect(Number(originalWeight)).toBe(5); // seeded weight from spec 015
 
   // Edit: bump weight from 5 → 12. Use a deterministic value that
   // isn't a multiple of any other seeded weight so we can assert it
   // came from this test.
-  await driverWeightInput.fill('12');
+  await driverWeightInput2.fill('12');
 
   // Save the draft.
   await page.getByRole('button', { name: 'Save draft' }).click();
@@ -168,7 +188,7 @@ test('@walk SMOKE 016 US4 — Edit chip weight, save draft, publish, persist to 
   // Cleanup: revert the weight so subsequent runs aren't sticky.
   // The DB can also be reset via `pnpm db:seed`; this revert keeps
   // re-runs idempotent in the steady state.
-  await driverWeightInput.fill('5');
+  await driverWeightInput2.fill('5');
   await page.getByRole('button', { name: 'Save draft' }).click();
   await expect(page.getByText(/Saved as draft v\d+/i)).toBeVisible({
     timeout: 30_000,

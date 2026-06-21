@@ -1,0 +1,16 @@
+{
+  "_note": "Captured from main branch for behavior-equivalence smoke test (021-chat-api-latency T012). Regenerate with: pnpm --filter @legal-chatbot/api tsx scripts/dump-walk-fixtures.ts",
+  "fixture_version": "021-v1",
+  "input": {
+    "message": "I was in a car accident last week and I think the other driver was at fault.",
+    "sessionId": null
+  },
+  "expected": {
+    "assistantTextContains": ["help", "legal"],
+    "dbState": {
+      "session": {
+        "messageCount": 2
+      }
+    }
+  }
+}

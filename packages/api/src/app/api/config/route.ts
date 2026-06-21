@@ -29,13 +29,14 @@ export async function GET(req: Request) {
     );
   }
 
-  const config = await getPublishedConfig(auth.accountId);
-  if (!config) {
+  const configResult = await getPublishedConfig(auth.accountId);
+  if (!configResult) {
     return Response.json(
       { error: 'internal', message: 'No published configuration found' },
       { status: 500, headers: configCorsHeaders }
     );
   }
+  const config = configResult.config;
 
   // 010-sop-workflow T033: include SOP + chip catalogs so the widget
   // can render chips for whichever SOP step is currently pending. The

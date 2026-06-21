@@ -97,28 +97,6 @@ test('@walk SOP editor — Case Types tab expands a sub-types editor', async ({ 
   await page.getByRole('button', { name: 'Collapse' }).first().click();
 });
 
-test('@walk SOP editor — Goodbye Phrases tab adds and removes a chip', async ({ page }) => {
-  await navigateToSop(page);
-  await clickTab(page, 'Goodbye Phrases');
-
-  // Header counter.
-  await expect(page.locator("text=/Goodbye phrases \\(\\d+\\/50\\)/")).toBeVisible();
-
-  // At least 5 of the 7 seeded phrase chips visible.
-  const chips = page.locator("span.inline-flex:has(button[aria-label^='Remove'])");
-  await expect(chips.first()).toBeVisible();
-  expect(await chips.count()).toBeGreaterThanOrEqual(5);
-
-  // Add a fresh phrase.
-  const phraseInput = page.locator("input[placeholder*='thanks']").first();
-  await phraseInput.fill('walk-test phrase');
-  await page.getByRole('button', { name: 'Add' }).click();
-  await expect(page.getByText('walk-test phrase')).toBeVisible();
-
-  // Remove it again so the page is clean for the next run.
-  const removeBtn = page.locator(
-    "span.inline-flex:has(span:text-is('walk-test phrase')) >> button[aria-label^='Remove']",
-  );
-  await removeBtn.first().click();
-  await expect(page.getByText('walk-test phrase')).not.toBeVisible();
-});
+// Goodbye Phrases tab test removed — the tab is temporarily hidden in
+// sop-editor.tsx (TabButton commented out). Re-add this test when the tab
+// is re-enabled.

@@ -17,8 +17,8 @@ import { extractPartialLeadData, savePartialLead } from '../../../lib/partial-le
 import { checkRateLimit } from '../../../lib/rate-limit';
 import { initSOPState } from '../../../lib/sop/state-machine';
 import { advanceForVisitorMessage } from '../../../lib/sop/advancer';
-import { isOffTopic } from '../../../lib/sop/off-sop-detour';
 import { detectPendingContact } from '../../../lib/sop/pending-contact-detector';
+import { runAfterResponse } from '../../../lib/run-after-response';
 import {
   runBranchOrchestrator,
   type BranchOrchestratorDeps,
@@ -97,17 +97,19 @@ export async function POST(req: Request) {
   // we'll create a new session below in that case. This obsoletes
   // the previous separate `sessionExists` round trip.
   const incomingSessionId = req.headers.get('x-session-id');
-  const [config, sopBundle, body, existingSession] = await Promise.all([
+  const [configResult, sopBundle, body, existingSession] = await Promise.all([
     isPreview
-      ? getLatestConfig(auth.accountId).then((latest) => latest?.config ?? null)
+      ? getLatestConfig(auth.accountId)
       : getPublishedConfig(auth.accountId),
     getSOPBundle(auth.accountId, { isPreview }),
     bodyPromise,
     incomingSessionId ? getSessionForSOP(incomingSessionId) : Promise.resolve(null),
   ]);
-  if (!config) {
+  if (!configResult) {
     return Response.json({ error: 'internal', message: 'No published configuration found' }, { status: 500, headers: corsHeaders });
   }
+  const config = configResult.config;
+  const configVersionId = configResult.id;
   const messages = body.messages;
   if (!Array.isArray(messages) || messages.length === 0) {
     return Response.json({ error: 'bad_request', message: 'Messages array required' }, { status: 400, headers: corsHeaders });
@@ -140,10 +142,9 @@ export async function POST(req: Request) {
   }
 
   // Advance state for the latest visitor message (Phase 4 skip-detector).
-  // Capture detector matches + pre-advance pending step so the off-SOP
-  // detour detector can decide whether to add a directive to the system
-  // prompt this turn (Phase 5 / US3).
-  let isOffTopicNow = false;
+  // 021-chat-api-latency T023: removed isOffTopicNow / isOffTopic call —
+  // the static "### Off-SOP detour rule" in the system prompt handles this
+  // case without a per-turn dynamic block.
   if (sopState && sopBundle.sop) {
     const userText = typeof newUserMessage?.content === 'string'
       ? newUserMessage.content
@@ -156,14 +157,6 @@ export async function POST(req: Request) {
         message: userText,
       });
       sopState = advanced.state;
-      // Off-SOP detour signal: skip-detector found nothing AND a pending
-      // step exists AND the message has minimal keyword overlap with the
-      // pending question.
-      isOffTopicNow = isOffTopic({
-        message: userText,
-        pendingStep: advanced.pendingStepBefore,
-        skipDetectorMatches: advanced.matches,
-      });
 
       // Spec 016 US3 — sequence-safe contact stash (FR-005a).
       // Scan every visitor message for volunteered email/phone/name
@@ -205,7 +198,10 @@ export async function POST(req: Request) {
     classification: import('@legal-chatbot/shared').LeadClassification;
     reasons: string[];
   } | null = null;
-  if (sopState) {
+  // 021-chat-api-latency T024: branchDeps construction is now INSIDE
+  // if (sopState?.is_finalized) so we skip the no-op orchestrator call on
+  // every non-finalized turn (the majority of turns during an intake flow).
+  if (sopState?.is_finalized) {
     const branchDeps: BranchOrchestratorDeps = {
       lookupBranch: ({ accountId, caseTypeSlug, subTypeSlug }) =>
         lookupBranch({ accountId, caseTypeSlug, subTypeSlug }),
@@ -339,6 +335,9 @@ export async function POST(req: Request) {
     }
   }
 
+  // 021-chat-api-latency T023: pass opts to composeSystemPrompt so the static
+  // prefix is read from the in-process cache. configVersionId = the row id
+  // from getPublishedConfig / getLatestConfig (stable per published version).
   const systemPrompt =
     composeSystemPrompt(
       config,
@@ -346,8 +345,8 @@ export async function POST(req: Request) {
       sopState ?? undefined,
       sopBundle.sop ?? undefined,
       sopBundle.goodbyePhrases.length > 0 ? sopBundle.goodbyePhrases : undefined,
-      isOffTopicNow,
       sopBundle.caseTypes.length > 0 ? sopBundle.caseTypes : undefined,
+      { accountId: auth.accountId, configVersionId, isPreview },
     ) +
     (branchPromptDirective ? `\n\n${branchPromptDirective}` : '');
   const contextStoreUrl = auth.contextStoreUrl;
@@ -459,79 +458,86 @@ export async function POST(req: Request) {
       console.error('[chat] Stream error:', event.error);
     },
     onFinish: async ({ text }) => {
-      // The four post-stream writes split into two independent
-      // streams that can run in parallel:
-      //   (a) `sessions` writes: appendMessagesAndSOPState. Independent
-      //       of any `leads` write.
-      //   (b) `leads` writes: updateLeadSOPState → branch finalization
-      //       UPDATE → savePartialLead. These touch the same row so
-      //       they MUST stay sequential among themselves to avoid
-      //       races, but the whole chain can execute alongside (a).
-      // The AI SDK awaits onFinish before closing the data-stream, so
-      // shaving 30–60ms off this phase is visible to the client as a
-      // faster `done` event.
+      // 021-chat-api-latency T025: split writes into critical-path and
+      // deferred paths:
+      //   (a) CRITICAL: appendMessagesAndSOPState — awaited directly so the
+      //       sessions row is consistent before the done event fires.
+      //   (b) DEFERRED: leads chain (updateLeadSOPState → branch update →
+      //       applyAndPersistHardOverrides → savePartialLead) — wrapped in
+      //       runAfterResponse so it runs after the HTTP response is flushed.
+      //       These writes are important but not visible to the client within
+      //       the same turn, so deferring them saves 30–80 ms off the
+      //       done-event latency.
       const allMessages = [...fullMessages, { role: 'assistant', content: text }];
+      const newAssistantMessage = { role: 'assistant' as const, content: text };
 
-      const sessionsWrite = appendMessagesAndSOPState(
+      // Critical path: session write (no SELECT — uses existingHistory from
+      // the request-phase load).
+      await appendMessagesAndSOPState(
         sessionId,
-        [
-          newUserMessage,
-          { role: 'assistant', content: text },
-        ],
+        history,
+        [newUserMessage, newAssistantMessage],
         sopState,
       );
 
-      const leadsWrite = (async () => {
-        // 010-sop-workflow: backfill the lead row's sop_state_snapshot
-        // and (if eligible) incident_date with the latest SOP runtime
-        // state. Handles the case where captureLead fired earlier in
-        // the conversation before the when-step ISO date was captured.
-        // No-ops when no lead exists for the session yet.
-        await updateLeadSOPState(sessionId, sopState);
+      // Deferred path: all leads-side writes.
+      runAfterResponse(
+        async () => {
+          // 010-sop-workflow: backfill the lead row's sop_state_snapshot
+          // and (if eligible) incident_date with the latest SOP runtime
+          // state. Handles the case where captureLead fired earlier in
+          // the conversation before the when-step ISO date was captured.
+          // No-ops when no lead exists for the session yet.
+          await updateLeadSOPState(sessionId, sopState);
 
-        // Spec 016 US2 — When the branch orchestrator finalized the
-        // configured-branch flow this turn, write the snapshot + score
-        // onto the existing lead row (the agent's earlier captureLead
-        // call already created the row; we update it with branch
-        // data). No-op when this turn didn't finalize a branch.
-        if (branchFinalizationPayload) {
-          const reasonsJson = JSON.stringify(branchFinalizationPayload.reasons);
-          const branchUpdateResult = await db
-            .update(schema.leads)
-            .set({
-              branch_snapshot_json: JSON.stringify(branchFinalizationPayload.snapshot),
-              branch_incomplete: false,
-              lead_score: branchFinalizationPayload.score,
-              classification: branchFinalizationPayload.classification,
-              score_reasons_json: reasonsJson,
-            })
-            .where(eq(schema.leads.session_id, sessionId))
-            .returning({ id: schema.leads.id });
+          // Spec 016 US2 — When the branch orchestrator finalized the
+          // configured-branch flow this turn, write the snapshot + score
+          // onto the existing lead row (the agent's earlier captureLead
+          // call already created the row; we update it with branch
+          // data). No-op when this turn didn't finalize a branch.
+          if (branchFinalizationPayload) {
+            const reasonsJson = JSON.stringify(branchFinalizationPayload.reasons);
+            const branchUpdateResult = await db
+              .update(schema.leads)
+              .set({
+                branch_snapshot_json: JSON.stringify(branchFinalizationPayload.snapshot),
+                branch_incomplete: false,
+                lead_score: branchFinalizationPayload.score,
+                classification: branchFinalizationPayload.classification,
+                score_reasons_json: reasonsJson,
+              })
+              .where(eq(schema.leads.session_id, sessionId))
+              .returning({ id: schema.leads.id });
 
-          // Spec 015 T064 — apply hard-override rules to the
-          // freshly-branch-scored lead. Critical because the branch
-          // orchestrator's score / classification stage operates on
-          // chip weights only — it doesn't know about missing_contact,
-          // out_of_scope, no_injury_no_treatment, or fake_info. The
-          // override step is a downgrade-only safety net per FR-009.
-          const branchedLeadId = branchUpdateResult[0]?.id ?? null;
-          if (branchedLeadId) {
-            await applyAndPersistHardOverrides({
-              accountId: auth.accountId,
-              leadId: branchedLeadId,
-              sopState,
-            });
+            // Spec 015 T064 — apply hard-override rules to the
+            // freshly-branch-scored lead. Critical because the branch
+            // orchestrator's score / classification stage operates on
+            // chip weights only — it doesn't know about missing_contact,
+            // out_of_scope, no_injury_no_treatment, or fake_info. The
+            // override step is a downgrade-only safety net per FR-009.
+            const branchedLeadId = branchUpdateResult[0]?.id ?? null;
+            if (branchedLeadId) {
+              await applyAndPersistHardOverrides({
+                accountId: auth.accountId,
+                leadId: branchedLeadId,
+                sopState,
+              });
+            }
           }
-        }
 
-        // Extract and save partial lead data from the conversation so
-        // that information shared before an abandoned session is not
-        // lost. Early-exits when a full lead already exists.
-        const partial = extractPartialLeadData(allMessages);
-        await savePartialLead(auth.accountId, sessionId, partial, allMessages);
-      })();
-
-      await Promise.all([sessionsWrite, leadsWrite]);
+          // Extract and save partial lead data from the conversation so
+          // that information shared before an abandoned session is not
+          // lost. Early-exits when a full lead already exists.
+          const partial = extractPartialLeadData(allMessages);
+          await savePartialLead(auth.accountId, sessionId, partial, allMessages);
+        },
+        (err) =>
+          console.error('[chat] deferred-writes failed', {
+            sessionId,
+            accountId: auth.accountId,
+            err: { name: (err as Error)?.name, message: (err as Error)?.message },
+          }),
+      );
     },
   });
 

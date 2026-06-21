@@ -5,35 +5,25 @@ import type {
   SOPState,
 } from '@legal-chatbot/shared';
 import { composeSopBlock } from './sop/system-prompt-extension';
+import { getCachedStaticPrompt } from './system-prompt-cache';
 
 /**
- * Compose the chat-API system prompt for a given account configuration.
+ * Compose the static (cacheable) prefix of the chat-API system prompt.
  *
- * 010-sop-workflow Block 4 routing:
- *   - When all three SOP params (`sopState`, `sopConfig`, `goodbyePhrases`)
- *     are provided, the legacy "## Qualifying Questions" block is REPLACED
- *     by the SOP block produced by `composeSopBlock`.
- *   - When any SOP param is missing, the legacy block is rendered (preserves
- *     backward compatibility for accounts that haven't migrated to SOP yet).
+ * Contains everything that is stable per Configuration version: persona,
+ * role, practice areas, out-of-scope response, boundaries, escalation,
+ * contact, custom instructions, context-search instructions, and lead-capture
+ * instructions. Does NOT include the SOP block (which is dynamic per turn)
+ * or the incidentDate nudge (moved into composeSopBlock in T015).
  *
- * Practice-areas single-source-of-truth (019-remove-practice-areas):
- *   The "## Practice Areas (In Scope)" block is always derived from
- *   `case_types` where `is_in_scope=true`. The legacy fallback to
- *   `config.practice_areas` has been removed.
+ * Called by composeSystemPrompt through getCachedStaticPrompt so the
+ * string is produced at most once per (accountId, configVersionId, isPreview)
+ * triple within the 60 s cache TTL (021-chat-api-latency T017).
  */
-export function composeSystemPrompt(
+export function composeSystemPromptStatic(
   config: Configuration,
-  guardrailsMarkdown?: string,
-  sopState?: SOPState,
-  sopConfig?: SOPConfiguration,
-  goodbyePhrases?: string[],
-  isOffTopicNow: boolean = false,
   caseTypes?: CaseType[],
 ): string {
-  // guardrailsMarkdown is reserved for a future block 3 hook; not used today.
-  void guardrailsMarkdown;
-
-  const sopActive = !!(sopState && sopConfig && goodbyePhrases);
   const inScopeAreas = (caseTypes ?? [])
     .filter((ct) => ct.is_in_scope)
     .sort((a, b) => a.position - b.position)
@@ -98,12 +88,6 @@ export function composeSystemPrompt(
     parts.push('');
   }
 
-  // Block 4 — SOP intake state (010-sop-workflow).
-  if (sopActive) {
-    parts.push(composeSopBlock(sopState!, sopConfig!, goodbyePhrases!, isOffTopicNow));
-    parts.push('');
-  }
-
   parts.push('## Instructions for Using Context');
   parts.push('- Use the searchContext tool to find relevant information before answering questions about the firm');
   parts.push('- Only state facts that appear in the retrieved context');
@@ -118,12 +102,6 @@ export function composeSystemPrompt(
   parts.push('- Do NOT tell the visitor you are "capturing a lead" or "classifying" them — this is an internal operation');
   parts.push('- After capturing the lead, continue the conversation naturally (e.g., suggest scheduling a consultation)');
   parts.push('- IMPORTANT: If the user triggers an escalation condition, call captureLead BEFORE providing the escalation message');
-  if (sopActive) {
-    // 010-sop-workflow: when SOP is active, the runtime captures structured
-    // values that take precedence over the LLM's interpretation of conversation
-    // phrases. Direct the agent to read from the SOP block above.
-    parts.push('- IMPORTANT: When the SOP "when" step has a captured value (visible in the SOP State block above), pass that exact value as `incidentDate` — NOT a phrase paraphrased from the conversation. The captured value is already in YYYY-MM-DD form when the system was able to resolve it.');
-  }
   parts.push('- Classification guide (lead-classification revamp / spec 015):');
   parts.push('  - HOT: imminent legal urgency — recent arrest/charges, statute of limitations <30 days, active danger, ongoing medical treatment, court deadlines, restraining order/custody emergency, user requests immediate human help.');
   parts.push('  - WARM: legitimate legal matter, motivated prospect, no immediate time pressure.');
@@ -133,3 +111,58 @@ export function composeSystemPrompt(
   return parts.join('\n');
 }
 
+/**
+ * Compose the chat-API system prompt for a given account configuration.
+ *
+ * 010-sop-workflow Block 4 routing:
+ *   - When all three SOP params (`sopState`, `sopConfig`, `goodbyePhrases`)
+ *     are provided, the SOP block produced by `composeSopBlock` is appended
+ *     after the static prefix.
+ *   - When any SOP param is missing, no SOP block is added (preserves
+ *     backward compatibility for accounts that haven't migrated to SOP yet).
+ *
+ * 021-chat-api-latency: the static prefix is now read through
+ * getCachedStaticPrompt so it is computed at most once per
+ * (accountId, configVersionId, isPreview) triple within the 60 s TTL.
+ * The `opts` object is REQUIRED — pass it from the chat route.
+ *
+ * The `isOffTopicNow` parameter has been removed (021-chat-api-latency T015).
+ *
+ * Practice-areas single-source-of-truth (019-remove-practice-areas):
+ *   The "## Practice Areas (In Scope)" block is always derived from
+ *   `case_types` where `is_in_scope=true`.
+ */
+export function composeSystemPrompt(
+  config: Configuration,
+  guardrailsMarkdown?: string,
+  sopState?: SOPState,
+  sopConfig?: SOPConfiguration,
+  goodbyePhrases?: string[],
+  caseTypes?: CaseType[],
+  opts?: { accountId: string; configVersionId: string; isPreview: boolean },
+): string {
+  // guardrailsMarkdown is reserved for a future block 3 hook; not used today.
+  void guardrailsMarkdown;
+
+  const sopActive = !!(sopState && sopConfig && goodbyePhrases);
+
+  // Read the static prefix through the cache when opts are provided.
+  let staticPrefix: string;
+  if (opts) {
+    staticPrefix = getCachedStaticPrompt({
+      accountId: opts.accountId,
+      configVersionId: opts.configVersionId,
+      isPreview: opts.isPreview,
+      produce: () => composeSystemPromptStatic(config, caseTypes),
+    });
+  } else {
+    // Fallback for callers that don't yet pass opts (tests, scripts, etc.).
+    staticPrefix = composeSystemPromptStatic(config, caseTypes);
+  }
+
+  if (!sopActive) {
+    return staticPrefix;
+  }
+
+  return staticPrefix + '\n' + composeSopBlock(sopState!, sopConfig!, goodbyePhrases!);
+}

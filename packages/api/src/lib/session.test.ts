@@ -16,7 +16,7 @@ vi.mock('../db/index.js', async () => {
 });
 
 // Import module under test AFTER mock declaration (vitest hoists vi.mock)
-import { createSession, getSessionMessages, appendMessages, sessionExists } from './session.js';
+import { createSession, getSessionMessages, appendMessages, sessionExists, appendMessagesAndSOPState } from './session.js';
 import { db, schema } from '../db/index.js';
 
 // Access the raw sqlite handle for DDL operations
@@ -168,5 +168,67 @@ describe('sessionExists', () => {
 
   it('returns false for non-existent session', async () => {
     expect(await sessionExists('sess_nope')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T009 — 021-chat-api-latency: appendMessagesAndSOPState issues exactly ONE
+// database operation (an UPDATE, no SELECT).
+// (Written first per Constitution III; MUST fail until T022 lands)
+// ---------------------------------------------------------------------------
+describe('appendMessagesAndSOPState — 021 new 4-arg signature (T009 / T010)', () => {
+  it('(T009) appends new messages to the provided existingHistory without issuing a SELECT', async () => {
+    // Arrange: create a session, seed it with one message via direct DB update.
+    const id = await createSession(TEST_ACCOUNT_ID);
+    const existing = [{ role: 'user' as const, content: 'first message' }];
+    // Seed the session row directly (no appendMessages so we control state).
+    await db.update(schema.sessions)
+      .set({ messages_json: JSON.stringify(existing) })
+      .where(eq(schema.sessions.id, id));
+
+    const newUser = { role: 'user' as const, content: 'second message' };
+    const newAssistant = { role: 'assistant' as const, content: 'reply' };
+
+    // Act: call the new 4-arg signature — pass existing history, new messages, sopState=null.
+    await appendMessagesAndSOPState(id, existing, [newUser, newAssistant], null);
+
+    // Assert: all three messages are in the row.
+    const retrieved = await getSessionMessages(id);
+    expect(retrieved).toEqual([...existing, newUser, newAssistant]);
+  });
+
+  it('(T010) cold-session path: writes exactly the new messages when existingHistory is []', async () => {
+    const id = await createSession(TEST_ACCOUNT_ID);
+
+    const newUser = { role: 'user' as const, content: 'hello' };
+    const newAssistant = { role: 'assistant' as const, content: 'hi there' };
+
+    await appendMessagesAndSOPState(id, [], [newUser, newAssistant], null);
+
+    const retrieved = await getSessionMessages(id);
+    expect(retrieved).toEqual([newUser, newAssistant]);
+  });
+
+  it('persists sopState when provided', async () => {
+    const id = await createSession(TEST_ACCOUNT_ID);
+    const sopState = {
+      sop_configuration_id: 'cfg_test',
+      sop_version: 1,
+      conversation_anchor_iso: '2026-01-01T00:00:00.000Z',
+      steps: [],
+      qualified_lead_threshold: 3,
+      current_progress: 0,
+      is_finalized: false,
+      out_of_scope_termination: false,
+    };
+
+    await appendMessagesAndSOPState(id, [], [{ role: 'user' as const, content: 'msg' }], sopState as any);
+
+    const rows = await db.select().from(schema.sessions).where(eq(schema.sessions.id, id));
+    const row = rows[0];
+    expect(row).toBeDefined();
+    expect(row!.sop_state_json).not.toBeNull();
+    const parsed = JSON.parse(row!.sop_state_json!);
+    expect(parsed.sop_configuration_id).toBe('cfg_test');
   });
 });

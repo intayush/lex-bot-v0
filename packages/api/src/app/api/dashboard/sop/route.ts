@@ -26,6 +26,7 @@ import { eq, and, desc, asc } from 'drizzle-orm';
 import { db, schema } from '../../../../db';
 import { getAuthSession } from '../../../../lib/dashboard-session';
 import { getPublishedSOP } from '../../../../lib/sop-config';
+import { invalidateSystemPromptCache } from '../../../../lib/system-prompt-cache';
 import {
   validateSopStepStructure,
   validateThreshold,
@@ -215,6 +216,12 @@ async function handlePublish(accountId: string) {
     .update(schema.sopConfigurations)
     .set({ is_published: true })
     .where(and(eq(schema.sopConfigurations.id, latest.id)));
+
+  // 021-chat-api-latency T020: SOP changes affect the system prompt.
+  // Invalidate the prompt cache so live chats pick up the new SOP block
+  // immediately. (No config-cache invalidation needed; the SOP route only
+  // touches the sop_configurations table, not configurations.)
+  invalidateSystemPromptCache(accountId);
 
   return NextResponse.json({ success: true, version: latest.version });
 }

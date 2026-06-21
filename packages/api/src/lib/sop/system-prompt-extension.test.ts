@@ -260,46 +260,33 @@ describe('composeSopBlock — determinism', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 010-sop-workflow T045: off-topic-now directive (US3 detour signal)
+// 021-chat-api-latency T016: off-topic-now directive removed
+// The "### Detour required NOW" block has been removed (T015). The static
+// "### Off-SOP detour rule" continues to govern behaviour.
 // ---------------------------------------------------------------------------
 
-describe('composeSopBlock — off-topic-now directive (US3)', () => {
-  it('does NOT include the directive when isOffTopicNow=false (default)', () => {
+describe('composeSopBlock — off-topic-now directive removed (021-chat-api-latency T016)', () => {
+  it('never includes ### Detour required NOW in any state', () => {
     const sopConfig = buildSOPConfig();
     const state = initSOPState(sopConfig, ANCHOR);
+    // No isOffTopicNow param — it has been removed from the signature.
     const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES);
     expect(block).not.toContain('### Detour required NOW');
   });
 
-  it('includes the directive when isOffTopicNow=true', () => {
+  it('still includes the static ### Off-SOP detour rule', () => {
     const sopConfig = buildSOPConfig();
     const state = initSOPState(sopConfig, ANCHOR);
-    const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES, true);
-    expect(block).toContain('### Detour required NOW');
+    const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES);
+    expect(block).toContain('### Off-SOP detour rule');
   });
 
-  it('embeds the pending step\'s question verbatim in the directive', () => {
+  it('includes the incidentDate nudge when SOP is active (moved from system-prompt.ts)', () => {
     const sopConfig = buildSOPConfig();
     const state = initSOPState(sopConfig, ANCHOR);
-    const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES, true);
-    // The directive should quote the pending step's question text exactly.
-    expect(block).toMatch(/"What kind of legal matter can we help you with\?"/);
-  });
-
-  it('does NOT include the directive when SOP is finalized (no pending step to re-prompt)', () => {
-    const sopConfig = buildSOPConfig();
-    let state = initSOPState(sopConfig, ANCHOR);
-    // Capture all and finalize.
-    for (const step of state.steps) {
-      state = advanceSOP(
-        state,
-        { type: 'capture_step', step_id: step.step_id, value: 'x', capturedAt: T1 },
-        sopConfig,
-      );
-    }
-    state = advanceSOP(state, { type: 'finalize' }, sopConfig);
-    const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES, true);
-    expect(block).not.toContain('### Detour required NOW');
+    const block = composeSopBlock(state, sopConfig, DEFAULT_GOODBYES);
+    expect(block).toMatch(/SOP "when" step has a captured value/i);
+    expect(block).toContain('incidentDate');
   });
 });
 

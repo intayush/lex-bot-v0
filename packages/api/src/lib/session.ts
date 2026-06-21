@@ -86,19 +86,26 @@ export async function appendMessages(sessionId: string, messages: Message[]): Pr
 }
 
 /**
- * Persist appended messages AND the latest SOP state in a single update.
+ * Persist appended messages AND the latest SOP state in a single UPDATE.
  * The chat route's onFinish callback uses this to keep both in sync
  * (010-sop-workflow T031).
+ *
+ * 021-chat-api-latency T022: the signature now takes `existingHistory`
+ * (already read by the chat route at request time) and `newMessages` to
+ * append. This removes the internal SELECT, saving a DB round-trip on the
+ * critical path. The caller is responsible for passing the correct
+ * existingHistory — use the `history` value from the chat route's request-
+ * phase load (getSessionForSOP).
  *
  * `sopState` may be null when the account has no published SOP.
  */
 export async function appendMessagesAndSOPState(
   sessionId: string,
-  messages: Message[],
+  existingHistory: Message[],
+  newMessages: Message[],
   sopState: SOPState | null,
 ): Promise<void> {
-  const existing = await getSessionMessages(sessionId);
-  const updated = [...existing, ...messages];
+  const updated = [...existingHistory, ...newMessages];
   const now = new Date().toISOString();
 
   await db.update(schema.sessions)

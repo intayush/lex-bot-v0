@@ -45,18 +45,18 @@ function interpolateQuestionText(
   return questionText.replace(/\{case_type\}/g, capturedCaseTypeLabel);
 }
 
+/**
+ * Compose the SOP block for the chat-API system prompt.
+ *
+ * The `isOffTopicNow` parameter has been removed (021-chat-api-latency T015).
+ * The static "### Off-SOP detour rule" block below handles all detour
+ * scenarios; the dynamic per-turn directive caused token-budget overhead and
+ * has been retired.
+ */
 export function composeSopBlock(
   sopState: SOPState,
   sopConfig: SOPConfiguration,
   goodbyePhrases: readonly string[],
-  /**
-   * When true, the off-SOP detour detector flagged the CURRENT visitor
-   * message as unrelated to the pending step. The block adds a directive
-   * section nudging the agent to answer + re-prompt deterministically
-   * rather than relying on the generic "if unrelated..." rule alone
-   * (010-sop-workflow T045).
-   */
-  isOffTopicNow: boolean = false,
 ): string {
   const lines: string[] = [];
 
@@ -164,20 +164,6 @@ export function composeSopBlock(
     );
     lines.push('');
 
-    if (isOffTopicNow) {
-      lines.push('### Detour required NOW');
-      lines.push('');
-      lines.push(
-        'The visitor\'s CURRENT message is off-topic relative to the pending ' +
-        'SOP step. Do this:\n' +
-        '  1. Answer their question briefly within your guardrail boundaries.\n' +
-        '  2. End your response by asking the pending step\'s question ' +
-        `verbatim: "${interpolateQuestionText(earliestPending.question_text, capturedCaseTypeLabel)}"\n` +
-        'Do NOT skip step 2.',
-      );
-      lines.push('');
-    }
-
     lines.push('### Off-SOP detour rule');
     lines.push('');
     lines.push(
@@ -190,6 +176,15 @@ export function composeSopBlock(
   }
 
   lines.push(...composeGoodbyeRule(goodbyePhrases));
+
+  // 021-chat-api-latency: moved from system-prompt.ts static prefix so the
+  // incidentDate nudge is only present when SOP is active (this function is
+  // only called when sopActive=true). The static prefix no longer needs to be
+  // conditional on sopActive.
+  lines.push('');
+  lines.push(
+    '- IMPORTANT: When the SOP "when" step has a captured value (visible in the SOP State block above), pass that exact value as `incidentDate` — NOT a phrase paraphrased from the conversation. The captured value is already in YYYY-MM-DD form when the system was able to resolve it.',
+  );
 
   return lines.join('\n');
 }

@@ -23,7 +23,11 @@ interface CachedConfigEntry<T> {
 }
 
 const CONFIG_CACHE_TTL_MS = 60_000;
-const publishedCache = new Map<string, CachedConfigEntry<Configuration>>();
+const publishedCache = new Map<string, CachedConfigEntry<{
+  id: string;
+  version: number;
+  config: Configuration;
+}>>();
 const latestCache = new Map<
   string,
   CachedConfigEntry<{
@@ -93,7 +97,16 @@ export function invalidateConfigCache(accountId: string): void {
   latestCache.delete(accountId);
 }
 
-export async function getPublishedConfig(accountId: string): Promise<Configuration | null> {
+/**
+ * Return the published configuration row plus its stable row id and version
+ * so callers can use the id as a `configVersionId` for the system-prompt
+ * cache (021-chat-api-latency T026).
+ *
+ * Changed from `Configuration | null` → `{ id, version, config } | null`
+ * to match the shape of `getLatestConfig`. All call sites in this package
+ * now read `.config` off the result.
+ */
+export async function getPublishedConfig(accountId: string): Promise<{ id: string; version: number; config: Configuration } | null> {
   const cached = getCached(publishedCache, accountId);
   if (cached !== undefined) return cached;
 
@@ -115,8 +128,9 @@ export async function getPublishedConfig(accountId: string): Promise<Configurati
     return null;
   }
   const config = migrateConfig(JSON.parse(row.config_json) as Configuration);
-  putCached(publishedCache, accountId, config);
-  return config;
+  const value = { id: row.id, version: row.version, config };
+  putCached(publishedCache, accountId, value);
+  return value;
 }
 
 export async function getLatestConfig(accountId: string): Promise<{ id: string; version: number; isPublished: boolean; config: Configuration } | null> {

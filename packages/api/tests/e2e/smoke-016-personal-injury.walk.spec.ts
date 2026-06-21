@@ -104,7 +104,7 @@ test('@walk SMOKE 016 — Personal Injury / Car Accident HOT walk produces branc
   // Turn 6: contact form
   const contactForm = page.getByRole('form', { name: /contact/i });
   await contactForm.getByRole('textbox', { name: /name/i }).fill('Pat Driver');
-  await contactForm.getByRole('textbox', { name: /email/i }).fill('pat.driver@example.com');
+  await contactForm.getByRole('textbox', { name: /email/i }).fill('pat.driver@gmail.com');
   await contactForm.getByRole('textbox', { name: /phone/i }).fill('+15551112222');
   await contactForm.getByRole('button', { name: /submit/i }).click();
 
@@ -126,17 +126,17 @@ test('@walk SMOKE 016 — Personal Injury / Car Accident HOT walk produces branc
   // Q2 (geographic_qualification): Yes  (weight 0)
   await chipOrFreeText(page, 'Yes', 'Yes');
 
-  // Q3 (accident_timing): Today  (+20)
-  await chipOrFreeText(page, 'Today', 'Today');
-
-  // Q4 (injury): Yes  (+15)
+  // Q3 (injury): Yes  (+15)
   await chipOrFreeText(page, 'Yes', 'Yes I was injured');
 
-  // Q5 (medical_treatment): Emergency Room Visit  (+15)
+  // Q4 (medical_treatment): Emergency Room Visit  (+15)
   await chipOrFreeText(page, 'Emergency Room Visit', 'Emergency Room');
 
-  // Q6 (accident_role): Driver  (+5)
+  // Q5 (accident_role): Driver  (+5)
   await chipOrFreeText(page, 'Driver', 'I was the driver');
+
+  // Q6 (liability): The Other Driver  (+15)
+  await chipOrFreeText(page, 'The Other Driver', 'The other driver was at fault');
 
   // Q7 (insurance_activity): Requested Recorded Statement  (+15)
   await chipOrFreeText(
@@ -148,7 +148,8 @@ test('@walk SMOKE 016 — Personal Injury / Car Accident HOT walk produces branc
   // Q8 (work_impact): Missed Work  (+10)
   await chipOrFreeText(page, 'Missed Work', 'I missed work');
 
-  // Q9 (attorney_status): No  (+20)
+  // Q9 (attorney_status): No  (+15)
+  // Chip label is "No" (slug=no_lawyer, weight=15). Score total: 15+15+5+15+15+10+15 = 90 → HOT.
   await chipOrFreeText(page, 'No', "No I don't have a lawyer");
 
   // Allow the LLM final turn + persistence.

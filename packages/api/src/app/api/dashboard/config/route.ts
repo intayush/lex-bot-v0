@@ -5,6 +5,7 @@ import { db } from '../../../../db';
 import { configurations } from '../../../../db/schema';
 import { getAuthSession } from '../../../../lib/dashboard-session';
 import { getMaxVersion, invalidateConfigCache } from '../../../../lib/config';
+import { invalidateSystemPromptCache } from '../../../../lib/system-prompt-cache';
 import {
   configurationSchema,
   themeSchema,
@@ -50,6 +51,7 @@ export async function POST(req: Request) {
     // unaffected, but invalidate the latest cache so the dashboard
     // reload after save shows the new draft version immediately.
     invalidateConfigCache(session.accountId);
+    invalidateSystemPromptCache(session.accountId);
 
     return NextResponse.json({ success: true });
   }
@@ -78,6 +80,7 @@ export async function POST(req: Request) {
       .where(and(eq(configurations.id, latest.id)));
 
     invalidateConfigCache(session.accountId);
+    invalidateSystemPromptCache(session.accountId);
 
     return NextResponse.json({ success: true });
   }
@@ -165,6 +168,7 @@ export async function POST(req: Request) {
 
     // Invalidate cache so live chats see the new theme immediately.
     invalidateConfigCache(session.accountId);
+    invalidateSystemPromptCache(session.accountId);
 
     return NextResponse.json({ success: true, version: newVersion });
   }

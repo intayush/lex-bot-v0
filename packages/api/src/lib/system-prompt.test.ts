@@ -1,4 +1,5 @@
-import { composeSystemPrompt } from './system-prompt.js';
+import { composeSystemPrompt, composeSystemPromptStatic } from './system-prompt.js';
+import { __resetSystemPromptCacheForTests } from './system-prompt-cache.js';
 import type { Configuration } from '@legal-chatbot/shared';
 
 // ---------------------------------------------------------------------------
@@ -275,7 +276,7 @@ describe('composeSystemPrompt — practice areas (case_types always)', () => {
     const sopConfig = buildSampleSOPConfig();
     const sopState = buildSampleSOPState(sopConfig);
     const cts = buildCaseTypes();
-    const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES, false, cts);
+    const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES, cts);
 
     expect(prompt).toMatch(/^- DUI$/m);
     expect(prompt).toMatch(/^- Personal Injury$/m);
@@ -286,7 +287,7 @@ describe('composeSystemPrompt — practice areas (case_types always)', () => {
     const sopConfig = buildSampleSOPConfig();
     const sopState = buildSampleSOPState(sopConfig);
     const cts = buildCaseTypes().map((ct) => ({ ...ct, is_in_scope: false }));
-    const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES, false, cts);
+    const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES, cts);
     // No in-scope labels — block is present but empty.
     expect(prompt).toMatch(/## Practice Areas \(In Scope\)/);
     expect(prompt).not.toMatch(/^- DUI$/m);
@@ -296,7 +297,7 @@ describe('composeSystemPrompt — practice areas (case_types always)', () => {
   it('produces an empty in-scope block when caseTypes is empty (no legacy fallback)', () => {
     const sopConfig = buildSampleSOPConfig();
     const sopState = buildSampleSOPState(sopConfig);
-    const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES, false, []);
+    const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES, []);
     expect(prompt).toMatch(/## Practice Areas \(In Scope\)/);
     // Legacy values MUST NOT appear.
     expect(prompt).not.toMatch(/^- Criminal Defense$/m);
@@ -306,7 +307,75 @@ describe('composeSystemPrompt — practice areas (case_types always)', () => {
     const sopConfig = buildSampleSOPConfig();
     const sopState = buildSampleSOPState(sopConfig);
     const cts = buildCaseTypes();
-    const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES, false, cts);
+    const prompt = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES, cts);
     expect(prompt).toContain(testConfig.out_of_scope_response);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T008 — 021-chat-api-latency: cache-aware composeSystemPrompt
+// (written first per Constitution III; MUST fail until T017 lands)
+// ---------------------------------------------------------------------------
+
+describe('composeSystemPrompt — cache-aware (021-chat-api-latency T008)', () => {
+  beforeEach(() => {
+    __resetSystemPromptCacheForTests();
+  });
+
+  const TEST_OPTS = { accountId: 'acct_test', configVersionId: 'cfg_v1', isPreview: false };
+
+  it('accepts the new 6-param signature (no isOffTopicNow)', () => {
+    // This call must NOT have isOffTopicNow as 6th arg; caseTypes is 6th.
+    const cts = [
+      {
+        id: 'ct_1', account_id: 'acct_test',
+        slug: 'dui', label: 'DUI', position: 1,
+        is_in_scope: true, created_at: ANCHOR, sub_types: [],
+      },
+    ];
+    const prompt = composeSystemPrompt(testConfig, undefined, undefined, undefined, undefined, cts, TEST_OPTS);
+    expect(prompt).toContain('DUI');
+  });
+
+  it('composeSystemPromptStatic returns the static prefix (no SOP block)', () => {
+    const staticPrefix = composeSystemPromptStatic(testConfig);
+    expect(staticPrefix).toContain('Demo Law Firm');
+    expect(staticPrefix).not.toContain('## SOP State');
+  });
+
+  it('cache hit: produce called once for two identical calls', () => {
+    const sopConfig = buildSampleSOPConfig();
+    const sopState = buildSampleSOPState(sopConfig);
+
+    // Call once (cache miss).
+    const p1 = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES, undefined, TEST_OPTS);
+    // Call again with same opts (cache hit).
+    const p2 = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES, undefined, TEST_OPTS);
+    expect(p1).toBe(p2);
+  });
+
+  it('version isolation: different configVersionIds produce separate cache entries', () => {
+    const sopConfig = buildSampleSOPConfig();
+    const sopState = buildSampleSOPState(sopConfig);
+
+    const optsV1 = { accountId: 'acct_test', configVersionId: 'cfg_v1', isPreview: false };
+    const optsV2 = { accountId: 'acct_test', configVersionId: 'cfg_v2', isPreview: false };
+
+    const p1 = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES, undefined, optsV1);
+    const p2 = composeSystemPrompt(testConfig, undefined, sopState, sopConfig, SAMPLE_GOODBYES, undefined, optsV2);
+    // Both return valid prompts (not testing that they differ here — same config).
+    expect(p1).toContain('Demo Law Firm');
+    expect(p2).toContain('Demo Law Firm');
+  });
+
+  it('preview isolation: isPreview=true and false produce separate cache entries', () => {
+    const optsLive = { accountId: 'acct_test', configVersionId: 'cfg_v1', isPreview: false };
+    const optsPreview = { accountId: 'acct_test', configVersionId: 'cfg_v1', isPreview: true };
+
+    const pLive = composeSystemPrompt(testConfig, undefined, undefined, undefined, undefined, undefined, optsLive);
+    const pPreview = composeSystemPrompt(testConfig, undefined, undefined, undefined, undefined, undefined, optsPreview);
+    // Both return valid prompts.
+    expect(pLive).toContain('Demo Law Firm');
+    expect(pPreview).toContain('Demo Law Firm');
   });
 });

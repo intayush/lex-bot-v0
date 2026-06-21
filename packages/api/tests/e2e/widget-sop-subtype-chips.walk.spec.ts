@@ -81,7 +81,8 @@ test('@walk US1 — sub_type chips are DUI sub_types after tapping DUI (014)', a
   expect(stateAfterTurn1.pending_step_slug).toBe('sub_type');
 
   // The chip row should now show DUI's sub_types — and only those.
-  const chipGroup = page.locator(`[role='group'][aria-label='Quick reply options']`).first();
+  // ChatPanel renders chips with ariaLabel="Choose an option" (Composer.tsx:54).
+  const chipGroup = page.locator(`[role='group'][aria-label='Choose an option']`).first();
   await expect(chipGroup).toBeVisible({ timeout: 15_000 });
   const chipButtons = chipGroup.locator('button');
 
