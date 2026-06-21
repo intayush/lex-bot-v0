@@ -54,6 +54,7 @@ const sopActionSchema = z.discriminatedUnion('action', [
     action: z.literal('save'),
     qualified_lead_threshold: z.number().int().positive(),
     steps: z.array(stepDraftSchema).min(1),
+    label: z.string().max(80).nullable().optional(),
   }),
   z.object({ action: z.literal('publish') }),
   z.object({ action: z.literal('rollback'), version_id: z.string().min(1) }),
@@ -76,6 +77,7 @@ export async function GET() {
       .select({
         id: schema.sopConfigurations.id,
         version: schema.sopConfigurations.version,
+        label: schema.sopConfigurations.label,
         is_published: schema.sopConfigurations.is_published,
         created_at: schema.sopConfigurations.created_at,
       })
@@ -85,9 +87,20 @@ export async function GET() {
       .limit(20),
   ]);
 
+  // Enrich each history row with the step count for that version.
+  const history = await Promise.all(
+    allRows.map(async (row) => {
+      const stepRows = await db
+        .select({ id: schema.sopSteps.id })
+        .from(schema.sopSteps)
+        .where(eq(schema.sopSteps.sop_configuration_id, row.id));
+      return { ...row, step_count: stepRows.length };
+    }),
+  );
+
   return NextResponse.json({
     current_published: current,
-    history: allRows,
+    history,
   });
 }
 
@@ -118,7 +131,7 @@ export async function POST(req: Request) {
   }
 
   if (parsed.data.action === 'save') {
-    return handleSave(accountId, parsed.data);
+    return handleSave(accountId, { ...parsed.data, label: parsed.data.label ?? null });
   }
   if (parsed.data.action === 'publish') {
     return handlePublish(accountId);
@@ -132,7 +145,7 @@ export async function POST(req: Request) {
 
 async function handleSave(
   accountId: string,
-  data: { qualified_lead_threshold: number; steps: SopStepDraft[] },
+  data: { qualified_lead_threshold: number; steps: SopStepDraft[]; label?: string | null },
 ) {
   // Structural validation beyond Zod.
   const stepsResult = validateSopStepStructure(data.steps);
@@ -157,6 +170,10 @@ async function handleSave(
   const nowIso = new Date().toISOString();
 
   // Insert config row.
+  const saveLabel = typeof data.label === 'string' && data.label.trim().length > 0
+    ? data.label.trim().slice(0, 80)
+    : null;
+
   await db.insert(schema.sopConfigurations).values({
     id: newConfigId,
     account_id: accountId,
@@ -165,6 +182,7 @@ async function handleSave(
     is_published: false,
     derived_from_legacy: false,
     created_at: nowIso,
+    label: saveLabel,
   });
 
   // Insert step rows.

@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getAuthSession } from '../../../lib/dashboard-session';
-import { getLatestConfig } from '../../../lib/config';
+import { getLatestConfig, getConfigHistory } from '../../../lib/config';
 import { ConfigForm } from './config-form';
 import { PreviewChat } from './preview-chat';
 
@@ -10,7 +10,10 @@ export default async function ConfigPage() {
   const session = await getAuthSession();
   if (!session.accountId) redirect('/login');
 
-  const latest = await getLatestConfig(session.accountId);
+  const [latest, history] = await Promise.all([
+    getLatestConfig(session.accountId),
+    getConfigHistory(session.accountId),
+  ]);
 
   return (
     <div style={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -34,7 +37,11 @@ export default async function ConfigPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
-          <ConfigForm initialConfig={latest?.config ?? null} />
+          <ConfigForm
+            initialConfig={latest?.config ?? null}
+            history={history}
+            latestVersionId={latest?.id ?? null}
+          />
         </div>
         <div className="lg:col-span-1">
           <PreviewChat initialTheme={latest?.config.theme ?? null} />

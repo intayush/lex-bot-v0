@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { Configuration } from '@legal-chatbot/shared';
+import { VersionHistory, type VersionSummary } from './version-history';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -16,13 +17,21 @@ const defaultConfig: Configuration = {
   custom_instructions: '',
 };
 
-export function ConfigForm({ initialConfig }: { initialConfig: Configuration | null }) {
+interface ConfigFormProps {
+  initialConfig: Configuration | null;
+  history?: VersionSummary[];
+  latestVersionId?: string | null;
+}
+
+export function ConfigForm({ initialConfig, history = [], latestVersionId = null }: ConfigFormProps) {
   const [config, setConfig] = useState<Configuration>(initialConfig ?? defaultConfig);
   const [activeTab, setActiveTab] = useState(0);
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [saveResult, setSaveResult] = useState<{ success?: boolean; error?: string } | null>(null);
   const [pubResult, setPubResult] = useState<{ success?: boolean; error?: string } | null>(null);
+  const [restoring, setRestoring] = useState<string | null>(null);
+  const [draftLabel, setDraftLabel] = useState('');
 
   const tabs = ['Persona', 'Boundaries', 'Escalation', 'Contact', 'Custom'];
 
@@ -33,11 +42,12 @@ export function ConfigForm({ initialConfig }: { initialConfig: Configuration | n
       const res = await fetch('/api/dashboard/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'save', config }),
+        body: JSON.stringify({ action: 'save', config, label: draftLabel.trim() || null }),
       });
       const data = await res.json();
       setSaveResult(data);
       if (data.success) {
+        setDraftLabel('');
         // Reload to get updated version number
         setTimeout(() => window.location.reload(), 500);
       }
@@ -69,6 +79,30 @@ export function ConfigForm({ initialConfig }: { initialConfig: Configuration | n
     }
   }
 
+  async function handleRestore(versionId: string) {
+    setRestoring(versionId);
+    try {
+      const res = await fetch('/api/dashboard/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'restore', source_version_id: versionId }),
+      });
+      if (res.ok) {
+        window.location.reload();
+      }
+    } finally {
+      setRestoring(null);
+    }
+  }
+
+  async function handleLabelChange(versionId: string, label: string | null) {
+    await fetch('/api/dashboard/config/label', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ version_id: versionId, label }),
+    });
+  }
+
   return (
     <div>
       {/* Tabs */}
@@ -98,7 +132,21 @@ export function ConfigForm({ initialConfig }: { initialConfig: Configuration | n
       </div>
 
       {/* Actions */}
-      <div className="mt-6 flex gap-3 items-center">
+      <div className="mt-6 space-y-3">
+        <div className="flex gap-2 items-center">
+          <input
+            type="text"
+            value={draftLabel}
+            onChange={(e) => setDraftLabel(e.target.value.slice(0, 80))}
+            placeholder="Version label (optional)"
+            maxLength={80}
+            className="flex-1 max-w-xs px-3 py-2 text-sm rounded-lg border border-[#E5E5E5] bg-white text-[#171717] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-1 focus:ring-[#171717]"
+          />
+          {draftLabel.length > 0 && (
+            <span className="text-xs text-[#A3A3A3]">{draftLabel.length}/80</span>
+          )}
+        </div>
+        <div className="flex gap-3 items-center">
         <button
           onClick={handleSave}
           disabled={saving}
@@ -117,7 +165,22 @@ export function ConfigForm({ initialConfig }: { initialConfig: Configuration | n
         {saveResult?.error && <span className="text-[#DC2626] text-sm">{saveResult.error}</span>}
         {pubResult?.success && <span className="text-[#059669] text-sm">&#10003; Published!</span>}
         {pubResult?.error && <span className="text-[#DC2626] text-sm">{pubResult.error}</span>}
+        </div>
       </div>
+
+      {/* Version History */}
+      {history.length > 0 && (
+        <div className="mt-8">
+          <VersionHistory
+            type="config"
+            versions={history}
+            latestVersionId={latestVersionId ?? ''}
+            onRestore={handleRestore}
+            onLabelChange={handleLabelChange}
+            restoring={restoring}
+          />
+        </div>
+      )}
     </div>
   );
 }

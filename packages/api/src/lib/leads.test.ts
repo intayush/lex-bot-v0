@@ -106,6 +106,7 @@ CREATE TABLE \`sop_configurations\` (
   \`is_published\` integer DEFAULT 0 NOT NULL,
   \`derived_from_legacy\` integer DEFAULT 0 NOT NULL,
   \`created_at\` text NOT NULL,
+  \`label\` text,
   FOREIGN KEY (\`account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE no action
 );
 

@@ -159,6 +159,30 @@ export async function getLatestConfig(accountId: string): Promise<{ id: string; 
   return value;
 }
 
+export interface ConfigVersionSummary {
+  id: string;
+  version: number;
+  label: string | null;
+  is_published: boolean;
+  created_at: string;
+}
+
+export async function getConfigHistory(accountId: string): Promise<ConfigVersionSummary[]> {
+  const rows = await db
+    .select({
+      id: schema.configurations.id,
+      version: schema.configurations.version,
+      label: schema.configurations.label,
+      is_published: schema.configurations.is_published,
+      created_at: schema.configurations.created_at,
+    })
+    .from(schema.configurations)
+    .where(eq(schema.configurations.account_id, accountId))
+    .orderBy(desc(schema.configurations.version));
+
+  return rows;
+}
+
 export async function getMaxVersion(accountId: string): Promise<number> {
   const rows = await db
     .select({ version: schema.configurations.version })

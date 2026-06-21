@@ -30,6 +30,7 @@ export const configurations = sqliteTable('configurations', {
   config_json: text('config_json').notNull(),
   is_published: integer('is_published', { mode: 'boolean' }).notNull().default(false),
   created_at: text('created_at').notNull(),
+  label: text('label'),
 });
 
 export const sessions = sqliteTable('sessions', {
@@ -116,6 +117,7 @@ export const sopConfigurations = sqliteTable('sop_configurations', {
   is_published: integer('is_published', { mode: 'boolean' }).notNull().default(false),
   derived_from_legacy: integer('derived_from_legacy', { mode: 'boolean' }).notNull().default(false),
   created_at: text('created_at').notNull(),
+  label: text('label'),
 });
 
 export const sopSteps = sqliteTable('sop_steps', {

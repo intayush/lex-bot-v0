@@ -216,3 +216,33 @@ export async function getSOPBundle(
   sopBundleCache.set(key, { value, expiresAt: Date.now() + SOP_BUNDLE_TTL_MS });
   return value;
 }
+
+export interface SopVersionSummary {
+  id: string;
+  version: number;
+  label: string | null;
+  is_published: boolean;
+  created_at: string;
+  step_count: number;
+}
+
+export async function getSopHistory(accountId: string): Promise<SopVersionSummary[]> {
+  const { sql, count } = await import('drizzle-orm');
+  const rows = await db
+    .select({
+      id: schema.sopConfigurations.id,
+      version: schema.sopConfigurations.version,
+      label: schema.sopConfigurations.label,
+      is_published: schema.sopConfigurations.is_published,
+      created_at: schema.sopConfigurations.created_at,
+      step_count: count(schema.sopSteps.id),
+    })
+    .from(schema.sopConfigurations)
+    .leftJoin(schema.sopSteps, eq(schema.sopSteps.sop_configuration_id, schema.sopConfigurations.id))
+    .where(eq(schema.sopConfigurations.account_id, accountId))
+    .groupBy(schema.sopConfigurations.id)
+    .orderBy(desc(schema.sopConfigurations.version))
+    .limit(20);
+
+  return rows.map((r) => ({ ...r, step_count: r.step_count ?? 0 }));
+}
