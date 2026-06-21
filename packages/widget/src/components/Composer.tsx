@@ -108,21 +108,19 @@ export function Composer({
               flex: 1,
               padding: '12px 14px',
               borderRadius: '12px',
-              border: '1px solid var(--lc-border-subtle, rgba(31,27,22,0.06))',
-              fontSize: '16px',
+              border: '1.5px solid #E5E7EB',
+              fontSize: '14px',
               outline: 'none',
               fontFamily: 'inherit',
-              backgroundColor: 'var(--lc-background, #fcfaf5)',
-              color: 'var(--lc-text-primary, #1f1b16)',
+              backgroundColor: '#ffffff',
+              color: 'var(--lc-text-primary, #111827)',
               WebkitAppearance: 'none',
             }}
             onFocus={(e) => {
-              e.currentTarget.style.borderColor =
-                'var(--lc-primary-color, #4338ca)';
+              e.currentTarget.style.borderColor = 'var(--lc-primary-color, #4338ca)';
             }}
             onBlur={(e) => {
-              e.currentTarget.style.borderColor =
-                'var(--lc-border-subtle, rgba(31,27,22,0.06))';
+              e.currentTarget.style.borderColor = '#E5E7EB';
             }}
           />
           <button
@@ -130,23 +128,22 @@ export function Composer({
             disabled={disabled || !inputValue.trim()}
             aria-label="Send message"
             style={{
-              padding: '12px 18px',
-              borderRadius: '12px',
-              // `background` (shorthand) so a gradient set via
-              // --lc-primary-bg paints correctly. `backgroundColor`
-              // cannot hold a gradient value.
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
               background: 'var(--lc-primary-bg, #4338ca)',
               color: 'var(--lc-primary-text, #ffffff)',
               border: 'none',
               cursor: disabled || !inputValue.trim() ? 'not-allowed' : 'pointer',
-              fontSize: '14px',
-              fontWeight: 500,
               opacity: disabled || !inputValue.trim() ? 0.5 : 1,
-              minWidth: '44px',
-              minHeight: '44px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              fontSize: '16px',
             }}
           >
-            Send
+            ›
           </button>
         </form>
       )}
@@ -155,8 +152,8 @@ export function Composer({
       <div
         style={{
           padding: '8px 16px env(safe-area-inset-bottom, 8px)',
-          fontSize: '12px',
-          color: 'var(--lc-text-muted, #65604f)',
+          fontSize: '11px',
+          color: 'var(--lc-text-muted, #9CA3AF)',
           textAlign: 'center',
         }}
       >

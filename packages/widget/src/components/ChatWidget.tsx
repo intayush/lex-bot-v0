@@ -65,6 +65,7 @@ export function ChatWidget({ apiKey, apiUrl = DEFAULT_API_URL }: ChatWidgetProps
   const [isOpen, setIsOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(true);
   // Theme cascading style. Null when /api/config hasn't returned yet
   // OR when the firm hasn't customised colors — both cases fall back
   // to the indigo defaults declared in panel.css.
@@ -121,6 +122,12 @@ export function ChatWidget({ apiKey, apiUrl = DEFAULT_API_URL }: ChatWidgetProps
     }
   }, [isOpen, isMounted]);
 
+  // Auto-dismiss tooltip after 5 seconds
+  useEffect(() => {
+    const t = setTimeout(() => setShowTooltip(false), 5000);
+    return () => clearTimeout(t);
+  }, []);
+
   // Restore focus to the bubble when the panel finishes closing — but
   // only if it was actually open (we don't steal focus on mount).
   useEffect(() => {
@@ -153,7 +160,8 @@ export function ChatWidget({ apiKey, apiUrl = DEFAULT_API_URL }: ChatWidgetProps
         <ChatBubble
           ref={bubbleRef}
           isOpen={isOpen}
-          onClick={() => setIsOpen((v) => !v)}
+          showTooltip={showTooltip}
+          onClick={() => { setShowTooltip(false); setIsOpen((v) => !v); }}
         />
       )}
     </div>

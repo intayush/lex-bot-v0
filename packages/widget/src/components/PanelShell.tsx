@@ -78,6 +78,9 @@ export interface PanelShellProps {
    * the slot level.
    */
   mode?: 'floating' | 'embedded';
+
+  /** When true the panel renders at its enlarged expanded dimensions. */
+  isExpanded?: boolean;
 }
 
 type Phase = 'entering' | 'open' | 'exiting';
@@ -89,6 +92,7 @@ export function PanelShell({
   children,
   ariaLabel = 'Chat',
   mode = 'floating',
+  isExpanded = false,
 }: PanelShellProps) {
   const layout = usePanelLayout();
   const reducedMotion = useReducedMotion();
@@ -211,6 +215,7 @@ export function PanelShell({
         data-mode={mode}
         data-phase={phase}
         data-breakpoint={layout}
+        data-expanded={isExpanded ? 'true' : 'false'}
         tabIndex={-1}
         onAnimationEnd={handleAnimationEnd}
         onKeyDown={handleKeyDown}
