@@ -3,23 +3,22 @@
  *
  * Source of truth: specs/010-sop-workflow/spec.md US1 + quickstart.md US1.
  *
- * The visitor walks the full default 6-step SOP via the widget:
+ * The visitor walks the default 5-step SOP via the widget:
  *   1. Open chat → greeting + case_type chips visible
  *   2. Click DUI chip → agent advances to sub_type
  *   3. Click First Offense → agent advances to where
- *   4. Type free-text where → agent advances to what
- *   5. Type free-text what → agent advances to when
- *   6. Click Yesterday chip → agent advances to contact
- *   7. Fill the contact form → SOP finalizes; lead captured
+ *   4. Click "In Pittsburgh" chip → agent advances to when
+ *   5. Click Yesterday chip → agent advances to contact
+ *   6. Fill the contact form → SOP finalizes; lead captured
  *
  * Structural assertions only (we never assert exact agent prose):
- *   - Progress bar advances 0/6 → 6/6 over the run
+ *   - Progress bar advances 0/5 → 5/5 over the run
  *   - x-sop-state header `is_finalized` flips true at the end
  *   - leads.sop_state_snapshot is non-null and matches sopStateSchema
  *
  * Forgiveness: each step has a max-2-retries guard with disambiguation
  * follow-ups so a confused LLM doesn't fail the test on a single
- * unlucky response. Total LLM cost: ~6-10 turns × ~$0.005 each.
+ * unlucky response. Total LLM cost: ~5-8 turns × ~$0.005 each.
  *
  * @walk — runs in headed slow-mo via `pnpm e2e:walk`.
  */
@@ -55,7 +54,7 @@ async function waitForSopProgress(
 }
 
 test('@walk US1 — default SOP happy path (DUI → First Offense → ... → contact)', async ({ page }) => {
-  test.setTimeout(300_000); // ~5 min ceiling for 6 LLM turns + retries.
+  test.setTimeout(240_000); // ~4 min ceiling for 5 LLM turns + retries.
   await resetWidgetSession(page);
 
   const sopLog: SopStateHeaderPayload[] = [];
@@ -84,9 +83,6 @@ test('@walk US1 — default SOP happy path (DUI → First Offense → ... → co
 
   // -- Turn 3: where (chip) ---------------------------------------------------
   // The where step has inline chips "In Pittsburgh" / "Outside Pittsburgh".
-  // Prefer chip click (deterministic skip-detector match) over free-text to
-  // avoid keyword-overlap fragility (018-forward-only-sop removed multi-step
-  // skip detection; free-text now requires exact overlap with step question).
   try {
     await clickChip(page, 'In Pittsburgh');
   } catch {
@@ -94,27 +90,23 @@ test('@walk US1 — default SOP happy path (DUI → First Offense → ... → co
   }
   await waitForSopProgress(sopLog, 3, 'after where, current should be ≥3');
 
-  // -- Turn 4: what (free-text) ------------------------------------------------
-  await sendMessage(page, 'I was pulled over after a friend\'s party. Officer said I failed the breathalyzer.');
-  await waitForSopProgress(sopLog, 4, 'after what, current should be ≥4');
-
-  // -- Turn 5: when (chip) -----------------------------------------------------
+  // -- Turn 4: when (chip) ---------------------------------------------------
   // The when step has 7 inline chips including "Yesterday".
   try {
     await clickChip(page, 'Yesterday');
   } catch {
     await sendMessage(page, 'Yesterday');
   }
-  await waitForSopProgress(sopLog, 5, 'after when, current should be ≥5');
+  await waitForSopProgress(sopLog, 4, 'after when, current should be ≥4');
 
-  // -- Turn 6: contact form ----------------------------------------------------
+  // -- Turn 5: contact form --------------------------------------------------
   // The contact step renders a form (chip_source='contact_form') with name
   // + email + phone fields and a Submit button.
   const contactForm = page.locator("[aria-label='Contact information']");
   await expect(contactForm, 'contact form should appear after when').toBeVisible({ timeout: 30_000 });
 
   await contactForm.locator("input[placeholder='Jane Doe']").fill('Test Visitor');
-  await contactForm.locator("input[placeholder='jane@example.com']").fill('test.visitor@example.com');
+  await contactForm.locator("input[placeholder='jane@example.com']").fill('test.visitor@gmail.com');
   await contactForm.locator("input[placeholder='(555) 867-5309']").fill('(555) 867-5309');
 
   // Submit — the form button text is "Submit".
@@ -125,9 +117,7 @@ test('@walk US1 — default SOP happy path (DUI → First Offense → ... → co
   await contactForm.getByRole('button', { name: 'Submit' }).click();
   await submitPromise;
 
-  // -- Final state -------------------------------------------------------------
-  // Final turn includes longest prompt (5+ turns of history) so we allow
-  // generous time for the agent to finalize.
+  // -- Final state -----------------------------------------------------------
   await expect
     .poll(() => lastSopState(sopLog).is_finalized, {
       timeout: 90_000,
@@ -136,5 +126,5 @@ test('@walk US1 — default SOP happy path (DUI → First Offense → ... → co
     .toBe(true);
 
   bar = await readProgressBar(page);
-  expect(bar?.current ?? 0, 'final progress should be at threshold (6)').toBeGreaterThanOrEqual(6);
+  expect(bar?.current ?? 0, 'final progress should be at threshold (5)').toBeGreaterThanOrEqual(5);
 });

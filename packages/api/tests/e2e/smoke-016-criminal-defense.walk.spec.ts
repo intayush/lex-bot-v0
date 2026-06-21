@@ -122,30 +122,24 @@ test('@walk SMOKE 016 — Criminal Defense / Assault Charges takes default-only 
   await waitForSopProgress(sopLog, 2, 'sub_type should be captured (current ≥ 2)');
   await assertNoForbiddenChips(page, 'after sub_type');
 
-  // Turn 3: where.
-  await sendMessage(page, 'Pittsburgh, PA');
+  // Turn 3: where → In Pittsburgh chip.
+  await chipOrFreeText(page, 'In Pittsburgh', 'Pittsburgh, PA');
   await waitForSopProgress(sopLog, 3, 'where should be captured (current ≥ 3)');
   await assertNoForbiddenChips(page, 'after where');
 
-  // Turn 4: what.
-  await sendMessage(page, 'I had an altercation with someone outside a bar');
-  await waitForSopProgress(sopLog, 4, 'what should be captured (current ≥ 4)');
-  await assertNoForbiddenChips(page, 'after what');
-
-  // Turn 5: when — tap Today chip from the standard `when` chip set
-  // (these chips have no car-accident terms, so they're never forbidden).
+  // Turn 4: when — tap Today chip from the standard `when` chip set.
   await chipOrFreeText(page, 'Today', 'Today');
-  await waitForSopProgress(sopLog, 5, 'when should be captured (current ≥ 5)');
+  await waitForSopProgress(sopLog, 4, 'when should be captured (current ≥ 4)');
   await assertNoForbiddenChips(page, 'after when');
 
-  // Turn 6: contact form. Per spec 010 the widget renders a structured
+  // Turn 5: contact form. Per spec 010 the widget renders a structured
   // form with three labelled inputs + a Submit button. Spec 016
   // tightens the validation to "≥ 1 of email/phone"; name remains
   // optional in the visible form (the Submit button enables when at
   // least one of email/phone is filled).
   const contactForm = page.getByRole('form', { name: /contact/i });
   await contactForm.getByRole('textbox', { name: /name/i }).fill('Jane Defendant');
-  await contactForm.getByRole('textbox', { name: /email/i }).fill('jane.defendant@example.com');
+  await contactForm.getByRole('textbox', { name: /email/i }).fill('jane.defendant@gmail.com');
   await contactForm.getByRole('textbox', { name: /phone/i }).fill('+15551234567');
   await contactForm.getByRole('button', { name: /submit/i }).click();
 

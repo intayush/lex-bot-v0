@@ -100,7 +100,7 @@ export async function publicConfig(request: APIRequestContext): Promise<PublicCo
  */
 export const DEFAULT_SIX_STEP_SOP = {
   action: 'save' as const,
-  qualified_lead_threshold: 6,
+  qualified_lead_threshold: 5,
   steps: [
     {
       slug: 'case_type',
@@ -126,25 +126,18 @@ export const DEFAULT_SIX_STEP_SOP = {
       slug: 'where',
       position: 3,
       question_text: 'Where did this happen?',
-      chip_source: null,
-      inline_chips_json: null,
-      accepts_free_text: true,
-      is_required: true,
-      counts_toward_threshold: true,
-    },
-    {
-      slug: 'what',
-      position: 4,
-      question_text: 'Can you briefly tell us what happened?',
-      chip_source: null,
-      inline_chips_json: null,
+      chip_source: 'inline',
+      inline_chips_json: JSON.stringify([
+        { label: 'In Pittsburgh', slug: 'in_pittsburgh' },
+        { label: 'Outside Pittsburgh', slug: 'outside_pittsburgh' },
+      ]),
       accepts_free_text: true,
       is_required: true,
       counts_toward_threshold: true,
     },
     {
       slug: 'when',
-      position: 5,
+      position: 4,
       question_text: 'When did this happen?',
       chip_source: 'inline',
       inline_chips_json: JSON.stringify([
@@ -162,7 +155,7 @@ export const DEFAULT_SIX_STEP_SOP = {
     },
     {
       slug: 'contact',
-      position: 6,
+      position: 5,
       question_text: "What's your name and how can we reach you?",
       chip_source: 'contact_form',
       inline_chips_json: null,
@@ -175,7 +168,7 @@ export const DEFAULT_SIX_STEP_SOP = {
 
 /**
  * Best-effort cleanup. Saves a fresh default SOP and publishes it so
- * the dev account ends back at "6 steps, threshold 6, published".
+ * the dev account ends back at "5 steps, threshold 5, published".
  * Called from `test.afterAll`.
  */
 export async function restoreDefaultSop(request: APIRequestContext): Promise<void> {

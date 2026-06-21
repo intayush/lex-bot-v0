@@ -89,19 +89,15 @@ test('@walk SMOKE 016 — Personal Injury / Car Accident HOT walk produces branc
   await chipOrFreeText(page, 'Car Accident', 'It was a car accident');
   await waitForSopProgress(sopLog, 2, 'sub_type ≥ 2');
 
-  // Turn 3: where
-  await sendMessage(page, 'Pittsburgh, PA');
+  // Turn 3: where → In Pittsburgh (chip)
+  await chipOrFreeText(page, 'In Pittsburgh', 'Pittsburgh, PA');
   await waitForSopProgress(sopLog, 3, 'where ≥ 3');
 
-  // Turn 4: what
-  await sendMessage(page, 'Other driver ran a red light and hit my car');
-  await waitForSopProgress(sopLog, 4, 'what ≥ 4');
-
-  // Turn 5: when → Today (chip)
+  // Turn 4: when → Today (chip)
   await chipOrFreeText(page, 'Today', 'Today');
-  await waitForSopProgress(sopLog, 5, 'when ≥ 5');
+  await waitForSopProgress(sopLog, 4, 'when ≥ 4');
 
-  // Turn 6: contact form
+  // Turn 5: contact form
   const contactForm = page.getByRole('form', { name: /contact/i });
   await contactForm.getByRole('textbox', { name: /name/i }).fill('Pat Driver');
   await contactForm.getByRole('textbox', { name: /email/i }).fill('pat.driver@gmail.com');
