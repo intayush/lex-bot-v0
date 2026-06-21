@@ -163,8 +163,8 @@ export function MessageList({
                 className="lc-message"
                 data-variant="assistant"
                 style={{
-                  fontSize: '16px',
-                  lineHeight: '1.6',
+                  fontSize: '14px',
+                  lineHeight: '1.55',
                   color: 'var(--lc-text-primary, #111827)',
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-word',

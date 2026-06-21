@@ -382,8 +382,8 @@ function ChatPanelInner({
       {/* Large bold heading — matches reference design */}
       <div
         style={{
-          fontSize: '22px',
-          fontWeight: 700,
+          fontSize: '18px',
+          fontWeight: 600,
           color: '#111827',
           lineHeight: '1.3',
           marginBottom: '8px',

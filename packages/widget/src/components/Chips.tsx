@@ -52,7 +52,7 @@ export function Chips({ chips, onSelect, ariaLabel }: ChipsProps) {
             border: '2px solid var(--lc-primary-color, #4338ca)',
             background: 'transparent',
             color: 'var(--lc-primary-color, #4338ca)',
-            fontSize: '14px',
+            fontSize: '13px',
             cursor: 'pointer',
             transition: 'background 0.15s, color 0.15s',
             fontFamily: 'inherit',
