@@ -44,6 +44,29 @@ function captureSlugFromState(state: SOPState, slug: string): string | null {
 const manifestCache = new Map<string, { manifest: Manifest; fetchedAt: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+// In-process cache for branch versions. Branch versions are immutable once
+// published — their questions_json / thresholds never change. A 60s TTL
+// matches the config/SOP cache and is sufficient to cover a full branch
+// flow (typically 3-9 turns), saving one Neon round-trip per turn.
+const BRANCH_VERSION_CACHE_TTL = 60_000;
+const BRANCH_VERSION_CACHE_MAX = 128;
+const branchVersionCache = new Map<string, { value: ReturnType<typeof parseBranchVersionRow> | null; expiresAt: number }>();
+
+function parseBranchVersionRow(row: typeof schema.branchVersions.$inferSelect) {
+  return {
+    id: row.id,
+    branch_id: row.branch_id,
+    version_number: row.version_number,
+    is_published: row.is_published,
+    questions: JSON.parse(row.questions_json),
+    classification_thresholds: JSON.parse(row.classification_thresholds_json),
+    hard_override_toggles: JSON.parse(row.hard_override_toggles_json),
+    published_at: row.published_at === null ? null : Number(new Date(row.published_at)),
+    created_at: Number(new Date(row.created_at)),
+    created_by_user_id: row.created_by_user_id,
+  };
+}
+
 async function getCachedManifest(contextStoreUrl: string): Promise<Manifest> {
   const cached = manifestCache.get(contextStoreUrl);
   if (cached && Date.now() - cached.fetchedAt < CACHE_TTL) {
@@ -206,25 +229,23 @@ export async function POST(req: Request) {
       lookupBranch: ({ accountId, caseTypeSlug, subTypeSlug }) =>
         lookupBranch({ accountId, caseTypeSlug, subTypeSlug }),
       getVersionById: async (versionId) => {
+        const cached = branchVersionCache.get(versionId);
+        if (cached && Date.now() < cached.expiresAt) return cached.value;
+
         const rows = await db
           .select()
           .from(schema.branchVersions)
           .where(eq(schema.branchVersions.id, versionId))
           .limit(1);
         const row = rows[0];
-        if (!row) return null;
-        return {
-          id: row.id,
-          branch_id: row.branch_id,
-          version_number: row.version_number,
-          is_published: row.is_published,
-          questions: JSON.parse(row.questions_json),
-          classification_thresholds: JSON.parse(row.classification_thresholds_json),
-          hard_override_toggles: JSON.parse(row.hard_override_toggles_json),
-          published_at: row.published_at === null ? null : Number(new Date(row.published_at)),
-          created_at: Number(new Date(row.created_at)),
-          created_by_user_id: row.created_by_user_id,
-        };
+        const value = row ? parseBranchVersionRow(row) : null;
+
+        // Evict oldest entry when at capacity.
+        if (branchVersionCache.size >= BRANCH_VERSION_CACHE_MAX) {
+          branchVersionCache.delete(branchVersionCache.keys().next().value!);
+        }
+        branchVersionCache.set(versionId, { value, expiresAt: Date.now() + BRANCH_VERSION_CACHE_TTL });
+        return value;
       },
       now: () => Date.now(),
       sessionId: sessionId ?? undefined,
@@ -232,46 +253,30 @@ export async function POST(req: Request) {
       // weights to the orchestrator so it can score the captured
       // date bucket at finalize-time. Resolved from the live SOP
       // config (no DB round-trip).
-      whenChipWeights: (() => {
+      // Parse whenStep chips once; both weight maps share the result.
+      ...(() => {
         const whenStep = sopBundle.sop?.steps.find((s) => s.slug === 'when');
-        if (!whenStep?.inline_chips_json) return {};
+        const empty = { whenChipWeights: {} as Record<string, number>, whenChipWeightsByLabel: {} as Record<string, number> };
+        if (!whenStep?.inline_chips_json) return empty;
         try {
           const chips = JSON.parse(whenStep.inline_chips_json) as Array<{
             slug: string;
-            score_weight?: number;
-          }>;
-          const map: Record<string, number> = {};
-          for (const c of chips) {
-            if (typeof c.score_weight === 'number') map[c.slug] = c.score_weight;
-          }
-          return map;
-        } catch {
-          return {};
-        }
-      })(),
-      // Companion to `whenChipWeights` keyed by lowercased chip
-      // label. Required because the default SOP advancer's
-      // date-inferer overwrites the captured chip slug with an
-      // ISO date — the chip slug is unrecoverable from the SOP
-      // state at branch-finalize-time, but the chip label is
-      // preserved on `state.steps[when].captured_label`.
-      whenChipWeightsByLabel: (() => {
-        const whenStep = sopBundle.sop?.steps.find((s) => s.slug === 'when');
-        if (!whenStep?.inline_chips_json) return {};
-        try {
-          const chips = JSON.parse(whenStep.inline_chips_json) as Array<{
             label?: string;
             score_weight?: number;
           }>;
-          const map: Record<string, number> = {};
+          const whenChipWeights: Record<string, number> = {};
+          const whenChipWeightsByLabel: Record<string, number> = {};
           for (const c of chips) {
-            if (typeof c.score_weight === 'number' && typeof c.label === 'string') {
-              map[c.label.toLowerCase()] = c.score_weight;
+            if (typeof c.score_weight === 'number') {
+              whenChipWeights[c.slug] = c.score_weight;
+              if (typeof c.label === 'string') {
+                whenChipWeightsByLabel[c.label.toLowerCase()] = c.score_weight;
+              }
             }
           }
-          return map;
+          return { whenChipWeights, whenChipWeightsByLabel };
         } catch {
-          return {};
+          return empty;
         }
       })(),
       // Suppress branch-question presentation on goodbye turns so
