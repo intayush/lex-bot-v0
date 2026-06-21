@@ -27,7 +27,10 @@ export const configurations = pgTable('configurations', {
   config_json: text('config_json').notNull(),
   is_published: boolean('is_published').notNull().default(false),
   created_at: text('created_at').notNull(),
-});
+  label: text('label'),
+}, (table) => [
+  uniqueIndex('configurations_account_version_unique').on(table.account_id, table.version),
+]);
 
 export const sessions = pgTable('sessions', {
   id: text('id').primaryKey(),
@@ -171,6 +174,7 @@ export const sopConfigurations = pgTable('sop_configurations', {
   is_published: boolean('is_published').notNull().default(false),
   derived_from_legacy: boolean('derived_from_legacy').notNull().default(false),
   created_at: text('created_at').notNull(),
+  label: text('label'),
 }, (table) => [
   uniqueIndex('sop_configurations_account_version_unique').on(table.account_id, table.version),
 ]);

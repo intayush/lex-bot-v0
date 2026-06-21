@@ -29,6 +29,7 @@ import { GoodbyePhrasesTab } from './goodbye-phrases-tab';
 import { BranchesTab } from './branches-tab';
 import { useIsMounted } from './use-is-mounted';
 import type { BranchPairSummary } from '@legal-chatbot/shared';
+import { VersionHistory, type VersionSummary } from '../config/version-history';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -41,6 +42,8 @@ interface SopEditorProps {
   initialCaseTypes: CaseType[];
   initialGoodbyePhrases: string[];
   initialBranchPairs: BranchPairSummary[];
+  sopHistory?: VersionSummary[];
+  latestSopVersionId?: string | null;
 }
 
 interface ResultMessage {
@@ -57,8 +60,35 @@ export function SopEditor({
   initialCaseTypes,
   initialGoodbyePhrases,
   initialBranchPairs,
+  sopHistory = [],
+  latestSopVersionId = null,
 }: SopEditorProps) {
   const [activeTab, setActiveTab] = useState<TabId>('steps');
+  const [restoring, setRestoring] = useState<string | null>(null);
+
+  async function handleSopRestore(versionId: string) {
+    setRestoring(versionId);
+    try {
+      const res = await fetch('/api/dashboard/sop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'rollback', version_id: versionId }),
+      });
+      if (res.ok) {
+        window.location.reload();
+      }
+    } finally {
+      setRestoring(null);
+    }
+  }
+
+  async function handleSopLabelChange(versionId: string, label: string | null) {
+    await fetch('/api/dashboard/sop/label', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ version_id: versionId, label }),
+    });
+  }
 
   return (
     <div>
@@ -85,6 +115,20 @@ export function SopEditor({
       {activeTab === 'case_types' && <CaseTypesTab initialCaseTypes={initialCaseTypes} />}
       {activeTab === 'branches' && <BranchesTab initialPairs={initialBranchPairs} />}
       {/* {activeTab === 'goodbye_phrases' && <GoodbyePhrasesTab initialPhrases={initialGoodbyePhrases} />} */}
+
+      {/* Version History */}
+      {sopHistory.length > 0 && (
+        <div className="mt-8">
+          <VersionHistory
+            type="sop"
+            versions={sopHistory}
+            latestVersionId={latestSopVersionId ?? ''}
+            onRestore={handleSopRestore}
+            onLabelChange={handleSopLabelChange}
+            restoring={restoring}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -155,6 +199,7 @@ function StepsTab({ initialSop }: { initialSop: SOPConfiguration | null }) {
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [result, setResult] = useState<ResultMessage | null>(null);
+  const [draftLabel, setDraftLabel] = useState('');
   const isMounted = useIsMounted();
 
   const sensors = useSensors(
@@ -215,6 +260,7 @@ function StepsTab({ initialSop }: { initialSop: SOPConfiguration | null }) {
           action: 'save',
           qualified_lead_threshold: threshold,
           steps,
+          label: draftLabel.trim() || null,
         }),
       });
       const data = await res.json();
@@ -330,7 +376,21 @@ function StepsTab({ initialSop }: { initialSop: SOPConfiguration | null }) {
       )}
 
       {/* Actions */}
-      <div className="mt-8 pt-6 border-t border-[#F5F5F5] flex gap-3 items-center flex-wrap">
+      <div className="mt-8 pt-6 border-t border-[#F5F5F5] space-y-3">
+        <div className="flex gap-2 items-center">
+          <input
+            type="text"
+            value={draftLabel}
+            onChange={(e) => setDraftLabel(e.target.value.slice(0, 80))}
+            placeholder="Version label (optional)"
+            maxLength={80}
+            className="flex-1 max-w-xs px-3 py-2 text-sm rounded-lg border border-[#E5E5E5] bg-white text-[#171717] placeholder:text-[#A3A3A3] focus:outline-none focus:ring-1 focus:ring-[#171717]"
+          />
+          {draftLabel.length > 0 && (
+            <span className="text-xs text-[#A3A3A3]">{draftLabel.length}/80</span>
+          )}
+        </div>
+        <div className="flex gap-3 items-center flex-wrap">
         <button
           onClick={handleSave}
           disabled={saving || publishing}
@@ -355,6 +415,7 @@ function StepsTab({ initialSop }: { initialSop: SOPConfiguration | null }) {
             {result.message}
           </span>
         )}
+        </div>
       </div>
       <p className="text-xs text-[#A3A3A3] mt-3">
         Save creates a new draft version. Publish makes the latest saved version

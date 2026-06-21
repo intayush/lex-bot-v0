@@ -1,16 +1,35 @@
 import { NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
 import { eq, and, desc } from 'drizzle-orm';
+import { z } from 'zod';
 import { db } from '../../../../db';
 import { configurations } from '../../../../db/schema';
 import { getAuthSession } from '../../../../lib/dashboard-session';
-import { getMaxVersion, invalidateConfigCache } from '../../../../lib/config';
+import { getMaxVersion, getConfigHistory, invalidateConfigCache } from '../../../../lib/config';
 import { invalidateSystemPromptCache } from '../../../../lib/system-prompt-cache';
 import {
   configurationSchema,
   themeSchema,
   type Configuration,
 } from '@legal-chatbot/shared';
+
+// ---------------------------------------------------------------------------
+// GET → version history list
+// ---------------------------------------------------------------------------
+
+export async function GET() {
+  const session = await getAuthSession();
+  if (!session.accountId) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
+
+  const versions = await getConfigHistory(session.accountId);
+  return NextResponse.json({ versions });
+}
+
+// ---------------------------------------------------------------------------
+// POST → save | publish | save_theme | restore
+// ---------------------------------------------------------------------------
 
 export async function POST(req: Request) {
   const session = await getAuthSession();
@@ -19,7 +38,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { action, config: rawConfig, theme: rawTheme } = body;
+  const { action, config: rawConfig, theme: rawTheme, label: rawLabel } = body;
 
   if (action === 'save') {
     if (!rawConfig) {
@@ -38,6 +57,10 @@ export async function POST(req: Request) {
     config.version = newVersion;
     config.saved_at = new Date().toISOString();
 
+    const saveLabel = typeof rawLabel === 'string' && rawLabel.trim().length > 0
+      ? rawLabel.trim().slice(0, 80)
+      : null;
+
     await db.insert(configurations).values({
       id: nanoid(),
       account_id: session.accountId,
@@ -45,6 +68,7 @@ export async function POST(req: Request) {
       config_json: JSON.stringify(config),
       is_published: false,
       created_at: new Date().toISOString(),
+      label: saveLabel,
     });
 
     // Drafts aren't read by /api/config so the published cache is
@@ -171,6 +195,43 @@ export async function POST(req: Request) {
     invalidateSystemPromptCache(session.accountId);
 
     return NextResponse.json({ success: true, version: newVersion });
+  }
+
+  if (action === 'restore') {
+    const parsed = z.object({ source_version_id: z.string().min(1) }).safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'source_version_id is required' }, { status: 400 });
+    }
+
+    const sourceRows = await db
+      .select()
+      .from(configurations)
+      .where(and(
+        eq(configurations.id, parsed.data.source_version_id),
+        eq(configurations.account_id, session.accountId),
+      ))
+      .limit(1);
+
+    if (!sourceRows[0]) {
+      return NextResponse.json({ error: 'not_found' }, { status: 404 });
+    }
+
+    const newVersion = (await getMaxVersion(session.accountId)) + 1;
+
+    await db.insert(configurations).values({
+      id: nanoid(),
+      account_id: session.accountId,
+      version: newVersion,
+      config_json: sourceRows[0].config_json,
+      is_published: false,
+      created_at: new Date().toISOString(),
+      label: null,
+    });
+
+    invalidateConfigCache(session.accountId);
+    invalidateSystemPromptCache(session.accountId);
+
+    return NextResponse.json({ success: true, new_version: newVersion });
   }
 
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
