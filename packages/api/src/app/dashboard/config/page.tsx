@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation';
 import { getAuthSession } from '../../../lib/dashboard-session';
 import { getLatestConfig, getConfigHistory } from '../../../lib/config';
+import { getAttorneys } from '../../../lib/attorneys';
+import { getCaseTypes } from '../../../lib/sop-config';
 import { ConfigForm } from './config-form';
 import { PreviewChat } from './preview-chat';
 
@@ -10,9 +12,11 @@ export default async function ConfigPage() {
   const session = await getAuthSession();
   if (!session.accountId) redirect('/login');
 
-  const [latest, history] = await Promise.all([
+  const [latest, history, attorneys, caseTypes] = await Promise.all([
     getLatestConfig(session.accountId),
     getConfigHistory(session.accountId),
+    getAttorneys(session.accountId),
+    getCaseTypes(session.accountId),
   ]);
 
   return (
@@ -41,6 +45,8 @@ export default async function ConfigPage() {
             initialConfig={latest?.config ?? null}
             history={history}
             latestVersionId={latest?.id ?? null}
+            initialAttorneys={attorneys}
+            caseTypes={caseTypes}
           />
         </div>
         <div className="lg:col-span-1">

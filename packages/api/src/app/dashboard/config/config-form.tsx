@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import type { Configuration } from '@legal-chatbot/shared';
+import type { Configuration, CaseType } from '@legal-chatbot/shared';
 import { VersionHistory, type VersionSummary } from './version-history';
+import { AttorneysTab } from './attorneys-tab';
+import type { Attorney } from '../../../lib/attorneys';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -21,9 +23,11 @@ interface ConfigFormProps {
   initialConfig: Configuration | null;
   history?: VersionSummary[];
   latestVersionId?: string | null;
+  initialAttorneys?: Attorney[];
+  caseTypes?: CaseType[];
 }
 
-export function ConfigForm({ initialConfig, history = [], latestVersionId = null }: ConfigFormProps) {
+export function ConfigForm({ initialConfig, history = [], latestVersionId = null, initialAttorneys = [], caseTypes = [] }: ConfigFormProps) {
   const [config, setConfig] = useState<Configuration>(initialConfig ?? defaultConfig);
   const [activeTab, setActiveTab] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -33,7 +37,7 @@ export function ConfigForm({ initialConfig, history = [], latestVersionId = null
   const [restoring, setRestoring] = useState<string | null>(null);
   const [draftLabel, setDraftLabel] = useState('');
 
-  const tabs = ['Persona', 'Boundaries', 'Escalation', 'Contact', 'Custom'];
+  const tabs = ['Persona', 'Boundaries', 'Escalation', 'Contact', 'Custom', 'Attorneys'];
 
   async function handleSave() {
     setSaving(true);
@@ -129,8 +133,11 @@ export function ConfigForm({ initialConfig, history = [], latestVersionId = null
         {activeTab === 2 && <EscalationSection config={config} setConfig={setConfig} />}
         {activeTab === 3 && <ContactSection config={config} setConfig={setConfig} />}
         {activeTab === 4 && <CustomSection config={config} setConfig={setConfig} />}
+        {activeTab === 5 && <AttorneysTab initialAttorneys={initialAttorneys} caseTypes={caseTypes} />}
       </div>
 
+      {/* Actions — hidden on Attorneys tab (no config save needed) */}
+      {activeTab === 5 ? null : null /* placeholder to preserve structure */}
       {/* Actions */}
       <div className="mt-6 space-y-3">
         <div className="flex gap-2 items-center">

@@ -105,6 +105,29 @@ export const notifications = sqliteTable('notifications', {
   delivery_channel: text('delivery_channel').notNull().default('dashboard'),
   delivered_at: text('delivered_at'),
   created_at: text('created_at').notNull(),
+  attorney_id: text('attorney_id'),
+});
+
+// ---------------------------------------------------------------------------
+// 024-attorney-routing: SQLite mirror for tests
+// ---------------------------------------------------------------------------
+
+export const attorneys = sqliteTable('attorneys', {
+  id: text('id').primaryKey(),
+  account_id: text('account_id').notNull().references(() => accounts.id),
+  name: text('name').notNull(),
+  email: text('email').notNull(),
+  mobile: text('mobile'),
+  created_at: text('created_at').notNull(),
+  updated_at: text('updated_at').notNull(),
+});
+
+export const attorneyCaseTypeAssignments = sqliteTable('attorney_case_type_assignments', {
+  id: text('id').primaryKey(),
+  attorney_id: text('attorney_id').notNull().references(() => attorneys.id),
+  account_id: text('account_id').notNull().references(() => accounts.id),
+  case_type_slug: text('case_type_slug').notNull(),
+  created_at: text('created_at').notNull(),
 });
 
 // ---------------------------------------------------------------------------

@@ -50,6 +50,13 @@
       "when": 1782046444630,
       "tag": "0006_add_lead_reverted_at",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1782059296650,
+      "tag": "0007_add_attorney_tables",
+      "breakpoints": true
     }
   ]
 }
