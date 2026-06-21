@@ -26,15 +26,18 @@
 import { NextResponse } from 'next/server';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
+import { z } from 'zod';
 
 import { db, schema } from '../../../../db';
 import { getAuthSession } from '../../../../lib/dashboard-session';
 import {
   branchSaveRequestSchema,
+  caseValueConfigSchema,
   type BranchPairSummary,
   type BranchSaveResponse,
   type BranchSaveWarning,
   type BranchVersion,
+  type CaseValueConfig,
 } from '@legal-chatbot/shared';
 
 // ---------------------------------------------------------------------------
@@ -47,6 +50,8 @@ export interface BranchRow {
   case_type_slug: string;
   sub_type_slug: string;
   is_active: boolean;
+  /** 025-case-value-estimator: case-type-level toggle. */
+  is_case_value_enabled?: boolean;
   current_version_id: string | null;
   created_at: string;
   updated_at: string;
@@ -60,6 +65,8 @@ export interface BranchVersionRow {
   questions_json: string;
   classification_thresholds_json: string;
   hard_override_toggles_json: string;
+  /** 025-case-value-estimator: optional JSON-encoded CaseValueConfig. */
+  case_value_config_json?: string | null;
   published_at: string | null;
   created_at: string;
   created_by_user_id: string;
@@ -340,6 +347,15 @@ function notFound() {
  * dashboard receives ready-to-render payloads.
  */
 function hydrateVersion(row: BranchVersionRow): BranchVersion {
+  let case_value_config: CaseValueConfig | null = null;
+  if (row.case_value_config_json) {
+    try {
+      const parsed = caseValueConfigSchema.safeParse(JSON.parse(row.case_value_config_json));
+      if (parsed.success) case_value_config = parsed.data;
+    } catch {
+      // Malformed JSON — treat as unconfigured
+    }
+  }
   return {
     id: row.id,
     branch_id: row.branch_id,
@@ -352,6 +368,7 @@ function hydrateVersion(row: BranchVersionRow): BranchVersion {
     hard_override_toggles: JSON.parse(
       row.hard_override_toggles_json,
     ) as BranchVersion['hard_override_toggles'],
+    case_value_config,
     published_at: row.published_at === null ? null : Number(new Date(row.published_at)),
     created_at: Number(new Date(row.created_at)),
     created_by_user_id: row.created_by_user_id,
@@ -499,6 +516,7 @@ export async function handleGetBranchDetail(
         case_type_slug: branch.case_type_slug,
         sub_type_slug: branch.sub_type_slug,
         is_active: branch.is_active,
+        is_case_value_enabled: branch.is_case_value_enabled ?? false,
       },
       current_version: currentVersion ? hydrateVersion(currentVersion) : null,
       draft_version: draftVersion ? hydrateVersion(draftVersion) : null,
@@ -576,6 +594,14 @@ export async function handleSaveBranch(
   // Create a new draft version on top.
   const versionId = deps.newId();
   const versionNumber = (await deps.getMaxVersionNumber(branchId)) + 1;
+  // 025-case-value-estimator: persist case_value_config if provided in the request body
+  const bodyWithCv = rawBody as Record<string, unknown>;
+  let caseValueConfigJson: string | null = null;
+  if (bodyWithCv.case_value_config !== undefined && bodyWithCv.case_value_config !== null) {
+    const cvParsed = caseValueConfigSchema.safeParse(bodyWithCv.case_value_config);
+    if (cvParsed.success) caseValueConfigJson = JSON.stringify(cvParsed.data);
+  }
+
   await deps.insertBranchVersion({
     id: versionId,
     branch_id: branchId,
@@ -584,6 +610,7 @@ export async function handleSaveBranch(
     questions_json: JSON.stringify(body.questions),
     classification_thresholds_json: JSON.stringify(body.classification_thresholds),
     hard_override_toggles_json: JSON.stringify(body.hard_override_toggles),
+    case_value_config_json: caseValueConfigJson,
     published_at: null,
     created_at: ts,
     created_by_user_id: deps.currentUserId({ accountId }),
@@ -682,3 +709,41 @@ export async function handleDeleteBranch(
   return new NextResponse(null, { status: 204 });
 }
 
+
+// ---------------------------------------------------------------------------
+// POST /api/dashboard/branches/[caseType]/[subType]/toggle-case-value
+// 025-case-value-estimator: toggles is_case_value_enabled without a new version
+// ---------------------------------------------------------------------------
+
+export async function handleToggleCaseValue(
+  req: Request,
+  params: { caseType: string; subType: string },
+  deps: BranchesDeps,
+): Promise<Response> {
+  const session = await deps.getAuthSession();
+  if (!session.accountId) return unauthorized();
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return badRequest('Invalid JSON body.');
+  }
+
+  const parsed = z.object({ enabled: z.boolean() }).safeParse(body);
+  if (!parsed.success) return badRequest('enabled (boolean) is required.');
+
+  const branch = await deps.findBranchByPair({
+    accountId: session.accountId,
+    caseTypeSlug: params.caseType,
+    subTypeSlug: params.subType,
+  });
+  if (!branch) return notFound();
+
+  await db
+    .update(schema.branches)
+    .set({ is_case_value_enabled: parsed.data.enabled, updated_at: deps.now().toISOString() })
+    .where(eq(schema.branches.id, branch.id));
+
+  return NextResponse.json({ success: true });
+}

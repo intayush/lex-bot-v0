@@ -57,6 +57,13 @@
       "when": 1782059296650,
       "tag": "0007_add_attorney_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782078704397,
+      "tag": "0008_add_case_value_estimator",
+      "breakpoints": true
     }
   ]
 }

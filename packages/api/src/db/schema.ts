@@ -338,6 +338,12 @@ export const branches = pgTable('branches', {
   sub_type_slug: text('sub_type_slug').notNull(),
   is_active: boolean('is_active').notNull().default(true),
   /**
+   * 025-case-value-estimator: case-type-level on/off toggle.
+   * When false, no value badge is shown for leads of this branch.
+   * Separate from the versioned config so toggling off doesn't lose bands.
+   */
+  is_case_value_enabled: boolean('is_case_value_enabled').notNull().default(false),
+  /**
    * FK is declared as a plain text column without a hard reference
    * to `branch_versions.id` to break the circular dependency
    * (branches → branch_versions → branches). The migration's data
@@ -372,6 +378,11 @@ export const branchVersions = pgTable('branch_versions', {
   classification_thresholds_json: text('classification_thresholds_json').notNull(),
   /** JSON-encoded `HardOverridesEnabled`. */
   hard_override_toggles_json: text('hard_override_toggles_json').notNull(),
+  /**
+   * 025-case-value-estimator: optional JSON-encoded `CaseValueConfig`.
+   * Null when case value estimation is not configured for this version.
+   */
+  case_value_config_json: text('case_value_config_json'),
   published_at: text('published_at'),
   created_at: text('created_at').notNull(),
   created_by_user_id: text('created_by_user_id').notNull(),

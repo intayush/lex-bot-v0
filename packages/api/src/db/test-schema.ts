@@ -203,6 +203,8 @@ export const branches = sqliteTable('branches', {
   case_type_slug: text('case_type_slug').notNull(),
   sub_type_slug: text('sub_type_slug').notNull(),
   is_active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  /** 025-case-value-estimator: case-type-level toggle. */
+  is_case_value_enabled: integer('is_case_value_enabled', { mode: 'boolean' }).notNull().default(false),
   current_version_id: text('current_version_id'),
   created_at: text('created_at').notNull(),
   updated_at: text('updated_at').notNull(),
@@ -216,6 +218,8 @@ export const branchVersions = sqliteTable('branch_versions', {
   questions_json: text('questions_json').notNull(),
   classification_thresholds_json: text('classification_thresholds_json').notNull(),
   hard_override_toggles_json: text('hard_override_toggles_json').notNull(),
+  /** 025-case-value-estimator: optional JSON-encoded CaseValueConfig. */
+  case_value_config_json: text('case_value_config_json'),
   published_at: text('published_at'),
   created_at: text('created_at').notNull(),
   created_by_user_id: text('created_by_user_id').notNull(),

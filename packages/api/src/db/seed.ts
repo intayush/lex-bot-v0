@@ -105,12 +105,38 @@ export async function seedSopForAccount(accountId: string): Promise<void> {
   // from spec 015 (FR-016).
   const branchId = nanoid();
   const versionId = nanoid();
+  // 025-case-value-estimator: case value configurations for Personal Injury branches.
+  // Values are US industry-standard settlement estimates.
+  const PI_CASE_VALUE_CONFIGS: Record<string, string> = {
+    car_accident: JSON.stringify({ bands: [
+      { score_min: 76, score_max: 100, value_min_usd: 75000,  value_max_usd: 250000, position: 0 },
+      { score_min: 51, score_max: 75,  value_min_usd: 15000,  value_max_usd: 75000,  position: 1 },
+      { score_min: 26, score_max: 50,  value_min_usd: 3000,   value_max_usd: 15000,  position: 2 },
+    ]}),
+    slip_fall: JSON.stringify({ bands: [
+      { score_min: 76, score_max: 100, value_min_usd: 50000,  value_max_usd: 150000, position: 0 },
+      { score_min: 51, score_max: 75,  value_min_usd: 10000,  value_max_usd: 50000,  position: 1 },
+      { score_min: 26, score_max: 50,  value_min_usd: 2000,   value_max_usd: 10000,  position: 2 },
+    ]}),
+    medical_malpractice: JSON.stringify({ bands: [
+      { score_min: 76, score_max: 100, value_min_usd: 200000,  value_max_usd: 1000000, position: 0 },
+      { score_min: 51, score_max: 75,  value_min_usd: 50000,   value_max_usd: 200000,  position: 1 },
+      { score_min: 26, score_max: 50,  value_min_usd: 10000,   value_max_usd: 50000,   position: 2 },
+    ]}),
+    dog_bite: JSON.stringify({ bands: [
+      { score_min: 76, score_max: 100, value_min_usd: 30000,  value_max_usd: 100000, position: 0 },
+      { score_min: 51, score_max: 75,  value_min_usd: 8000,   value_max_usd: 30000,  position: 1 },
+      { score_min: 26, score_max: 50,  value_min_usd: 1500,   value_max_usd: 8000,   position: 2 },
+    ]}),
+  };
+
   await db.insert(schema.branches).values({
     id: branchId,
     account_id: accountId,
     case_type_slug: 'personal_injury',
     sub_type_slug: 'car_accident',
     is_active: true,
+    is_case_value_enabled: true,
     current_version_id: versionId,
     created_at: now,
     updated_at: now,
@@ -123,6 +149,7 @@ export async function seedSopForAccount(accountId: string): Promise<void> {
     questions_json: CAR_ACCIDENT_BRANCH_QUESTIONS_JSON,
     classification_thresholds_json: CAR_ACCIDENT_BRANCH_THRESHOLDS_JSON,
     hard_override_toggles_json: CAR_ACCIDENT_BRANCH_HARD_OVERRIDES_JSON,
+    case_value_config_json: PI_CASE_VALUE_CONFIGS.car_accident,
     published_at: now,
     created_at: now,
     created_by_user_id: 'system_seed_016',
@@ -135,12 +162,15 @@ export async function seedSopForAccount(accountId: string): Promise<void> {
   for (const seed of DEFAULT_BRANCH_SEEDS) {
     const seededBranchId = nanoid();
     const seededVersionId = nanoid();
+    const isPiBranch = seed.case_type_slug === 'personal_injury' &&
+      PI_CASE_VALUE_CONFIGS[seed.sub_type_slug] !== undefined;
     await db.insert(schema.branches).values({
       id: seededBranchId,
       account_id: accountId,
       case_type_slug: seed.case_type_slug,
       sub_type_slug: seed.sub_type_slug,
       is_active: true,
+      is_case_value_enabled: isPiBranch,
       current_version_id: seededVersionId,
       created_at: now,
       updated_at: now,
@@ -153,6 +183,7 @@ export async function seedSopForAccount(accountId: string): Promise<void> {
       questions_json: seed.questions_json,
       classification_thresholds_json: seed.classification_thresholds_json,
       hard_override_toggles_json: seed.hard_override_toggles_json,
+      case_value_config_json: PI_CASE_VALUE_CONFIGS[seed.sub_type_slug] ?? null,
       published_at: now,
       created_at: now,
       created_by_user_id: 'system_seed_017',
