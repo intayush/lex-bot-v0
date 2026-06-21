@@ -79,6 +79,7 @@ CREATE TABLE \`leads\` (
   \`branch_snapshot_json\` text,
   \`branch_incomplete\` integer DEFAULT 0 NOT NULL,
   \`created_at\` text NOT NULL,
+  \`reverted_at\` text,
   FOREIGN KEY (\`account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE no action,
   FOREIGN KEY (\`session_id\`) REFERENCES \`sessions\`(\`id\`) ON UPDATE no action ON DELETE no action
 );

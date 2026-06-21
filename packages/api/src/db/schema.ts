@@ -132,6 +132,14 @@ export const leads = pgTable('leads', {
    */
   branch_incomplete: boolean('branch_incomplete').notNull().default(false),
   created_at: text('created_at').notNull(),
+  /**
+   * ISO 8601 timestamp set when a visitor re-submits contact info after an
+   * undo, replacing the previous submission. Non-null means the lead row
+   * has been superseded in-place and the prior contact data was overwritten.
+   * Soft-delete marker for the dashboard (reverted leads show a "Re-submitted"
+   * badge rather than appearing as fresh leads).
+   */
+  reverted_at: text('reverted_at'),
 });
 
 export const archivedData = pgTable('archived_data', {

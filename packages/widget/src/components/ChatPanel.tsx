@@ -335,13 +335,17 @@ function ChatPanelInner({
 
   // Derived: show chips/contact-form trailing slot when either:
   // (a) the assistant just spoke (normal mid-SOP state), OR
-  // (b) no messages yet but we have chips ready (greeting screen).
+  // (b) no messages yet but we have chips ready (greeting screen), OR
+  // (c) the contact step is still pending — ensures the form reappears
+  //     after undo even when there is no assistant message at the tail
+  //     (undo pops client messages but sopState tracks server state).
   const showSOPTrailing =
     !isLoading
     && !isLoadingHistory
     && (
       (messages.length > 0 && messages[messages.length - 1]?.role === 'assistant')
       || (messages.length === 0 && activeChips.length > 0)
+      || (sopState?.pending_step_slug === 'contact' && !sopState?.is_finalized)
     );
 
   // SOP chips render in the conversation trailing slot (NOT the

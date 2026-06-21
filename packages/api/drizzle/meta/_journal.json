@@ -43,6 +43,13 @@
       "when": 1782040630811,
       "tag": "0005_add_version_labels",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782046444630,
+      "tag": "0006_add_lead_reverted_at",
+      "breakpoints": true
     }
   ]
 }

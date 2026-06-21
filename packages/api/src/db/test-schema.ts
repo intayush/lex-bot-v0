@@ -80,6 +80,8 @@ export const leads = sqliteTable('leads', {
   /** Spec 016 — true for partial-branch leads (FR-011a / FR-011b). */
   branch_incomplete: integer('branch_incomplete', { mode: 'boolean' }).notNull().default(false),
   created_at: text('created_at').notNull(),
+  /** Set when visitor re-submits contact info after undo (soft-delete marker). */
+  reverted_at: text('reverted_at'),
 });
 
 export const archivedData = sqliteTable('archived_data', {

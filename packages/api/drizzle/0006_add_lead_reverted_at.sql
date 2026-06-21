@@ -1,0 +1,1 @@
+ALTER TABLE "leads" ADD COLUMN "reverted_at" text;

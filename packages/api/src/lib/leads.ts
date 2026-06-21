@@ -396,6 +396,8 @@ export async function captureLead(input: CaptureLeadInput): Promise<{ leadId: st
         classification_rationale: input.classificationRationale,
         urgency_factors_json: JSON.stringify(input.urgencyFactors),
         sop_state_snapshot: input.sopState ? JSON.stringify(input.sopState) : null,
+        // Mark as re-submitted: prior contact data was replaced by the visitor.
+        reverted_at: now,
         // Spec 015 — rule-based scoring fields. NULL on the LLM
         // fallback path (computeScoringFields returned
         // NULL_SCORING_RESULT) and on pre-finalize invocations.
