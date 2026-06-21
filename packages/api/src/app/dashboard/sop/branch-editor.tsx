@@ -252,9 +252,23 @@ export function BranchEditor({
         `/api/dashboard/branches/${encodeURIComponent(caseTypeSlug)}/${encodeURIComponent(subTypeSlug)}/import`,
         { method: 'POST', body: fd },
       );
-      const data = await res.json() as { ok: boolean; questions?: BranchQuestion[]; errors?: Array<{ row: number; column: string; message: string }> };
+      const data = await res.json() as {
+        ok: boolean;
+        questions?: BranchQuestion[];
+        caseValueConfig?: { caseValueEnabled: boolean | null; bands: CaseValueBand[] } | null;
+        errors?: Array<{ row: number; column: string; message: string }>;
+      };
       if (data.ok && data.questions) {
         setImportedQuestions(data.questions);
+        // 025-case-value-estimator: pre-fill case value bands from CSV import
+        if (data.caseValueConfig) {
+          if (data.caseValueConfig.bands.length > 0) {
+            setCaseValueBands(data.caseValueConfig.bands);
+          }
+          if (data.caseValueConfig.caseValueEnabled !== null) {
+            setIsCaseValueEnabled(data.caseValueConfig.caseValueEnabled);
+          }
+        }
         setImportState('preview');
       } else {
         setImportErrors(data.errors ?? []);
@@ -287,6 +301,7 @@ export function BranchEditor({
             questions: importedQuestions,
             classification_thresholds: { self: thresholdsSelf, family_friend: thresholdsFamily },
             hard_override_toggles: overrides,
+            case_value_config: caseValueBands.length > 0 ? { bands: caseValueBands } : null,
           }),
         },
       );

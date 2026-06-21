@@ -76,7 +76,14 @@ export async function POST(req: Request, _ctx: RouteContext) {
   }
 
   return Response.json(
-    { ok: true, questions: result.questions, warnings: [] },
+    {
+      ok: true,
+      questions: result.questions,
+      // 025-case-value-estimator: include parsed case value config so the
+      // branch editor preview can pre-fill the band editor.
+      caseValueConfig: result.caseValueConfig ?? null,
+      warnings: [],
+    },
     { status: 200, headers: corsHeaders },
   );
 }

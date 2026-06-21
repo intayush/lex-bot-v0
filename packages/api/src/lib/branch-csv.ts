@@ -3,7 +3,8 @@
  * No I/O, no DB, no HTTP — fully unit-testable.
  */
 import { nanoid } from 'nanoid';
-import type { BranchQuestion } from '@legal-chatbot/shared';
+import type { BranchQuestion, CaseValueBand } from '@legal-chatbot/shared';
+import { caseValueBandSchema } from '@legal-chatbot/shared';
 
 export interface CsvError {
   /** 1-indexed row number (header = row 1, first data row = row 2). */
@@ -24,8 +25,14 @@ const REQUIRED_COLUMNS = [
 
 type RequiredColumn = (typeof REQUIRED_COLUMNS)[number];
 
+export interface CaseValueParseResult {
+  /** null when the [CASE_VALUE] section is absent (not an error). */
+  caseValueEnabled: boolean | null;
+  bands: CaseValueBand[];
+}
+
 type ParseResult =
-  | { ok: true; questions: BranchQuestion[] }
+  | { ok: true; questions: BranchQuestion[]; caseValueConfig: CaseValueParseResult | null }
   | { ok: false; errors: CsvError[] };
 
 // ---------------------------------------------------------------------------
@@ -38,8 +45,13 @@ export function parseAndValidateCsv(rawCsv: string): ParseResult {
   // Strip UTF-8 BOM if present.
   const csv = rawCsv.startsWith('\xEF\xBB\xBF') ? rawCsv.slice(3) : rawCsv;
 
-  // Normalize line endings.
-  const lines = csv.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  // Normalize line endings and split into all lines.
+  const allLines = csv.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+
+  // Split the file into the question section and the optional [CASE_VALUE] section.
+  const caseValueSectionStart = allLines.findIndex((l) => l.trim() === '[CASE_VALUE]');
+  const lines = caseValueSectionStart === -1 ? allLines : allLines.slice(0, caseValueSectionStart);
+  const caseValueLines = caseValueSectionStart === -1 ? null : allLines.slice(caseValueSectionStart + 1);
 
   if (lines.length === 0) {
     return { ok: false, errors: [{ row: 1, column: 'file', message: 'The file is empty.' }] };
@@ -223,14 +235,87 @@ export function parseAndValidateCsv(rawCsv: string): ParseResult {
       multi_select: q.multiSelect,
     }));
 
-  return { ok: true, questions };
+  // Parse optional [CASE_VALUE] section.
+  const caseValueConfig = caseValueLines ? parseCaseValueSection(caseValueLines) : null;
+
+  return { ok: true, questions, caseValueConfig };
+}
+
+// ---------------------------------------------------------------------------
+// parseCaseValueSection
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse the lines after `[CASE_VALUE]` into a CaseValueParseResult.
+ * Expected format:
+ *   case_value_enabled,YES   ← optional
+ *   score_min,score_max,value_min_usd,value_max_usd   ← header row
+ *   76,100,75000,250000   ← band rows
+ *   ...
+ */
+function parseCaseValueSection(lines: string[]): CaseValueParseResult {
+  const dataLines = lines.filter((l) => l.trim().length > 0 && !l.trim().startsWith('#'));
+
+  let caseValueEnabled: boolean | null = null;
+  let headerIdx = -1;
+  let i = 0;
+
+  // Look for optional case_value_enabled row.
+  if (i < dataLines.length) {
+    const first = dataLines[i]!.trim().toLowerCase();
+    if (first.startsWith('case_value_enabled,')) {
+      const val = first.split(',')[1]?.trim().toUpperCase();
+      caseValueEnabled = val === 'YES' ? true : val === 'NO' ? false : null;
+      i++;
+    }
+  }
+
+  // Look for header row.
+  if (i < dataLines.length) {
+    const h = dataLines[i]!.trim().toLowerCase();
+    if (h.includes('score_min') && h.includes('score_max')) {
+      headerIdx = i;
+      i++;
+    }
+  }
+
+  if (headerIdx === -1) {
+    // No header found — return with whatever enabled state we found, empty bands.
+    return { caseValueEnabled, bands: [] };
+  }
+
+  const bands: CaseValueBand[] = [];
+  for (; i < dataLines.length; i++) {
+    const cells = dataLines[i]!.split(',').map((c) => c.trim());
+    if (cells.length < 4) continue;
+    const [scoreMinStr, scoreMaxStr, valueMinStr, valueMaxStr] = cells;
+    const raw = {
+      score_min: parseInt(scoreMinStr ?? '', 10),
+      score_max: parseInt(scoreMaxStr ?? '', 10),
+      value_min_usd: parseInt(valueMinStr ?? '', 10),
+      value_max_usd: parseInt(valueMaxStr ?? '', 10),
+      position: bands.length,
+    };
+    const parsed = caseValueBandSchema.safeParse(raw);
+    if (parsed.success) {
+      bands.push(parsed.data);
+    }
+    // Invalid rows are silently skipped — per spec, row-level errors are
+    // reported during import validation, not during template generation.
+  }
+
+  return { caseValueEnabled, bands };
 }
 
 // ---------------------------------------------------------------------------
 // generateTemplateCsv
 // ---------------------------------------------------------------------------
 
-export function generateTemplateCsv(caseTypeSlug: string, subTypeSlug: string): string {
+export function generateTemplateCsv(
+  caseTypeSlug: string,
+  subTypeSlug: string,
+  existingCaseValueConfig?: { enabled: boolean; bands: CaseValueBand[] } | null,
+): string {
   // The slugs are accepted as parameters for future use (e.g., dynamic templates).
   void caseTypeSlug;
   void subTypeSlug;
@@ -250,6 +335,23 @@ export function generateTemplateCsv(caseTypeSlug: string, subTypeSlug: string): 
     '3,Has an insurance company contacted you?,YES,NO,No,insurance_not_contacted,0',
     '3,Has an insurance company contacted you?,YES,NO,Not sure,insurance_not_sure,0',
   ];
+
+  // Append [CASE_VALUE] section.
+  rows.push('');
+  rows.push('[CASE_VALUE]');
+  if (existingCaseValueConfig) {
+    rows.push(`case_value_enabled,${existingCaseValueConfig.enabled ? 'YES' : 'NO'}`);
+    rows.push('score_min,score_max,value_min_usd,value_max_usd');
+    for (const band of existingCaseValueConfig.bands) {
+      rows.push(`${band.score_min},${band.score_max},${band.value_min_usd},${band.value_max_usd}`);
+    }
+  } else {
+    rows.push('# case_value_enabled,YES');
+    rows.push('# score_min,score_max,value_min_usd,value_max_usd');
+    rows.push('# 76,100,75000,250000');
+    rows.push('# 51,75,15000,75000');
+    rows.push('# 26,50,3000,15000');
+  }
 
   return rows.join('\n');
 }
