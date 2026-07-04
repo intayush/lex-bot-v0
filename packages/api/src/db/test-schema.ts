@@ -40,6 +40,8 @@ export const sessions = sqliteTable('sessions', {
   is_preview: integer('is_preview', { mode: 'boolean' }).notNull().default(false),
   /** SOP runtime state (010-sop-workflow). JSON-serialized SOPState. */
   sop_state_json: text('sop_state_json'),
+  /** Undo stack (2026-07-04 conversation rollback). JSON-encoded SOPStateHistory. */
+  sop_state_history_json: text('sop_state_history_json'),
   created_at: text('created_at').notNull(),
   updated_at: text('updated_at').notNull(),
 });

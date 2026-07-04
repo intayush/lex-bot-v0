@@ -41,6 +41,7 @@ CREATE TABLE \`sessions\` (
   \`messages_json\` text DEFAULT '[]' NOT NULL,
   \`is_preview\` integer DEFAULT 0 NOT NULL,
   \`sop_state_json\` text,
+  \`sop_state_history_json\` text,
   \`created_at\` text NOT NULL,
   \`updated_at\` text NOT NULL,
   FOREIGN KEY (\`account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE no action

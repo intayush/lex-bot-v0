@@ -44,6 +44,14 @@ export const sessions = pgTable('sessions', {
    * state yet.
    */
   sop_state_json: text('sop_state_json'),
+  /**
+   * Undo stack (2026-07-04 conversation rollback). JSON-encoded
+   * SOPStateHistory (max 10 snapshots) per
+   * `packages/shared/src/schemas/sop.ts → sopStateHistorySchema`.
+   * Each entry captures state ENTERING a turn so undo can restore it.
+   * Null for sessions that predate this feature.
+   */
+  sop_state_history_json: text('sop_state_history_json'),
   created_at: text('created_at').notNull(),
   updated_at: text('updated_at').notNull(),
 });
