@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     // currency symbols) to \uXXXX. The widget's useSOPState JSON.parses this
     // and restores the original characters transparently.
     const json = JSON.stringify(sopState);
-    const ascii = json.replace(/[-￿]/g, (ch) =>
+    const ascii = json.replace(/[\u0080-\uffff]/g, (ch) =>
       '\\u' + ch.charCodeAt(0).toString(16).padStart(4, '0'));
     headers.set('x-sop-state', ascii);
   }
