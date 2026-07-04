@@ -317,11 +317,9 @@ function ChatPanelInner({
     onCloseRequest();
   };
 
-  // Undo: authoritative server-side rewind of one exchange. Calls
-  // POST /api/chat/undo (via sessionAwareFetch so x-session-id is
-  // attached), then replaces local messages AND SOP state from the
-  // response so client and server agree. Await the response — no
-  // optimistic pop (undo is deliberate and low-frequency).
+  // Undo: authoritative server-side rewind of one exchange. Awaits the
+  // /api/chat/undo response and replaces local messages + SOP state from
+  // it (no optimistic pop) so client and server agree.
   const [isUndoing, setIsUndoing] = useState(false);
   async function handleUndo() {
     if (isUndoing) return;
@@ -340,7 +338,7 @@ function ChatPanelInner({
         messages: typeof messages;
         sopState: unknown;
       };
-      setMessages(data.messages);
+      setMessages(data.messages.map((m, i) => ({ ...(m as any), id: (m as any).id ?? `undo_${i}` })));
       onSOPResponse(res); // reuse the header-based SOP state update path
     } catch {
       // Network error — leave local state untouched; user can retry.
@@ -598,7 +596,7 @@ function ChatPanelInner({
         }}
         inputValue={input}
         onInputChange={handleInputChange}
-        disabled={isLoading || isLoadingHistory}
+        disabled={isLoading || isLoadingHistory || isUndoing}
       />
     </PanelShell>
   );

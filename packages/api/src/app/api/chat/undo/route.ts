@@ -50,7 +50,7 @@ export async function POST(req: Request) {
   }
 
   const [result, caseTypes] = await Promise.all([
-    revertLastTurn(sessionId),
+    revertLastTurn(sessionId, auth.accountId),
     getCaseTypes(auth.accountId),
   ]);
 

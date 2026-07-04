@@ -156,11 +156,12 @@ export async function sessionExists(sessionId: string): Promise<boolean> {
  * truncate messages_json to the snapshot's message_count, and soft-delete
  * the lead that turn created (if any). Idempotent no-op on an empty stack.
  *
- * Ordered sequential writes (neon-http has no interactive transactions).
- * The widget disables the undo button in-flight, so there is one writer
- * per session during an undo.
+ * Ordered sequential writes (neon-http has no interactive transactions):
+ * lead soft-delete FIRST (crash-safe), then session update. The widget
+ * disables the undo button in-flight, so there is one writer per session
+ * during an undo.
  */
-export async function revertLastTurn(sessionId: string): Promise<{
+export async function revertLastTurn(sessionId: string, accountId: string): Promise<{
   messages: Message[];
   sopState: SOPState | null;
 }> {
@@ -180,6 +181,9 @@ export async function revertLastTurn(sessionId: string): Promise<{
     catch { currentSop = null; }
   }
 
+  // Authorization: never rewind a session that isn't this account's.
+  if (row.account_id !== accountId) return { messages, sopState: currentSop };
+
   // Parse the undo stack.
   let stack: SOPStateHistory = [];
   if (row.sop_state_history_json) {
@@ -197,6 +201,15 @@ export async function revertLastTurn(sessionId: string): Promise<{
   const restoredSop = snapshot.sop_state;
   const now = new Date().toISOString();
 
+  // Soft-delete the lead FIRST (crash-safe): if we die before the session
+  // write, the stack is intact and a retry undo completes; reverted_at is
+  // idempotent. (neon-http has no interactive transactions.)
+  if (snapshot.lead_id) {
+    await db.update(schema.leads)
+      .set({ reverted_at: now })
+      .where(eq(schema.leads.id, snapshot.lead_id));
+  }
+
   await db.update(schema.sessions)
     .set({
       messages_json: JSON.stringify(restoredMessages),
@@ -205,13 +218,6 @@ export async function revertLastTurn(sessionId: string): Promise<{
       updated_at: now,
     })
     .where(eq(schema.sessions.id, sessionId));
-
-  // Soft-delete the lead this turn created (option B).
-  if (snapshot.lead_id) {
-    await db.update(schema.leads)
-      .set({ reverted_at: now })
-      .where(eq(schema.leads.id, snapshot.lead_id));
-  }
 
   return { messages: restoredMessages, sopState: restoredSop };
 }

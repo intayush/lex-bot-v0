@@ -349,7 +349,7 @@ describe('revertLastTurn', () => {
       makeSopState(2), makeSopState(1), null,
     );
 
-    const res = await revertLastTurn(id);
+    const res = await revertLastTurn(id, TEST_ACCOUNT_ID);
     expect(res.messages).toHaveLength(2);          // back to after turn 1
     expect(res.sopState?.current_progress).toBe(1); // prior state restored
 
@@ -361,7 +361,7 @@ describe('revertLastTurn', () => {
 
   it('is a no-op on an empty stack', async () => {
     const id = await createSession(TEST_ACCOUNT_ID);
-    const res = await revertLastTurn(id);
+    const res = await revertLastTurn(id, TEST_ACCOUNT_ID);
     expect(res.messages).toEqual([]);
     expect(res.sopState).toBeNull();
   });
@@ -374,7 +374,7 @@ describe('revertLastTurn', () => {
     }).run();
     await appendMessagesAndSOPState(id, [] as any, [] as any, makeSopState(1), null, 'lead_1');
 
-    await revertLastTurn(id);
+    await revertLastTurn(id, TEST_ACCOUNT_ID);
 
     const lead = (db as any).select().from(schema.leads)
       .where(eq(schema.leads.id, 'lead_1')).get();
@@ -388,8 +388,35 @@ describe('revertLastTurn', () => {
       [{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }] as any,
       makeSopState(1), null, null,   // prior state = null (fresh)
     );
-    const res = await revertLastTurn(id);
+    const res = await revertLastTurn(id, TEST_ACCOUNT_ID);
     expect(res.messages).toEqual([]);
     expect(res.sopState).toBeNull();
+  });
+
+  it('refuses to undo when accountId does not match session owner', async () => {
+    const id = await createSession(TEST_ACCOUNT_ID);
+    // Set up a session with two turns.
+    await appendMessagesAndSOPState(
+      id, [] as any,
+      [{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }] as any,
+      makeSopState(1), null, 'lead_x',
+    );
+    await appendMessagesAndSOPState(
+      id,
+      [{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }] as any,
+      [{ role: 'user', content: 'c' }, { role: 'assistant', content: 'd' }] as any,
+      makeSopState(2), makeSopState(1), null,
+    );
+
+    // Attempt undo with wrong account_id.
+    const res = await revertLastTurn(id, 'acct_wrong');
+    // Should be a no-op: returns current state (4 messages), does not pop stack.
+    expect(res.messages).toHaveLength(4);
+    expect(res.sopState?.current_progress).toBe(2);
+
+    // Verify stack is unchanged (2 snapshots).
+    const row = (db as any).select().from(schema.sessions)
+      .where(eq(schema.sessions.id, id)).get();
+    expect(JSON.parse(row.sop_state_history_json)).toHaveLength(2);
   });
 });
