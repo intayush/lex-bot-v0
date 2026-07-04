@@ -150,3 +150,68 @@ export async function sessionExists(sessionId: string): Promise<boolean> {
     .where(eq(schema.sessions.id, sessionId));
   return !!rows[0];
 }
+
+/**
+ * Undo one exchange: pop the top snapshot, restore sop_state_json,
+ * truncate messages_json to the snapshot's message_count, and soft-delete
+ * the lead that turn created (if any). Idempotent no-op on an empty stack.
+ *
+ * Ordered sequential writes (neon-http has no interactive transactions).
+ * The widget disables the undo button in-flight, so there is one writer
+ * per session during an undo.
+ */
+export async function revertLastTurn(sessionId: string): Promise<{
+  messages: Message[];
+  sopState: SOPState | null;
+}> {
+  const rows = await db
+    .select()
+    .from(schema.sessions)
+    .where(eq(schema.sessions.id, sessionId));
+  const row = rows[0];
+  if (!row) return { messages: [], sopState: null };
+
+  const messages = JSON.parse(row.messages_json) as Message[];
+
+  // Parse the current SOP state (for the no-op return path).
+  let currentSop: SOPState | null = null;
+  if (row.sop_state_json) {
+    try { currentSop = sopStateSchema.parse(JSON.parse(row.sop_state_json)); }
+    catch { currentSop = null; }
+  }
+
+  // Parse the undo stack.
+  let stack: SOPStateHistory = [];
+  if (row.sop_state_history_json) {
+    try { stack = sopStateHistorySchema.parse(JSON.parse(row.sop_state_history_json)); }
+    catch { stack = []; }
+  }
+
+  // Empty stack → nothing to undo.
+  if (stack.length === 0) {
+    return { messages, sopState: currentSop };
+  }
+
+  const snapshot = stack.pop()!;
+  const restoredMessages = messages.slice(0, snapshot.message_count);
+  const restoredSop = snapshot.sop_state;
+  const now = new Date().toISOString();
+
+  await db.update(schema.sessions)
+    .set({
+      messages_json: JSON.stringify(restoredMessages),
+      sop_state_json: restoredSop ? JSON.stringify(restoredSop) : null,
+      sop_state_history_json: JSON.stringify(stack),
+      updated_at: now,
+    })
+    .where(eq(schema.sessions.id, sessionId));
+
+  // Soft-delete the lead this turn created (option B).
+  if (snapshot.lead_id) {
+    await db.update(schema.leads)
+      .set({ reverted_at: now })
+      .where(eq(schema.leads.id, snapshot.lead_id));
+  }
+
+  return { messages: restoredMessages, sopState: restoredSop };
+}

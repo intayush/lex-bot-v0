@@ -16,7 +16,7 @@ vi.mock('../db/index.js', async () => {
 });
 
 // Import module under test AFTER mock declaration (vitest hoists vi.mock)
-import { createSession, getSessionMessages, appendMessages, sessionExists, appendMessagesAndSOPState } from './session.js';
+import { createSession, getSessionMessages, appendMessages, sessionExists, appendMessagesAndSOPState, revertLastTurn } from './session.js';
 import { db, schema } from '../db/index.js';
 import type { SOPState } from '@legal-chatbot/shared';
 
@@ -47,6 +47,35 @@ CREATE TABLE \`sessions\` (
   \`updated_at\` text NOT NULL,
   FOREIGN KEY (\`account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE no action
 );
+
+CREATE TABLE \`leads\` (
+  \`id\` text PRIMARY KEY NOT NULL,
+  \`account_id\` text NOT NULL,
+  \`session_id\` text NOT NULL,
+  \`name\` text,
+  \`contact_email\` text,
+  \`contact_phone\` text,
+  \`case_type\` text,
+  \`incident_date\` text,
+  \`brief_description\` text,
+  \`classification\` text NOT NULL,
+  \`classification_rationale\` text,
+  \`urgency_factors_json\` text,
+  \`sop_state_snapshot\` text,
+  \`status\` text NOT NULL DEFAULT 'new',
+  \`follow_up_action\` text,
+  \`follow_up_action_changed_at\` text,
+  \`lead_score\` integer,
+  \`score_reasons_json\` text,
+  \`request_type\` text,
+  \`geographic_qualification\` text,
+  \`geographic_qualification_details_json\` text,
+  \`branch_snapshot_json\` text,
+  \`branch_incomplete\` integer NOT NULL DEFAULT 0,
+  \`reverted_at\` text,
+  \`created_at\` text NOT NULL,
+  FOREIGN KEY (\`session_id\`) REFERENCES \`sessions\`(\`id\`)
+);
 `;
 
 const TEST_ACCOUNT_ID = 'acct_test_001';
@@ -69,6 +98,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  sqlite.exec('DROP TABLE IF EXISTS leads');
   sqlite.exec('DROP TABLE IF EXISTS sessions');
   sqlite.exec('DROP INDEX IF EXISTS accounts_email_unique');
   sqlite.exec('DROP TABLE IF EXISTS accounts');
@@ -296,5 +326,70 @@ describe('appendMessagesAndSOPState snapshot push', () => {
     expect(stack).toHaveLength(10);
     expect(stack[0].lead_id).toBe('lead_1');   // lead_0 dropped
     expect(stack[9].lead_id).toBe('lead_10');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// revertLastTurn
+// ---------------------------------------------------------------------------
+describe('revertLastTurn', () => {
+  it('restores prior sop_state and truncates messages to message_count', async () => {
+    const id = await createSession(TEST_ACCOUNT_ID);
+    // Turn 1: enters empty, exits progress=1, 2 messages.
+    await appendMessagesAndSOPState(
+      id, [] as any,
+      [{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }] as any,
+      makeSopState(1), null, null,
+    );
+    // Turn 2: enters progress=1 (2 msgs), exits progress=2, 4 messages.
+    await appendMessagesAndSOPState(
+      id,
+      [{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }] as any,
+      [{ role: 'user', content: 'c' }, { role: 'assistant', content: 'd' }] as any,
+      makeSopState(2), makeSopState(1), null,
+    );
+
+    const res = await revertLastTurn(id);
+    expect(res.messages).toHaveLength(2);          // back to after turn 1
+    expect(res.sopState?.current_progress).toBe(1); // prior state restored
+
+    const row = (db as any).select().from(schema.sessions)
+      .where(eq(schema.sessions.id, id)).get();
+    expect(JSON.parse(row.messages_json)).toHaveLength(2);
+    expect(JSON.parse(row.sop_state_history_json)).toHaveLength(1); // one popped
+  });
+
+  it('is a no-op on an empty stack', async () => {
+    const id = await createSession(TEST_ACCOUNT_ID);
+    const res = await revertLastTurn(id);
+    expect(res.messages).toEqual([]);
+    expect(res.sopState).toBeNull();
+  });
+
+  it('soft-deletes the lead recorded in the popped snapshot', async () => {
+    const id = await createSession(TEST_ACCOUNT_ID);
+    (db as any).insert(schema.leads).values({
+      id: 'lead_1', account_id: TEST_ACCOUNT_ID, session_id: id,
+      classification: 'HOT', reverted_at: null, created_at: new Date().toISOString(),
+    }).run();
+    await appendMessagesAndSOPState(id, [] as any, [] as any, makeSopState(1), null, 'lead_1');
+
+    await revertLastTurn(id);
+
+    const lead = (db as any).select().from(schema.leads)
+      .where(eq(schema.leads.id, 'lead_1')).get();
+    expect(lead.reverted_at).not.toBeNull();
+  });
+
+  it('restores empty state when undoing back to the first turn', async () => {
+    const id = await createSession(TEST_ACCOUNT_ID);
+    await appendMessagesAndSOPState(
+      id, [] as any,
+      [{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }] as any,
+      makeSopState(1), null, null,   // prior state = null (fresh)
+    );
+    const res = await revertLastTurn(id);
+    expect(res.messages).toEqual([]);
+    expect(res.sopState).toBeNull();
   });
 });
