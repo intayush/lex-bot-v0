@@ -49,6 +49,7 @@ CREATE TABLE \`sessions\` (
   \`messages_json\` text DEFAULT '[]' NOT NULL,
   \`is_preview\` integer DEFAULT 0 NOT NULL,
   \`sop_state_json\` text,
+  \`sop_state_history_json\` text,
   \`created_at\` text NOT NULL,
   \`updated_at\` text NOT NULL,
   FOREIGN KEY (\`account_id\`) REFERENCES \`accounts\`(\`id\`) ON UPDATE no action ON DELETE no action
@@ -638,6 +639,19 @@ describe('captureLead — per-session dedup (multi-call fix)', () => {
     const parsed = JSON.parse(lead.sop_state_snapshot);
     expect(parsed.current_progress).toBe(5);
     expect(parsed.is_finalized).toBe(true);
+  });
+
+  it('does NOT set reverted_at on re-submit (second call for same session)', async () => {
+    // Spec 026: reverted_at is undo-only. Normal re-submissions within
+    // the same session (UPDATE path) must NOT set reverted_at.
+    await captureLead(makeLeadInput({ caseType: 'DUI' }));
+    await captureLead(makeLeadInput({ caseType: 'DUI', briefDescription: 'Updated details' }));
+
+    const lead = (db as any)
+      .select().from(schema.leads)
+      .where(eq(schema.leads.session_id, TEST_SESSION_ID))
+      .get();
+    expect(lead.reverted_at).toBeNull();
   });
 });
 

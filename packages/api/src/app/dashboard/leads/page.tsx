@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, isNull } from 'drizzle-orm';
 import { redirect } from 'next/navigation';
 import { db, schema } from '../../../db';
 import { leads } from '../../../db/schema';
@@ -37,7 +37,10 @@ export default async function LeadsPage() {
   const allLeads = await db
     .select()
     .from(leads)
-    .where(eq(leads.account_id, session.accountId))
+    .where(and(
+      eq(leads.account_id, session.accountId),
+      isNull(leads.reverted_at)
+    ))
     .orderBy(desc(leads.created_at));
 
   // 025-case-value-estimator: load active branch versions for accounts with
