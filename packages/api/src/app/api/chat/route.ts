@@ -145,6 +145,9 @@ export async function POST(req: Request) {
   // already returns null for a missing row.
   let sessionId: string;
   let sessionData = existingSession;
+  // Lead id created/updated by captureLead during this turn (for the undo
+  // snapshot). Set inside the captureLead tool's execute closure below.
+  let capturedLeadId: string | null = null;
   if (sessionData && incomingSessionId) {
     sessionId = incomingSessionId;
   } else {
@@ -163,6 +166,12 @@ export async function POST(req: Request) {
   if (sopBundle.sop && !sopState) {
     sopState = initSOPState(sopBundle.sop, conversationAnchorIso);
   }
+
+  // Snapshot the state ENTERING this turn (before advance) for the undo
+  // stack. Deep-cloned so later mutation of `sopState` can't alias it.
+  const priorSopState: SOPState | null = sopState
+    ? (JSON.parse(JSON.stringify(sopState)) as SOPState)
+    : null;
 
   // Advance state for the latest visitor message (Phase 4 skip-detector).
   // 021-chat-api-latency T023: removed isOffTopicNow / isOffTopic call —
@@ -448,6 +457,7 @@ export async function POST(req: Request) {
         if ('error' in result && result.error) {
           return { success: false, error: result.error };
         }
+        capturedLeadId = result.leadId;
         return { success: true, leadId: result.leadId, classification: result.classification };
       },
     }),
@@ -483,6 +493,8 @@ export async function POST(req: Request) {
         history,
         [newUserMessage, newAssistantMessage],
         sopState,
+        priorSopState,
+        capturedLeadId,
       );
 
       // Deferred path: all leads-side writes.
