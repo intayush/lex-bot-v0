@@ -13,6 +13,8 @@ import {
   scoringConfigSchema,
   sopStateStepSchema,
   sopStateHeaderPayloadSchema,
+  sopStateSnapshotSchema,
+  sopStateHistorySchema,
 } from './sop';
 
 describe('sopStateStepSchema — captured_label', () => {
@@ -362,5 +364,39 @@ describe('scoringConfigSchema (015)', () => {
       },
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('sopStateSnapshotSchema', () => {
+  it('accepts a snapshot with null sop_state and a lead id', () => {
+    const snap = { sop_state: null, message_count: 0, lead_id: 'lead_1' };
+    expect(sopStateSnapshotSchema.parse(snap)).toEqual(snap);
+  });
+
+  it('accepts a snapshot with null lead_id', () => {
+    const snap = { sop_state: null, message_count: 4, lead_id: null };
+    expect(sopStateSnapshotSchema.parse(snap)).toEqual(snap);
+  });
+
+  it('rejects a negative message_count', () => {
+    expect(() =>
+      sopStateSnapshotSchema.parse({ sop_state: null, message_count: -1, lead_id: null }),
+    ).toThrow();
+  });
+});
+
+describe('sopStateHistorySchema', () => {
+  it('accepts up to 10 snapshots', () => {
+    const stack = Array.from({ length: 10 }, () => ({
+      sop_state: null, message_count: 0, lead_id: null,
+    }));
+    expect(sopStateHistorySchema.parse(stack)).toHaveLength(10);
+  });
+
+  it('rejects more than 10 snapshots', () => {
+    const stack = Array.from({ length: 11 }, () => ({
+      sop_state: null, message_count: 0, lead_id: null,
+    }));
+    expect(() => sopStateHistorySchema.parse(stack)).toThrow();
   });
 });

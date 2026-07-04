@@ -319,6 +319,24 @@ export const sopStateSchema = z.object({
 });
 export type SOPState = z.infer<typeof sopStateSchema>;
 
+/**
+ * A single undo-stack snapshot: the SOP state and message count as they
+ * were ENTERING a turn (i.e. before that turn advanced state), plus the
+ * lead row that turn created/updated (if any). Popping this restores the
+ * conversation to just before that exchange. See
+ * docs/superpowers/specs/2026-07-04-conversation-rollback-design.md.
+ */
+export const sopStateSnapshotSchema = z.object({
+  sop_state: sopStateSchema.nullable(),
+  message_count: z.number().int().nonnegative(),
+  lead_id: z.string().nullable(),
+});
+export type SOPStateSnapshot = z.infer<typeof sopStateSnapshotSchema>;
+
+/** Bounded LIFO undo stack persisted in sessions.sop_state_history_json. */
+export const sopStateHistorySchema = z.array(sopStateSnapshotSchema).max(10);
+export type SOPStateHistory = z.infer<typeof sopStateHistorySchema>;
+
 // ---------------------------------------------------------------------------
 // SOP State header payload (compact form sent to the widget)
 // ---------------------------------------------------------------------------
