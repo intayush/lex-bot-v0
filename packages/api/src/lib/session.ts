@@ -1,8 +1,8 @@
 import { db, schema } from '../db';
 import { eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
-import type { Message, SOPState } from '@legal-chatbot/shared';
-import { sopStateSchema } from '@legal-chatbot/shared';
+import type { Message, SOPState, SOPStateHistory, SOPStateSnapshot } from '@legal-chatbot/shared';
+import { sopStateSchema, sopStateHistorySchema } from '@legal-chatbot/shared';
 
 export async function createSession(accountId: string, isPreview = false): Promise<string> {
   const id = `sess_${nanoid()}`;
@@ -104,14 +104,40 @@ export async function appendMessagesAndSOPState(
   existingHistory: Message[],
   newMessages: Message[],
   sopState: SOPState | null,
+  priorSopState: SOPState | null,
+  leadIdThisTurn: string | null = null,
 ): Promise<void> {
   const updated = [...existingHistory, ...newMessages];
   const now = new Date().toISOString();
+
+  // Read the current undo stack for this row (single select).
+  const rows = await db
+    .select({ history: schema.sessions.sop_state_history_json })
+    .from(schema.sessions)
+    .where(eq(schema.sessions.id, sessionId));
+  let stack: SOPStateHistory = [];
+  if (rows[0]?.history) {
+    try {
+      stack = sopStateHistorySchema.parse(JSON.parse(rows[0].history));
+    } catch {
+      stack = []; // corrupted stack → start fresh; undo depth resets, no crash
+    }
+  }
+
+  // Push a snapshot of the state ENTERING this turn.
+  const snapshot: SOPStateSnapshot = {
+    sop_state: priorSopState,
+    message_count: existingHistory.length,
+    lead_id: leadIdThisTurn,
+  };
+  stack.push(snapshot);
+  if (stack.length > 10) stack.shift(); // drop oldest
 
   await db.update(schema.sessions)
     .set({
       messages_json: JSON.stringify(updated),
       sop_state_json: sopState ? JSON.stringify(sopState) : null,
+      sop_state_history_json: JSON.stringify(stack),
       updated_at: now,
     })
     .where(eq(schema.sessions.id, sessionId));

@@ -18,6 +18,7 @@ vi.mock('../db/index.js', async () => {
 // Import module under test AFTER mock declaration (vitest hoists vi.mock)
 import { createSession, getSessionMessages, appendMessages, sessionExists, appendMessagesAndSOPState } from './session.js';
 import { db, schema } from '../db/index.js';
+import type { SOPState } from '@legal-chatbot/shared';
 
 // Access the raw sqlite handle for DDL operations
 const { __sqlite: sqlite } = await import('../db/index.js') as unknown as { __sqlite: import('better-sqlite3').Database };
@@ -231,5 +232,69 @@ describe('appendMessagesAndSOPState — 021 new 4-arg signature (T009 / T010)', 
     expect(row!.sop_state_json).not.toBeNull();
     const parsed = JSON.parse(row!.sop_state_json!);
     expect(parsed.sop_configuration_id).toBe('cfg_test');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// appendMessagesAndSOPState snapshot push
+// ---------------------------------------------------------------------------
+function makeSopState(progress: number): SOPState {
+  return {
+    sop_configuration_id: 'sop_1',
+    sop_version: 1,
+    conversation_anchor_iso: '2026-07-04T00:00:00.000Z',
+    steps: [],
+    qualified_lead_threshold: 6,
+    current_progress: progress,
+    is_finalized: false,
+    out_of_scope_termination: false,
+  } as SOPState;
+}
+
+describe('appendMessagesAndSOPState snapshot push', () => {
+  it('pushes a snapshot of the PRIOR state, not the new state', async () => {
+    const id = await createSession(TEST_ACCOUNT_ID);
+    const prior = makeSopState(1);
+    const next = makeSopState(2);
+
+    await appendMessagesAndSOPState(
+      id,
+      [{ role: 'user', content: 'hi' }] as any,
+      [{ role: 'assistant', content: 'hello' }] as any,
+      next,
+      prior,
+      'lead_xyz',
+    );
+
+    const row = (db as any).select().from(schema.sessions)
+      .where(eq(schema.sessions.id, id)).get();
+    const stack = JSON.parse(row.sop_state_history_json);
+    expect(stack).toHaveLength(1);
+    expect(stack[0].sop_state.current_progress).toBe(1); // prior, not 2
+    expect(stack[0].message_count).toBe(1);              // existingHistory length
+    expect(stack[0].lead_id).toBe('lead_xyz');
+    // sop_state_json holds the NEW state
+    expect(JSON.parse(row.sop_state_json).current_progress).toBe(2);
+  });
+
+  it('records lead_id null when not passed', async () => {
+    const id = await createSession(TEST_ACCOUNT_ID);
+    await appendMessagesAndSOPState(id, [] as any, [] as any, makeSopState(1), makeSopState(0));
+    const row = (db as any).select().from(schema.sessions)
+      .where(eq(schema.sessions.id, id)).get();
+    expect(JSON.parse(row.sop_state_history_json)[0].lead_id).toBeNull();
+  });
+
+  it('drops the oldest snapshot when the stack exceeds 10', async () => {
+    const id = await createSession(TEST_ACCOUNT_ID);
+    for (let i = 0; i < 11; i++) {
+      await appendMessagesAndSOPState(id, [] as any, [] as any, makeSopState(i + 1), makeSopState(i), `lead_${i}`);
+    }
+    const row = (db as any).select().from(schema.sessions)
+      .where(eq(schema.sessions.id, id)).get();
+    const stack = JSON.parse(row.sop_state_history_json);
+    expect(stack).toHaveLength(10);
+    expect(stack[0].lead_id).toBe('lead_1');   // lead_0 dropped
+    expect(stack[9].lead_id).toBe('lead_10');
   });
 });
