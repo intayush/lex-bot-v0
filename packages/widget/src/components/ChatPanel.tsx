@@ -317,10 +317,36 @@ function ChatPanelInner({
     onCloseRequest();
   };
 
-  // Undo: pop the last [user, assistant] message pair from local state.
-  // Client-side only — server session retains full history.
-  function handleUndo() {
-    setMessages((prev) => prev.length >= 2 ? prev.slice(0, -2) : prev);
+  // Undo: authoritative server-side rewind of one exchange. Calls
+  // POST /api/chat/undo (via sessionAwareFetch so x-session-id is
+  // attached), then replaces local messages AND SOP state from the
+  // response so client and server agree. Await the response — no
+  // optimistic pop (undo is deliberate and low-frequency).
+  const [isUndoing, setIsUndoing] = useState(false);
+  async function handleUndo() {
+    if (isUndoing) return;
+    const undoUrl = apiUrl.replace(/\/api\/chat\/?$/, '') + '/api/chat/undo';
+    setIsUndoing(true);
+    try {
+      const res = await sessionAwareFetch(undoUrl, {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          ...(extraHeaders ?? {}),
+        },
+      });
+      if (!res.ok) return; // leave state untouched on failure
+      const data = await res.json() as {
+        messages: typeof messages;
+        sopState: unknown;
+      };
+      setMessages(data.messages);
+      onSOPResponse(res); // reuse the header-based SOP state update path
+    } catch {
+      // Network error — leave local state untouched; user can retry.
+    } finally {
+      setIsUndoing(false);
+    }
   }
 
   // The Composer's chips prop is a flat list of strings rather than the
@@ -531,7 +557,7 @@ function ChatPanelInner({
         greeting={greetingNode}
         errorBanner={errorBanner}
         onUndo={handleUndo}
-        isLoading={isLoading}
+        isLoading={isLoading || isUndoing}
         trailing={
           <>
             {trailingNode}
