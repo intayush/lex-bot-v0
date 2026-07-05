@@ -77,6 +77,27 @@ export type WizardSubmission = z.infer<typeof wizardSubmissionSchema>;
 /** Fields that must be present before a wizard may `finish` (FR-012). */
 export const REQUIRED_WIZARD_SECTIONS = ['firmIdentity', 'caseTypeSelection'] as const;
 
+/** Permissive shape for partial autosave (finish:false). Never rejects incomplete input. */
+export const wizardDraftSchema = z.object({
+  firmIdentity: z.object({
+    firmName: z.string().optional(),
+    chatbotName: z.string().optional(),
+    email: z.string().optional(),
+    domain: z.string().optional(),
+  }).partial().optional(),
+  caseTypeSelection: z.array(z.object({
+    caseTypeSlug: z.string(),
+    subTypeSlugs: z.array(z.string()).default([]),
+  })).optional(),
+  attorneys: z.array(z.object({
+    name: z.string().optional().default(''),
+    email: z.string().optional().default(''),
+    mobile: z.string().nullable().optional(),
+    subTypeAssignments: z.array(z.object({ caseTypeSlug: z.string(), subTypeSlug: z.string() })).default([]),
+  })).optional(),
+});
+export type WizardDraft = z.infer<typeof wizardDraftSchema>;
+
 // --- Metrics DTO ---
 
 export const metricsWindowSchema = z.enum(['7d', '30d', '90d']).default('30d');
