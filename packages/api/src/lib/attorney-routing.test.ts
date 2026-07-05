@@ -50,7 +50,7 @@ CREATE TABLE \`accounts\` (
   \`status\` text DEFAULT 'active' NOT NULL,
   \`onboarding_status\` text DEFAULT 'live' NOT NULL,
   \`deleted_at\` text,
-  \`domain\` text
+  \`domain\` text, \`onboarding_draft_json\` text
 );
 
 CREATE TABLE \`attorneys\` (

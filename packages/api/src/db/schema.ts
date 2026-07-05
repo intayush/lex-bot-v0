@@ -14,6 +14,8 @@ export const accounts = pgTable('accounts', {
   deleted_at: text('deleted_at'),
   /** 027 onboarding-redesign: website domain where the widget is deployed. Display-only. */
   domain: text('domain'),
+  /** 027 onboarding-redesign: raw partial wizard submission for draft resume. JSON. */
+  onboarding_draft_json: text('onboarding_draft_json'),
 }, (table) => [
   uniqueIndex('accounts_email_unique').on(table.email),
 ]);

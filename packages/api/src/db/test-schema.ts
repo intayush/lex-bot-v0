@@ -16,6 +16,7 @@ export const accounts = sqliteTable('accounts', {
   onboarding_status: text('onboarding_status').notNull().default('live'),
   deleted_at: text('deleted_at'),
   domain: text('domain'),
+  onboarding_draft_json: text('onboarding_draft_json'),
 });
 
 export const apiKeys = sqliteTable('api_keys', {

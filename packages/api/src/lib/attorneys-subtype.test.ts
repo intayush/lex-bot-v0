@@ -16,7 +16,7 @@ import { db, schema } from '../db/index.js';
 const { __sqlite: sqlite } = (await import('../db/index.js')) as unknown as { __sqlite: import('better-sqlite3').Database };
 
 const MIGRATION_SQL = `
-CREATE TABLE accounts (id text PRIMARY KEY, email text NOT NULL, password_hash text NOT NULL, firm_name text, created_at text NOT NULL, status text DEFAULT 'active' NOT NULL, onboarding_status text DEFAULT 'live' NOT NULL, deleted_at text, domain text);
+CREATE TABLE accounts (id text PRIMARY KEY, email text NOT NULL, password_hash text NOT NULL, firm_name text, created_at text NOT NULL, status text DEFAULT 'active' NOT NULL, onboarding_status text DEFAULT 'live' NOT NULL, deleted_at text, domain text, onboarding_draft_json text);
 CREATE TABLE attorneys (id text PRIMARY KEY, account_id text NOT NULL, name text NOT NULL, email text NOT NULL, mobile text, created_at text NOT NULL, updated_at text NOT NULL);
 CREATE TABLE attorney_case_type_assignments (id text PRIMARY KEY, attorney_id text NOT NULL, account_id text NOT NULL, case_type_slug text NOT NULL, sub_type_slug text, created_at text NOT NULL);
 `;

@@ -42,7 +42,8 @@ CREATE TABLE \`accounts\` (
   \`created_at\` text NOT NULL,
   \`status\` text DEFAULT 'active' NOT NULL,
   \`onboarding_status\` text DEFAULT 'live' NOT NULL,
-  \`deleted_at\` text
+  \`deleted_at\` text,
+  \`domain\` text, \`onboarding_draft_json\` text
 );
 CREATE UNIQUE INDEX \`accounts_email_unique\` ON \`accounts\` (\`email\`);
 
