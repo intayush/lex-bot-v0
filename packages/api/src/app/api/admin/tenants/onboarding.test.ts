@@ -24,10 +24,17 @@ vi.mock('../../../../lib/admin-session.js', () => ({
   })),
 }));
 
-const { seedSopAndBranchesMock } = vi.hoisted(() => ({ seedSopAndBranchesMock: vi.fn(async () => {}) }));
+const { seedSopAndBranchesMock, provisionAttorneysMock } = vi.hoisted(() => ({
+  seedSopAndBranchesMock: vi.fn(async () => {}),
+  provisionAttorneysMock: vi.fn(async () => {}),
+}));
 vi.mock('../../../../lib/admin/tenant-provisioning.js', async (orig) => {
   const mod = await orig<typeof import('../../../../lib/admin/tenant-provisioning.js')>();
-  return { ...mod, seedSopAndBranches: seedSopAndBranchesMock };
+  return {
+    ...mod,
+    seedSopAndBranches: seedSopAndBranchesMock,
+    provisionAttorneys: provisionAttorneysMock,
+  };
 });
 
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -71,6 +78,7 @@ beforeEach(() => {
   for (const stmt of MIGRATION_SQL.split(';').filter((s) => s.trim())) sqlite.exec(stmt);
   sessionState.adminId = 'admin_1';
   seedSopAndBranchesMock.mockClear();
+  provisionAttorneysMock.mockClear();
 });
 
 afterEach(() => {
@@ -84,9 +92,9 @@ function jsonReq(url: string, body: unknown) {
 }
 
 const fullWizard = {
-  firmIdentity: { firmName: 'Acme Law', chatbotName: 'Ace', greetingMessage: 'Hi!', language: 'English' },
-  caseTypes: [{ slug: 'dui', label: 'DUI', subTypes: [] }],
-  contact: { phone: '555', email: 'info@acme.law', officeHours: [], afterHoursMessage: '' },
+  firmIdentity: { firmName: 'Acme', chatbotName: 'Ace', email: 'a@acme.law', domain: 'acme.law' },
+  caseTypeSelection: [{ caseTypeSlug: 'dui', subTypeSlugs: ['first_offense'] }],
+  attorneys: [{ name: 'Lawyer A', email: 'la@f.com', subTypeAssignments: [{ caseTypeSlug: 'dui', subTypeSlug: 'first_offense' }] }],
 };
 
 describe('POST /api/admin/tenants (register) — T024', () => {
@@ -123,17 +131,18 @@ describe('onboarding finish + publish — T026', () => {
 
   it('422 on finish when required sections are missing', async () => {
     const id = await register();
-    const res = await onboarding(jsonReq(`http://localhost/x`, { firmIdentity: fullWizard.firmIdentity, finish: true }), { params: Promise.resolve({ id }) });
+    const res = await onboarding(jsonReq(`http://localhost/x`, { firmIdentity: fullWizard.firmIdentity, caseTypeSelection: [], finish: true }), { params: Promise.resolve({ id }) });
     expect(res.status).toBe(422);
     const data = await res.json();
-    expect(data.missing).toContain('caseTypes');
+    expect(data.missing).toContain('caseTypeSelection');
   });
 
   it('finish generates a draft config + runs seed/branches', async () => {
     const id = await register();
     const res = await onboarding(jsonReq('http://localhost/x', { ...fullWizard, finish: true }), { params: Promise.resolve({ id }) });
     expect(res.status).toBe(200);
-    expect(seedSopAndBranchesMock).toHaveBeenCalledWith(id);
+    expect(seedSopAndBranchesMock).toHaveBeenCalledWith(id, fullWizard.caseTypeSelection);
+    expect(provisionAttorneysMock).toHaveBeenCalledWith(id, fullWizard.attorneys);
     const cfg = await db.select().from(schema.configurations).where(eq(schema.configurations.account_id, id));
     expect(cfg).toHaveLength(1);
     expect(cfg[0].is_published).toBe(false); // draft, not yet published

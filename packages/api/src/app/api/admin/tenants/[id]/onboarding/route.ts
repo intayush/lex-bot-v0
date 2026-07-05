@@ -5,6 +5,7 @@ import { recordAdminAction } from '../../../../../../lib/admin/audit';
 import {
   saveOnboardingDraft,
   seedSopAndBranches,
+  provisionAttorneys,
 } from '../../../../../../lib/admin/tenant-provisioning';
 
 /**
@@ -34,7 +35,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         { status: 422 },
       );
     }
-    await seedSopAndBranches(accountId);
+    await seedSopAndBranches(accountId, submission.caseTypeSelection);
+    if (submission.attorneys && submission.attorneys.length > 0) {
+      await provisionAttorneys(accountId, submission.attorneys);
+    }
     await recordAdminAction(guard.adminId, 'tenant.onboard', accountId);
     return NextResponse.json({ onboardingStatus: 'draft', draftReady: true });
   }
