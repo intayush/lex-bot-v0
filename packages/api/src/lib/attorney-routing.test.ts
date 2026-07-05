@@ -49,7 +49,8 @@ CREATE TABLE \`accounts\` (
   \`created_at\` text NOT NULL,
   \`status\` text DEFAULT 'active' NOT NULL,
   \`onboarding_status\` text DEFAULT 'live' NOT NULL,
-  \`deleted_at\` text
+  \`deleted_at\` text,
+  \`domain\` text
 );
 
 CREATE TABLE \`attorneys\` (
@@ -68,6 +69,7 @@ CREATE TABLE \`attorney_case_type_assignments\` (
   \`attorney_id\` text NOT NULL,
   \`account_id\` text NOT NULL,
   \`case_type_slug\` text NOT NULL,
+  \`sub_type_slug\` text,
   \`created_at\` text NOT NULL,
   FOREIGN KEY (\`attorney_id\`) REFERENCES \`attorneys\`(\`id\`)
 );
@@ -154,16 +156,17 @@ describe('getAttorneysForCaseType — T019', () => {
 
 describe('enqueueAttorneyRoutingNotifications — T020', () => {
   beforeEach(async () => {
+    sqlite.exec(`INSERT INTO leads VALUES ('lead_1', '${ACCT}', 'sess_1', 'HOT', '${NOW}', null)`);
+  });
+
+  it('inserts one email-channel notification per matching attorney', async () => {
     await db.insert(schema.attorneys).values([
       { id: 'atty_dui', account_id: ACCT, name: 'Sarah Kim', email: 'sarah@firm.com', mobile: null, created_at: NOW, updated_at: NOW },
     ]);
     await db.insert(schema.attorneyCaseTypeAssignments).values([
       { id: 'ass_1', attorney_id: 'atty_dui', account_id: ACCT, case_type_slug: 'dui', created_at: NOW },
     ]);
-    sqlite.exec(`INSERT INTO leads VALUES ('lead_1', '${ACCT}', 'sess_1', 'HOT', '${NOW}', null)`);
-  });
 
-  it('inserts one email-channel notification per matching attorney', async () => {
     await enqueueAttorneyRoutingNotifications({
       accountId: ACCT,
       leadId: 'lead_1',
@@ -189,10 +192,17 @@ describe('enqueueAttorneyRoutingNotifications — T020', () => {
   });
 
   it('inserts zero notifications when no attorneys match the case type', async () => {
+    await db.insert(schema.attorneys).values([
+      { id: 'atty_pi', account_id: ACCT, name: 'John Doe', email: 'john@firm.com', mobile: null, created_at: NOW, updated_at: NOW },
+    ]);
+    await db.insert(schema.attorneyCaseTypeAssignments).values([
+      { id: 'ass_1', attorney_id: 'atty_pi', account_id: ACCT, case_type_slug: 'personal_injury', created_at: NOW },
+    ]);
+
     await enqueueAttorneyRoutingNotifications({
       accountId: ACCT,
       leadId: 'lead_1',
-      caseTypeSlug: 'personal_injury', // no attorney assigned to this
+      caseTypeSlug: 'dui', // no attorney assigned to this
       leadName: null,
       leadEmail: null,
       leadPhone: null,
@@ -205,5 +215,74 @@ describe('enqueueAttorneyRoutingNotifications — T020', () => {
       .from(schema.notifications)
       .where(eq(schema.notifications.delivery_channel, 'email'));
     expect(rows).toHaveLength(0);
+  });
+
+  it('prefers sub-type-assigned attorney when sub-type is provided', async () => {
+    // Insert two attorneys: one assigned to case-type only, one to sub-type
+    await db.insert(schema.attorneys).values([
+      { id: 'atty_case_level', account_id: ACCT, name: 'General DUI Attorney', email: 'general@firm.com', mobile: null, created_at: NOW, updated_at: NOW },
+      { id: 'atty_subtype', account_id: ACCT, name: 'First Offense Specialist', email: 'specialist@firm.com', mobile: null, created_at: NOW, updated_at: NOW },
+    ]);
+    // Case-type-level assignment (sub_type_slug IS NULL)
+    await db.insert(schema.attorneyCaseTypeAssignments).values([
+      { id: 'ass_case', attorney_id: 'atty_case_level', account_id: ACCT, case_type_slug: 'dui', sub_type_slug: null, created_at: NOW },
+    ]);
+    // Sub-type-level assignment
+    await db.insert(schema.attorneyCaseTypeAssignments).values([
+      { id: 'ass_sub', attorney_id: 'atty_subtype', account_id: ACCT, case_type_slug: 'dui', sub_type_slug: 'first_offense', created_at: NOW },
+    ]);
+
+    await enqueueAttorneyRoutingNotifications({
+      accountId: ACCT,
+      leadId: 'lead_1',
+      caseTypeSlug: 'dui',
+      subTypeSlug: 'first_offense',
+      leadName: 'John Doe',
+      leadEmail: 'john@example.com',
+      leadPhone: '+15551234567',
+      leadDescription: 'First time DUI offense',
+      capturedAt: NOW,
+    });
+
+    const rows = await db
+      .select()
+      .from(schema.notifications)
+      .where(eq(schema.notifications.delivery_channel, 'email'));
+
+    // Should only notify the sub-type specialist, not the case-type-level attorney
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.attorney_id).toBe('atty_subtype');
+    expect(rows[0]!.type).toBe('attorney_lead_routing');
+  });
+
+  it('falls back to case-type attorney when sub-type has no assignment', async () => {
+    // Only a case-type-level attorney exists
+    await db.insert(schema.attorneys).values([
+      { id: 'atty_case_level', account_id: ACCT, name: 'General DUI Attorney', email: 'general@firm.com', mobile: null, created_at: NOW, updated_at: NOW },
+    ]);
+    await db.insert(schema.attorneyCaseTypeAssignments).values([
+      { id: 'ass_case', attorney_id: 'atty_case_level', account_id: ACCT, case_type_slug: 'dui', sub_type_slug: null, created_at: NOW },
+    ]);
+
+    await enqueueAttorneyRoutingNotifications({
+      accountId: ACCT,
+      leadId: 'lead_1',
+      caseTypeSlug: 'dui',
+      subTypeSlug: 'repeat_offense',  // No attorney assigned to this sub-type
+      leadName: 'Jane Doe',
+      leadEmail: 'jane@example.com',
+      leadPhone: '+15559876543',
+      leadDescription: 'Repeat DUI offense',
+      capturedAt: NOW,
+    });
+
+    const rows = await db
+      .select()
+      .from(schema.notifications)
+      .where(eq(schema.notifications.delivery_channel, 'email'));
+
+    // Should fall back to case-type-level attorney
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.attorney_id).toBe('atty_case_level');
   });
 });

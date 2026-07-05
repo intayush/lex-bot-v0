@@ -1,7 +1,7 @@
 import { nanoid } from 'nanoid';
 import { eq } from 'drizzle-orm';
 import { db, schema } from '../db';
-import { getAttorneysForCaseType } from './attorneys';
+import { getAttorneysForCaseType, getAttorneysForSubType } from './attorneys';
 import { sendEmail } from './email';
 import { runAfterResponse } from './run-after-response';
 
@@ -29,6 +29,7 @@ export async function enqueueAttorneyRoutingNotifications(input: {
   accountId: string;
   leadId: string;
   caseTypeSlug: string;
+  subTypeSlug?: string | null;
   leadName: string | null;
   leadEmail: string | null;
   leadPhone: string | null;
@@ -41,7 +42,12 @@ export async function enqueueAttorneyRoutingNotifications(input: {
   // but attorney assignments are stored by slug (e.g. "personal_injury").
   const caseTypeSlug = input.caseTypeSlug.toLowerCase().replace(/[\s-]+/g, '_');
 
-  const matchingAttorneys = await getAttorneysForCaseType(input.accountId, caseTypeSlug);
+  // When a sub-type is available, prefer sub-type-assigned attorneys.
+  // getAttorneysForSubType internally falls back to case-type-level assignments
+  // when no sub-type match exists.
+  const matchingAttorneys = input.subTypeSlug
+    ? await getAttorneysForSubType(input.accountId, caseTypeSlug, input.subTypeSlug)
+    : await getAttorneysForCaseType(input.accountId, caseTypeSlug);
   if (matchingAttorneys.length === 0) return;
 
   const now = new Date().toISOString();
