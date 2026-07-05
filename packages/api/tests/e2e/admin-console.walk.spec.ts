@@ -53,9 +53,9 @@ test.describe('027 admin console', () => {
     const ob = await request.put(`/api/admin/tenants/${accountId}/onboarding`, {
       headers: { 'Content-Type': 'application/json' },
       data: {
-        firmIdentity: { firmName: 'E2E Firm', chatbotName: 'Ace', greetingMessage: 'Hi!', language: 'English' },
-        caseTypes: [{ slug: 'general', label: 'General', subTypes: [] }],
-        contact: { phone: '555', email: uniqueEmail, officeHours: [], afterHoursMessage: '' },
+        firmIdentity: { firmName: 'E2E Firm', chatbotName: 'Ace', email: uniqueEmail, domain: 'e2e.test' },
+        caseTypeSelection: [{ caseTypeSlug: 'dui', subTypeSlugs: ['first_offense'] }],
+        attorneys: [{ name: 'E2E Lawyer', email: `atty+${Date.now()}@f.test`, subTypeAssignments: [{ caseTypeSlug: 'dui', subTypeSlug: 'first_offense' }] }],
         finish: true,
       },
     });
