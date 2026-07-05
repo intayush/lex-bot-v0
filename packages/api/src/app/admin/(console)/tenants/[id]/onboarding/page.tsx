@@ -1,5 +1,5 @@
 'use client';
-import { use, useState } from 'react';
+import { use, useState, useEffect } from 'react';
 import { CaseMatrix, type Selection } from './case-matrix';
 import { AttorneysStep, type WizardAttorney } from './attorneys-step';
 
@@ -13,6 +13,23 @@ export default function OnboardingWizard({ params }: { params: Promise<{ id: str
   const [firmIdentity, setFirm] = useState({ firmName: '', chatbotName: 'Assistant', email: '', domain: '' });
   const [caseTypeSelection, setSelection] = useState<Selection[]>([]);
   const [attorneys, setAttorneys] = useState<WizardAttorney[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/admin/tenants/${id}/onboarding`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const draft = d?.draft;
+        if (!draft) return;
+        if (draft.firmIdentity) setFirm((f) => ({ ...f, ...draft.firmIdentity }));
+        if (Array.isArray(draft.caseTypeSelection)) setSelection(draft.caseTypeSelection);
+        if (Array.isArray(draft.attorneys)) {
+          setAttorneys(draft.attorneys.map((a: { name?: string; email?: string; mobile?: string | null; subTypeAssignments?: { caseTypeSlug: string; subTypeSlug: string }[] }) => ({
+            name: a.name ?? '', email: a.email ?? '', mobile: a.mobile ?? '', subTypeAssignments: a.subTypeAssignments ?? [],
+          })));
+        }
+      })
+      .catch(() => {});
+  }, [id]);
 
   function payload(finish: boolean) {
     return { firmIdentity, caseTypeSelection, attorneys: attorneys.map((a) => ({ ...a, mobile: a.mobile || null })), finish };
