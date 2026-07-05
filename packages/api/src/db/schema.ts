@@ -12,6 +12,8 @@ export const accounts = pgTable('accounts', {
   onboarding_status: text('onboarding_status').notNull().default('live'),
   /** 027: soft-delete marker (ISO string). NULL = active fleet member. */
   deleted_at: text('deleted_at'),
+  /** 027 onboarding-redesign: website domain where the widget is deployed. Display-only. */
+  domain: text('domain'),
 }, (table) => [
   uniqueIndex('accounts_email_unique').on(table.email),
 ]);
@@ -204,9 +206,11 @@ export const attorneyCaseTypeAssignments = pgTable('attorney_case_type_assignmen
   attorney_id: text('attorney_id').notNull().references(() => attorneys.id, { onDelete: 'cascade' }),
   account_id: text('account_id').notNull().references(() => accounts.id),
   case_type_slug: text('case_type_slug').notNull(),
+  /** 027 onboarding-redesign: optional sub-type scope. NULL = whole case type. */
+  sub_type_slug: text('sub_type_slug'),
   created_at: text('created_at').notNull(),
 }, (table) => [
-  uniqueIndex('attorney_assignment_unique').on(table.attorney_id, table.case_type_slug),
+  uniqueIndex('attorney_assignment_unique').on(table.attorney_id, table.case_type_slug, table.sub_type_slug),
 ]);
 
 // ---------------------------------------------------------------------------

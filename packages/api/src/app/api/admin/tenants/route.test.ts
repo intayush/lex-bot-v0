@@ -35,7 +35,7 @@ const MIGRATION_SQL = `
 CREATE TABLE \`accounts\` (
   \`id\` text PRIMARY KEY NOT NULL, \`email\` text NOT NULL, \`password_hash\` text NOT NULL,
   \`firm_name\` text, \`created_at\` text NOT NULL,
-  \`status\` text DEFAULT 'active' NOT NULL, \`onboarding_status\` text DEFAULT 'live' NOT NULL, \`deleted_at\` text
+  \`status\` text DEFAULT 'active' NOT NULL, \`onboarding_status\` text DEFAULT 'live' NOT NULL, \`deleted_at\` text, \`domain\` text
 );
 CREATE TABLE \`leads\` (
   \`id\` text PRIMARY KEY NOT NULL, \`account_id\` text NOT NULL, \`session_id\` text NOT NULL,

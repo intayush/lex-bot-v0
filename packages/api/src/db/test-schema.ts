@@ -15,6 +15,7 @@ export const accounts = sqliteTable('accounts', {
   status: text('status').notNull().default('active'),
   onboarding_status: text('onboarding_status').notNull().default('live'),
   deleted_at: text('deleted_at'),
+  domain: text('domain'),
 });
 
 export const apiKeys = sqliteTable('api_keys', {
@@ -133,6 +134,7 @@ export const attorneyCaseTypeAssignments = sqliteTable('attorney_case_type_assig
   attorney_id: text('attorney_id').notNull().references(() => attorneys.id),
   account_id: text('account_id').notNull().references(() => accounts.id),
   case_type_slug: text('case_type_slug').notNull(),
+  sub_type_slug: text('sub_type_slug'),
   created_at: text('created_at').notNull(),
 });
 
