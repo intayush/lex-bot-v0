@@ -1,9 +1,7 @@
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { nanoid } from 'nanoid';
-import * as schema from './schema';
+import { db, schema } from './index';
 import {
   DEFAULT_SOP_STEPS,
   DEFAULT_CASE_TYPES,
@@ -15,15 +13,6 @@ import {
 } from './seed-defaults/sop';
 import { DEFAULT_BRANCH_SEEDS } from './seed-defaults/branches';
 
-const DATABASE_URL = process.env.DATABASE_URL;
-if (!DATABASE_URL) {
-  console.error('DATABASE_URL environment variable is required');
-  process.exit(1);
-}
-
-const sql = neon(DATABASE_URL);
-const db = drizzle(sql, { schema });
-
 /**
  * Seed the default SOP, case types, sub-types, and goodbye phrases for a
  * given account. Idempotent: if the account already has any
@@ -32,8 +21,17 @@ const db = drizzle(sql, { schema });
  * Per FR-004 and R1: shipped with every fresh account; lazy migration
  * helper for legacy accounts is in `migrate-legacy-qualifying-questions.ts`
  * (T071).
+ *
+ * @param accountId - The account ID to seed SOP for
+ * @param options - Optional selection to seed only specific case types/sub-types
+ * @param options.selection - Array of case types with their sub-types to seed.
+ *   When provided, only the specified case types and sub-types are created.
+ *   When omitted, all 6 default case types and their 21 sub-types are seeded.
  */
-export async function seedSopForAccount(accountId: string): Promise<void> {
+export async function seedSopForAccount(
+  accountId: string,
+  options?: { selection?: Array<{ caseTypeSlug: string; subTypeSlugs: string[] }> },
+): Promise<void> {
   const existing = await db
     .select({ id: schema.sopConfigurations.id })
     .from(schema.sopConfigurations)
@@ -45,6 +43,16 @@ export async function seedSopForAccount(accountId: string): Promise<void> {
 
   const now = new Date().toISOString();
   const sopConfigId = nanoid();
+
+  const selection = options?.selection;
+  const selectedCaseTypes = selection
+    ? DEFAULT_CASE_TYPES
+        .filter((ct) => selection.some((s) => s.caseTypeSlug === ct.slug))
+        .map((ct) => {
+          const chosen = selection.find((s) => s.caseTypeSlug === ct.slug)!;
+          return { ...ct, sub_types: ct.sub_types.filter((st) => chosen.subTypeSlugs.includes(st.slug)) };
+        })
+    : DEFAULT_CASE_TYPES;
 
   // 1. SOP configuration row
   await db.insert(schema.sopConfigurations).values({
@@ -66,8 +74,8 @@ export async function seedSopForAccount(accountId: string): Promise<void> {
     });
   }
 
-  // 3. Case types (6) + sub-types (≥3 each)
-  for (const ct of DEFAULT_CASE_TYPES) {
+  // 3. Case types + sub-types (filtered by selection if provided)
+  for (const ct of selectedCaseTypes) {
     const caseTypeId = nanoid();
     await db.insert(schema.caseTypes).values({
       id: caseTypeId,
@@ -100,11 +108,16 @@ export async function seedSopForAccount(accountId: string): Promise<void> {
     });
   }
 
+  // Helper to check if a case_type/sub_type pair is in the selected set
+  function isSelected(caseTypeSlug: string, subTypeSlug: string): boolean {
+    return selectedCaseTypes.some(
+      (ct) => ct.slug === caseTypeSlug && ct.sub_types.some((st) => st.slug === subTypeSlug),
+    );
+  }
+
   // 5. Spec 016 — seed the (personal_injury, car_accident) Branch with the
   // 9 scoring questions, thresholds, and hard-override toggles relocated
   // from spec 015 (FR-016).
-  const branchId = nanoid();
-  const versionId = nanoid();
   // 025-case-value-estimator: case value configurations for Personal Injury branches.
   // Values are US industry-standard settlement estimates.
   // 025-case-value-estimator: classification_bands added for LLM-only (unscored) leads.
@@ -147,36 +160,48 @@ export async function seedSopForAccount(accountId: string): Promise<void> {
     ]}),
   };
 
-  await db.insert(schema.branches).values({
-    id: branchId,
-    account_id: accountId,
-    case_type_slug: 'personal_injury',
-    sub_type_slug: 'car_accident',
-    is_active: true,
-    is_case_value_enabled: true,
-    current_version_id: versionId,
-    created_at: now,
-    updated_at: now,
-  });
-  await db.insert(schema.branchVersions).values({
-    id: versionId,
-    branch_id: branchId,
-    version_number: 1,
-    is_published: true,
-    questions_json: CAR_ACCIDENT_BRANCH_QUESTIONS_JSON,
-    classification_thresholds_json: CAR_ACCIDENT_BRANCH_THRESHOLDS_JSON,
-    hard_override_toggles_json: CAR_ACCIDENT_BRANCH_HARD_OVERRIDES_JSON,
-    case_value_config_json: PI_CASE_VALUE_CONFIGS.car_accident,
-    published_at: now,
-    created_at: now,
-    created_by_user_id: 'system_seed_016',
-  });
+  // Track branch count for logging
+  let branchCount = 0;
+
+  // Only seed car_accident branch if it's in the selection
+  if (isSelected('personal_injury', 'car_accident')) {
+    const branchId = nanoid();
+    const versionId = nanoid();
+    await db.insert(schema.branches).values({
+      id: branchId,
+      account_id: accountId,
+      case_type_slug: 'personal_injury',
+      sub_type_slug: 'car_accident',
+      is_active: true,
+      is_case_value_enabled: true,
+      current_version_id: versionId,
+      created_at: now,
+      updated_at: now,
+    });
+    await db.insert(schema.branchVersions).values({
+      id: versionId,
+      branch_id: branchId,
+      version_number: 1,
+      is_published: true,
+      questions_json: CAR_ACCIDENT_BRANCH_QUESTIONS_JSON,
+      classification_thresholds_json: CAR_ACCIDENT_BRANCH_THRESHOLDS_JSON,
+      hard_override_toggles_json: CAR_ACCIDENT_BRANCH_HARD_OVERRIDES_JSON,
+      case_value_config_json: PI_CASE_VALUE_CONFIGS.car_accident,
+      published_at: now,
+      created_at: now,
+      created_by_user_id: 'system_seed_016',
+    });
+    branchCount++;
+  }
 
   // 6. Seed every other default sub-type's Branch (spec 017 follow-up —
   // expansion beyond the car_accident reference). Family Law and Estate
   // Planning are intentionally excluded from this batch; their seed entries
   // are absent from `DEFAULT_BRANCH_SEEDS`. See `seed-defaults/branches.ts`.
-  for (const seed of DEFAULT_BRANCH_SEEDS) {
+  const selectedBranchSeeds = DEFAULT_BRANCH_SEEDS.filter((seed) =>
+    isSelected(seed.case_type_slug, seed.sub_type_slug),
+  );
+  for (const seed of selectedBranchSeeds) {
     const seededBranchId = nanoid();
     const seededVersionId = nanoid();
     const isPiBranch = seed.case_type_slug === 'personal_injury' &&
@@ -205,16 +230,16 @@ export async function seedSopForAccount(accountId: string): Promise<void> {
       created_at: now,
       created_by_user_id: 'system_seed_017',
     });
+    branchCount++;
   }
 
-  const subTypeCount = DEFAULT_CASE_TYPES.reduce((acc, ct) => acc + ct.sub_types.length, 0);
+  const subTypeCount = selectedCaseTypes.reduce((acc, ct) => acc + ct.sub_types.length, 0);
   console.log(
     `  SOP seeded for account ${accountId}: ` +
     `1 config, ${DEFAULT_SOP_STEPS.length} steps, ` +
-    `${DEFAULT_CASE_TYPES.length} case types, ${subTypeCount} sub-types, ` +
+    `${selectedCaseTypes.length} case types, ${subTypeCount} sub-types, ` +
     `${DEFAULT_GOODBYE_PHRASES.length} goodbye phrases, ` +
-    `${1 + DEFAULT_BRANCH_SEEDS.length} branches ` +
-    `(1 car-accident reference + ${DEFAULT_BRANCH_SEEDS.length} default sub-type branches).`,
+    `${branchCount} branches.`,
   );
 }
 
