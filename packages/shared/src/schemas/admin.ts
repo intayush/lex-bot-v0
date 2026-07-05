@@ -50,52 +50,32 @@ export type TenantSummary = z.infer<typeof tenantSummarySchema>;
 
 // --- Onboarding wizard submission ---
 
-const officeHourSchema = z.object({
-  day: z.string(),
-  open: z.string(),
-  close: z.string(),
-});
-
 export const wizardSubmissionSchema = z.object({
-  firmIdentity: z
-    .object({
-      firmName: z.string().min(1),
-      chatbotName: z.string().min(1),
-      greetingMessage: z.string().min(1),
-      language: z.string().default('English'),
-    })
-    .optional(),
-  caseTypes: z
-    .array(
-      z.object({
-        slug: z.string().min(1),
-        label: z.string().min(1),
-        subTypes: z
-          .array(z.object({ slug: z.string().min(1), label: z.string().min(1) }))
-          .default([]),
-      }),
-    )
-    .optional(),
-  persona: z
-    .object({ tone: z.enum(['formal', 'friendly', 'neutral']) })
-    .optional(),
-  contact: z
-    .object({
-      phone: z.string(),
-      email: z.string(),
-      officeHours: z.array(officeHourSchema).default([]),
-      afterHoursMessage: z.string().default(''),
-    })
-    .optional(),
-  escalation: z
-    .object({ triggers: z.array(z.string()).default([]), message: z.string().default('') })
-    .optional(),
+  firmIdentity: z.object({
+    firmName: z.string().min(1),
+    chatbotName: z.string().min(1),
+    email: z.string().email(),
+    domain: z.string().min(1),
+  }).optional(),
+  caseTypeSelection: z.array(z.object({
+    caseTypeSlug: z.string().min(1),
+    subTypeSlugs: z.array(z.string().min(1)).default([]),
+  })).optional(),
+  attorneys: z.array(z.object({
+    name: z.string().min(1),
+    email: z.string().email(),
+    mobile: z.string().nullable().optional(),
+    subTypeAssignments: z.array(z.object({
+      caseTypeSlug: z.string().min(1),
+      subTypeSlug: z.string().min(1),
+    })).default([]),
+  })).optional().default([]),
   finish: z.boolean().optional(),
 });
 export type WizardSubmission = z.infer<typeof wizardSubmissionSchema>;
 
 /** Fields that must be present before a wizard may `finish` (FR-012). */
-export const REQUIRED_WIZARD_SECTIONS = ['firmIdentity', 'caseTypes', 'contact'] as const;
+export const REQUIRED_WIZARD_SECTIONS = ['firmIdentity', 'caseTypeSelection'] as const;
 
 // --- Metrics DTO ---
 
