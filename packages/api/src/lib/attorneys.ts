@@ -1,5 +1,5 @@
 import { nanoid } from 'nanoid';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull, inArray } from 'drizzle-orm';
 import { db, schema } from '../db';
 
 export interface Attorney {
@@ -47,7 +47,13 @@ export async function getAttorneys(accountId: string): Promise<Attorney[]> {
 
 export async function createAttorney(
   accountId: string,
-  data: { name: string; email: string; mobile?: string | null; case_type_slugs?: string[] },
+  data: {
+    name: string;
+    email: string;
+    mobile?: string | null;
+    case_type_slugs?: string[];
+    assignments?: Array<{ caseTypeSlug: string; subTypeSlug: string | null }>;
+  },
 ): Promise<string> {
   const id = nanoid();
   const now = new Date().toISOString();
@@ -62,13 +68,19 @@ export async function createAttorney(
     updated_at: now,
   });
 
-  if (data.case_type_slugs && data.case_type_slugs.length > 0) {
+  // Normalize both inputs into assignment rows.
+  const rows: Array<{ caseTypeSlug: string; subTypeSlug: string | null }> = [
+    ...(data.assignments ?? []),
+    ...(data.case_type_slugs ?? []).map((slug) => ({ caseTypeSlug: slug, subTypeSlug: null })),
+  ];
+  if (rows.length > 0) {
     await db.insert(schema.attorneyCaseTypeAssignments).values(
-      data.case_type_slugs.map((slug) => ({
+      rows.map((r) => ({
         id: nanoid(),
         attorney_id: id,
         account_id: accountId,
-        case_type_slug: slug,
+        case_type_slug: r.caseTypeSlug,
+        sub_type_slug: r.subTypeSlug,
         created_at: now,
       })),
     );
@@ -142,4 +154,43 @@ export async function getAttorneysForCaseType(
     .where(eq(schema.attorneys.account_id, accountId));
 
   return rows.filter((r) => ids.includes(r.id));
+}
+
+export async function getAttorneysForSubType(
+  accountId: string,
+  caseTypeSlug: string,
+  subTypeSlug: string,
+): Promise<Array<{ id: string; name: string; email: string }>> {
+  // Prefer sub-type-scoped assignments.
+  const subAssigned = await db
+    .select({ attorney_id: schema.attorneyCaseTypeAssignments.attorney_id })
+    .from(schema.attorneyCaseTypeAssignments)
+    .where(
+      and(
+        eq(schema.attorneyCaseTypeAssignments.account_id, accountId),
+        eq(schema.attorneyCaseTypeAssignments.case_type_slug, caseTypeSlug),
+        eq(schema.attorneyCaseTypeAssignments.sub_type_slug, subTypeSlug),
+      ),
+    );
+  const ids = subAssigned.map((a) => a.attorney_id);
+  if (ids.length === 0) {
+    // Fallback: whole-case-type assignments (sub_type_slug IS NULL).
+    const caseAssigned = await db
+      .select({ attorney_id: schema.attorneyCaseTypeAssignments.attorney_id })
+      .from(schema.attorneyCaseTypeAssignments)
+      .where(
+        and(
+          eq(schema.attorneyCaseTypeAssignments.account_id, accountId),
+          eq(schema.attorneyCaseTypeAssignments.case_type_slug, caseTypeSlug),
+          isNull(schema.attorneyCaseTypeAssignments.sub_type_slug),
+        ),
+      );
+    ids.push(...caseAssigned.map((a) => a.attorney_id));
+  }
+  if (ids.length === 0) return [];
+  const rows = await db
+    .select({ id: schema.attorneys.id, name: schema.attorneys.name, email: schema.attorneys.email })
+    .from(schema.attorneys)
+    .where(and(eq(schema.attorneys.account_id, accountId), inArray(schema.attorneys.id, ids)));
+  return rows;
 }
