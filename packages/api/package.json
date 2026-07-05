@@ -16,12 +16,15 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
+    "db:seed-super-admin": "tsx src/db/seed-super-admin.ts",
     "db:ensure-car-accident-branch": "tsx src/db/ensure-car-accident-branch.ts",
     "db:ensure-default-branches": "tsx src/db/ensure-default-branches.ts",
     "db:bootstrap-prod": "tsx src/db/bootstrap-prod.ts"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^1.2.0",
     "@ai-sdk/google": "^1.2.0",
+    "@ai-sdk/openai": "^1.3.0",
     "@ai-sdk/react": "^1.2.0",
     "@dnd-kit/accessibility": "^3.1.1",
     "@dnd-kit/core": "^6.3.1",

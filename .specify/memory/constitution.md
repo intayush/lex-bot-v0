@@ -1,6 +1,50 @@
 <!--
 SYNC IMPACT REPORT (most recent)
 ================================
+Version change: 1.0.0 → 2.0.0 (MAJOR)
+Date: 2026-07-05
+Bump rationale: The Platform Admin Console feature (super-admin tooling to
+register, onboard, and oversee all law-firm tenants) requires three changes
+that the versioning policy classifies as MAJOR / principle-redefining:
+
+  1. LLM provider is no longer Gemini-only. Per §Versioning Policy, "swapping
+     the LLM provider away from Gemini" is an explicit MAJOR trigger. The
+     Required Stack now permits Google Gemini, Anthropic, and OpenAI selected
+     per-tenant behind a provider-resolver abstraction. Gemini 2.5 Flash
+     remains the platform default and fallback.
+  2. Principle I's "MUST NOT be implemented before MVP completion" contract is
+     redefined: super-admin multi-tenant operation, admin-facing analytics,
+     and user-configurable LLM providers are carved out of the deferral list
+     for the Platform Admin Console specifically. Other deferrals (payment,
+     CRM, per-firm team roles, self-serve signup, etc.) remain in force.
+  3. A new Principle VIII (Platform Administration & Tenant Isolation) is added
+     to bound the newly-permitted cross-tenant super-admin surface.
+
+Modified sections:
+  ~ §I MVP-First Discipline — exclusion list amended with an explicit
+    Platform Admin Console carve-out.
+  ~ §VI Bounded, Observable, Cost-Aware Agent — added per-tenant model/provider
+    resolution rules (bounded, key-secured, cost-attributed).
+  ~ §Required Stack — "LLM provider" row now lists Gemini + Anthropic + OpenAI
+    via the AI SDK; Gemini 2.5 Flash is the default/fallback.
+  + §VIII Platform Administration & Tenant Isolation (NON-NEGOTIABLE) — new
+    principle governing the super-admin role, cross-tenant access, and
+    per-tenant secret handling.
+
+Templates requiring updates:
+  ✅ .specify/templates/plan-template.md — Constitution Check enumerates gates
+     dynamically against this file; new Principle VIII is picked up without a
+     template edit. No change required.
+  ✅ .specify/templates/spec-template.md — principle-agnostic. No change required.
+  ✅ .specify/templates/tasks-template.md — phase model still aligns. No change
+     required.
+
+Follow-up TODOs: none. All principles resolved.
+-->
+
+<!--
+SYNC IMPACT REPORT (prior)
+================================
 Version change: 1.0.1 → 1.0.0 (REVERT)
 Date: 2026-05-24
 Bump rationale: Reverts the 1.0.0 → 1.0.1 PATCH that added
@@ -83,10 +127,15 @@ Rules:
 
 - Features outside §10's "Out of Scope (MVP)" table MUST NOT be implemented
   before MVP completion. This explicitly excludes payment processing, CRM
-  integrations, multi-tenant authentication, team roles, advanced analytics,
+  integrations, team roles (multiple users per firm), self-serve firm signup,
   notification channels beyond the dashboard bell, multi-language support,
-  custom widget builders, live agent handoff, and user-configurable LLM
-  providers.
+  custom widget builders, and live agent handoff.
+- **Platform Admin Console carve-out (amendment 2.0.0):** three items formerly
+  on the deferral list — super-admin multi-tenant operation, admin-facing
+  analytics, and user-configurable LLM providers — are now permitted, but
+  ONLY within the internal Platform Admin Console governed by Principle VIII.
+  They MUST NOT leak into the firm-facing dashboard or the widget. This
+  carve-out does not reopen the other deferrals above.
 - Any contribution that adds a "nice to have" beyond the spec MUST cite the
   spec section it implements. PRs that cannot map their changes to a spec
   section MUST be rejected or rescoped.
@@ -277,7 +326,19 @@ Rules:
   be queryable by session ID.
 - Token usage (input + output) MUST be recorded per conversation in the
   database for cost monitoring (§11.3). The dashboard surfaces cumulative
-  spend.
+  spend. Per-tenant usage records MUST additionally capture the resolved
+  provider and model so cost can be attributed per tenant and per provider.
+- Per-tenant model/provider resolution (amendment 2.0.0): the chat runtime
+  MUST resolve the LLM provider and model per tenant through a single
+  provider-resolver abstraction — never a hardcoded model call scattered
+  through the code. Supported providers are Google Gemini, Anthropic, and
+  OpenAI via the Vercel AI SDK. When a tenant has no explicit configuration,
+  the resolver MUST fall back to the platform default (`gemini-2.5-flash`).
+  A tenant's per-provider API key, if supplied, MUST be stored encrypted at
+  rest (not a bcryptjs hash — the key must be recoverable to call the
+  provider), MUST NOT be logged, and MUST NOT be returned to any client in
+  plaintext after entry. All existing agent bounds (maxSteps ≤ 5, token
+  budget, rate limits) apply identically regardless of the resolved provider.
 - The chatbot MUST display a persistent disclaimer: "I am an AI assistant,
   not a lawyer. Nothing I say constitutes legal advice." (§11.4). This is
   a non-removable widget element.
@@ -310,6 +371,50 @@ Rationale: §12.5 is explicit that no phase depends on a later one, and
 constitutional protects the spec's incremental-delivery property and
 keeps the prototype demoable at every checkpoint.
 
+### VIII. Platform Administration & Tenant Isolation (NON-NEGOTIABLE)
+
+The Platform Admin Console is an internal, super-admin-only surface for the
+SaaS operator to register, onboard, configure, and oversee all law-firm
+tenants. It is the ONLY place where cross-tenant access is permitted. This
+principle bounds that power so it cannot erode the per-tenant isolation that
+Principle V guarantees.
+
+Rules:
+
+- Super-admin identity MUST be a distinct role, stored separately from the
+  `accounts` (firm) table and authenticated on its own credentials. A firm
+  login MUST NEVER gain super-admin capability, and a super-admin session MUST
+  be explicitly flagged; absence of the flag denies every `/api/admin/*`
+  handler and every `/admin/*` route.
+- Cross-tenant read/write is permitted ONLY through `/api/admin/*` handlers
+  guarded by the super-admin check. The firm-facing dashboard and its
+  `/api/dashboard/*` handlers MUST remain scoped to the caller's own
+  `account_id` exactly as before — this amendment MUST NOT relax that scoping.
+- Every admin action that mutates a tenant (create, onboard, suspend,
+  reactivate, delete, rotate key, change LLM config) MUST be attributable:
+  the acting super-admin and a timestamp MUST be recorded.
+- Tenant deletion MUST follow Principle V's archival rule: soft-delete with an
+  `archived_data` snapshot, never a hard wipe of lead/PII data.
+- Per-tenant secrets managed from the console (LLM provider API keys) MUST be
+  encrypted at rest and MUST follow the plaintext-shown-once, never-logged,
+  never-returned rules of Principle V. API keys for the widget remain
+  bcryptjs-hashed; LLM provider keys are encrypted (recoverable) because they
+  must be replayed to the provider.
+- Admin analytics MUST be derived from data the platform already stores
+  (sessions, leads, token-usage records, routing/action events). Adding a new
+  tracking surface MUST be justified in the feature spec and MUST NOT record
+  PII into general-purpose log streams (Principle V).
+- The onboarding wizard produces DRAFT tenant configuration and SOP that reuse
+  the existing seed/default machinery and the existing versioning +
+  publish/draft model. It MUST NOT introduce a parallel configuration store.
+
+Rationale: Multi-tenant super-admin tooling concentrates privilege in one
+surface. Left unbounded it is the single most dangerous way to violate
+attorney-client data boundaries at scale. Making the role separation,
+attribution, archival-on-delete, and secret-handling rules constitutional
+ensures the convenience of central administration never silently overrides
+Principle V's isolation guarantees.
+
 ## Technology Stack & Architectural Limits
 
 The technology selections in product spec §9 are binding. Substitutions
@@ -322,8 +427,8 @@ require a constitution amendment.
 | Language | TypeScript (strict) | Node.js 20+ runtime |
 | Frontend framework | React (NPM widget, Dashboard); Preact (CDN widget bundle) | Per §6.2 |
 | Framework | Next.js (Dashboard + API) | Route Handlers only — no Server Actions |
-| LLM provider | Gemini via `@ai-sdk/google` | `gemini-2.5-flash` is the default model |
-| AI SDK | Vercel AI SDK (`ai`, `@ai-sdk/google`) | `streamText` + `tool()` + `useChat` |
+| LLM provider | Google Gemini (`@ai-sdk/google`), Anthropic (`@ai-sdk/anthropic`), OpenAI (`@ai-sdk/openai`) — selected per-tenant via a provider-resolver | `gemini-2.5-flash` is the platform default and fallback (amendment 2.0.0, §VIII) |
+| AI SDK | Vercel AI SDK (`ai`, `@ai-sdk/google`, `@ai-sdk/anthropic`, `@ai-sdk/openai`) | `streamText` + `tool()` + `useChat` |
 | Styling | Tailwind CSS (Dashboard); CSS custom properties (Widget) | §6.7, §8.11 |
 | Database (prod) | Neon serverless PostgreSQL via `@neondatabase/serverless` | §2.6, §9.3 |
 | Database (test) | `better-sqlite3` (in-memory) | Dev dependency only |
@@ -496,4 +601,4 @@ that are not policy) lives in `README.md`, `AGENTS.md`, and the active
 plan under `specs/[###-feature]/plan.md`. Those documents implement this
 constitution; they MUST NOT contradict it.
 
-**Version**: 1.0.0 | **Ratified**: 2026-05-23 | **Last Amended**: 2026-05-23
+**Version**: 2.0.0 | **Ratified**: 2026-05-23 | **Last Amended**: 2026-07-05

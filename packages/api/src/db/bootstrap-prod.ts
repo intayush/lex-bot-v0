@@ -37,12 +37,12 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import { migrate } from 'drizzle-orm/neon-http/migrator';
 import path from 'node:path';
 
-import { runMultiBranchSopDataMigration } from './migrations/0004-multi-branch-sop.js';
-import { seedSopForAccount } from './seed.js';
-import { ensureContactStepForAccount } from './ensure-contact-step.js';
-import { ensureCarAccidentBranchForAccount } from './ensure-car-accident-branch.js';
-import { ensureDefaultBranchesForAccount } from './ensure-default-branches.js';
-import { db, schema } from './index.js';
+import { runMultiBranchSopDataMigration } from './migrations/0004-multi-branch-sop';
+import { seedSopForAccount } from './seed';
+import { ensureContactStepForAccount } from './ensure-contact-step';
+import { ensureCarAccidentBranchForAccount } from './ensure-car-accident-branch';
+import { ensureDefaultBranchesForAccount } from './ensure-default-branches';
+import { db, schema } from './index';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {

@@ -34,12 +34,12 @@
 import { and, eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 
-import { db, schema } from './index.js';
+import { db, schema } from './index';
 import {
   CAR_ACCIDENT_BRANCH_HARD_OVERRIDES_JSON,
   CAR_ACCIDENT_BRANCH_QUESTIONS_JSON,
   CAR_ACCIDENT_BRANCH_THRESHOLDS_JSON,
-} from './seed-defaults/sop.js';
+} from './seed-defaults/sop';
 
 export type CarAccidentBranchMigrationOutcome =
   | 'inserted'

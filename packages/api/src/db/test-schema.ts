@@ -11,6 +11,10 @@ export const accounts = sqliteTable('accounts', {
   password_hash: text('password_hash').notNull(),
   firm_name: text('firm_name'),
   created_at: text('created_at').notNull(),
+  /** 027-platform-admin-console. */
+  status: text('status').notNull().default('active'),
+  onboarding_status: text('onboarding_status').notNull().default('live'),
+  deleted_at: text('deleted_at'),
 });
 
 export const apiKeys = sqliteTable('api_keys', {
@@ -225,4 +229,47 @@ export const branchVersions = sqliteTable('branch_versions', {
   published_at: text('published_at'),
   created_at: text('created_at').notNull(),
   created_by_user_id: text('created_by_user_id').notNull(),
+});
+
+// ---------------------------------------------------------------------------
+// 027-platform-admin-console — SQLite mirror for tests
+// ---------------------------------------------------------------------------
+
+export const superAdmins = sqliteTable('super_admins', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  password_hash: text('password_hash').notNull(),
+  created_at: text('created_at').notNull(),
+});
+
+export const accountLlmConfig = sqliteTable('account_llm_config', {
+  id: text('id').primaryKey(),
+  account_id: text('account_id').notNull().references(() => accounts.id),
+  provider: text('provider').notNull(),
+  model: text('model').notNull(),
+  api_key_encrypted: text('api_key_encrypted'),
+  is_active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  created_at: text('created_at').notNull(),
+  updated_at: text('updated_at').notNull(),
+});
+
+export const usageEvents = sqliteTable('usage_events', {
+  id: text('id').primaryKey(),
+  account_id: text('account_id').notNull().references(() => accounts.id),
+  session_id: text('session_id'),
+  provider: text('provider').notNull(),
+  model: text('model').notNull(),
+  prompt_tokens: integer('prompt_tokens').notNull().default(0),
+  completion_tokens: integer('completion_tokens').notNull().default(0),
+  total_tokens: integer('total_tokens').notNull().default(0),
+  created_at: text('created_at').notNull(),
+});
+
+export const adminAuditLog = sqliteTable('admin_audit_log', {
+  id: text('id').primaryKey(),
+  super_admin_id: text('super_admin_id').notNull().references(() => superAdmins.id),
+  action: text('action').notNull(),
+  target_account_id: text('target_account_id'),
+  metadata_json: text('metadata_json'),
+  created_at: text('created_at').notNull(),
 });

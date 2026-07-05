@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 import { nanoid } from 'nanoid';
-import * as schema from './schema.js';
+import * as schema from './schema';
 import {
   DEFAULT_SOP_STEPS,
   DEFAULT_CASE_TYPES,
@@ -12,8 +12,8 @@ import {
   CAR_ACCIDENT_BRANCH_HARD_OVERRIDES_JSON,
   CAR_ACCIDENT_BRANCH_QUESTIONS_JSON,
   CAR_ACCIDENT_BRANCH_THRESHOLDS_JSON,
-} from './seed-defaults/sop.js';
-import { DEFAULT_BRANCH_SEEDS } from './seed-defaults/branches.js';
+} from './seed-defaults/sop';
+import { DEFAULT_BRANCH_SEEDS } from './seed-defaults/branches';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {

@@ -25,7 +25,7 @@
  */
 
 import { eq, and } from 'drizzle-orm';
-import { db, schema } from './index.js';
+import { db, schema } from './index';
 
 // ---------------------------------------------------------------------------
 // Industry-standard PI case value bands (same as seed data in seed.ts)

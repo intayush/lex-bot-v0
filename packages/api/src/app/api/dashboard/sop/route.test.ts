@@ -48,7 +48,10 @@ CREATE TABLE \`accounts\` (
   \`email\` text NOT NULL,
   \`password_hash\` text NOT NULL,
   \`firm_name\` text,
-  \`created_at\` text NOT NULL
+  \`created_at\` text NOT NULL,
+  \`status\` text DEFAULT 'active' NOT NULL,
+  \`onboarding_status\` text DEFAULT 'live' NOT NULL,
+  \`deleted_at\` text
 );
 CREATE UNIQUE INDEX \`accounts_email_unique\` ON \`accounts\` (\`email\`);
 
@@ -89,7 +92,7 @@ beforeEach(() => {
   for (const stmt of MIGRATION_SQL.split(';').filter((s) => s.trim())) {
     sqlite.exec(stmt);
   }
-  sqlite.exec(`INSERT INTO accounts VALUES ('${ACCOUNT_ID}', 'sop@test.com', 'hash', 'SOP Firm', '${NOW}')`);
+  sqlite.exec(`INSERT INTO accounts (id, email, password_hash, firm_name, created_at) VALUES ('${ACCOUNT_ID}', 'sop@test.com', 'hash', 'SOP Firm', '${NOW}')`);
 });
 
 afterEach(() => {

@@ -3,7 +3,7 @@
  * Run: DATABASE_URL=... pnpm --filter @legal-chatbot/api exec tsx src/db/debug-case-value.ts
  */
 import { eq, isNotNull } from 'drizzle-orm';
-import { db, schema } from './index.js';
+import { db, schema } from './index';
 
 async function main() {
   // 1. PI branches — are they enabled?

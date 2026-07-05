@@ -29,11 +29,11 @@
 import { and, eq } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 
-import { db, schema } from './index.js';
+import { db, schema } from './index';
 import {
   DEFAULT_BRANCH_SEEDS,
   type DefaultBranchSeed,
-} from './seed-defaults/branches.js';
+} from './seed-defaults/branches';
 
 export type DefaultBranchMigrationOutcome =
   | 'inserted'

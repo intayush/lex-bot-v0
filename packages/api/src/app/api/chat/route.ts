@@ -1,7 +1,8 @@
 import { streamText, tool } from 'ai';
-import { google } from '@ai-sdk/google';
 import { z } from 'zod';
 import { verifyApiKey } from '../../../lib/auth';
+import { resolveModelForAccount, resolveProviderModel } from '../../../lib/llm/provider-resolver';
+import { recordUsageEvent } from '../../../lib/usage';
 import { getPublishedConfig, getLatestConfig } from '../../../lib/config';
 import { getSOPBundle } from '../../../lib/sop-config';
 import { composeSystemPrompt } from '../../../lib/system-prompt';
@@ -463,8 +464,13 @@ export async function POST(req: Request) {
     }),
   };
 
+  // 027-platform-admin-console: resolve the tenant's LLM provider/model
+  // (single resolution point; falls back to gemini-2.5-flash). All existing
+  // agent bounds (maxSteps, budgets, rate limits) are unchanged.
+  const model = await resolveModelForAccount(auth.accountId);
+
   const result = streamText({
-    model: google('gemini-2.5-flash'),
+    model,
     system: systemPrompt,
     messages: fullMessages,
     tools,
@@ -472,7 +478,24 @@ export async function POST(req: Request) {
     onError: (event) => {
       console.error('[chat] Stream error:', event.error);
     },
-    onFinish: async ({ text }) => {
+    onFinish: async ({ text, usage }) => {
+      // 027 US4: record per-conversation token usage (deferred, non-blocking)
+      // attributed to the resolved provider/model for tenant metrics + cost.
+      runAfterResponse(
+        async () => {
+          const { provider, model: resolvedModel } = await resolveProviderModel(auth.accountId);
+          await recordUsageEvent({
+            accountId: auth.accountId,
+            sessionId,
+            provider,
+            model: resolvedModel,
+            promptTokens: usage?.promptTokens ?? 0,
+            completionTokens: usage?.completionTokens ?? 0,
+            totalTokens: usage?.totalTokens ?? 0,
+          });
+        },
+        (err) => console.error('[chat] usage capture failed:', err),
+      );
       // 021-chat-api-latency T025: split writes into critical-path and
       // deferred paths:
       //   (a) CRITICAL: appendMessagesAndSOPState — awaited directly so the

@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/neon-http';
 import { migrate } from 'drizzle-orm/neon-http/migrator';
 import path from 'path';
 
-import { runMultiBranchSopDataMigration } from './migrations/0004-multi-branch-sop.js';
+import { runMultiBranchSopDataMigration } from './migrations/0004-multi-branch-sop';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {
@@ -24,7 +24,7 @@ console.log('Drizzle migrations complete.');
 const results = await runMultiBranchSopDataMigration({
   // Type-cast: the shared migration helper is typed against the
   // production `db` instance; here we pass the same instance.
-  db: db as unknown as typeof import('./index.js').db,
+  db: db as unknown as typeof import('./index').db,
 });
 const inserted = results.filter((r) => r.outcome === 'inserted').length;
 const skipped = results.filter((r) => r.outcome === 'skipped_already_present').length;

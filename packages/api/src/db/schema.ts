@@ -6,6 +6,12 @@ export const accounts = pgTable('accounts', {
   password_hash: text('password_hash').notNull(),
   firm_name: text('firm_name'),
   created_at: text('created_at').notNull(),
+  /** 027-platform-admin-console: lifecycle status. 'active' | 'suspended'. */
+  status: text('status').notNull().default('active'),
+  /** 027: onboarding progress. 'draft' | 'published' | 'live'. Existing rows default 'live'. */
+  onboarding_status: text('onboarding_status').notNull().default('live'),
+  /** 027: soft-delete marker (ISO string). NULL = active fleet member. */
+  deleted_at: text('deleted_at'),
 }, (table) => [
   uniqueIndex('accounts_email_unique').on(table.email),
 ]);
@@ -399,4 +405,62 @@ export const branchVersions = pgTable('branch_versions', {
     table.version_number,
   ),
   index('branch_versions_branch_idx').on(table.branch_id),
+]);
+
+// ---------------------------------------------------------------------------
+// 027-platform-admin-console
+// ---------------------------------------------------------------------------
+
+/** Platform operator identity — separate from `accounts` (Constitution VIII). */
+export const superAdmins = pgTable('super_admins', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull(),
+  password_hash: text('password_hash').notNull(),
+  created_at: text('created_at').notNull(),
+}, (table) => [
+  uniqueIndex('super_admins_email_unique').on(table.email),
+]);
+
+/** Per-tenant LLM provider/model/key. Absent row => platform default. */
+export const accountLlmConfig = pgTable('account_llm_config', {
+  id: text('id').primaryKey(),
+  account_id: text('account_id').notNull().references(() => accounts.id),
+  /** 'google' | 'anthropic' | 'openai' (validated by Zod at the boundary). */
+  provider: text('provider').notNull(),
+  model: text('model').notNull(),
+  /** AES-256-GCM `iv:tag:ciphertext` (base64). NULL => use platform key. */
+  api_key_encrypted: text('api_key_encrypted'),
+  is_active: boolean('is_active').notNull().default(true),
+  created_at: text('created_at').notNull(),
+  updated_at: text('updated_at').notNull(),
+}, (table) => [
+  uniqueIndex('account_llm_config_account_unique').on(table.account_id),
+]);
+
+/** Per-conversation token usage for metrics + cost attribution (Constitution VI). */
+export const usageEvents = pgTable('usage_events', {
+  id: text('id').primaryKey(),
+  account_id: text('account_id').notNull().references(() => accounts.id),
+  session_id: text('session_id'),
+  provider: text('provider').notNull(),
+  model: text('model').notNull(),
+  prompt_tokens: integer('prompt_tokens').notNull().default(0),
+  completion_tokens: integer('completion_tokens').notNull().default(0),
+  total_tokens: integer('total_tokens').notNull().default(0),
+  created_at: text('created_at').notNull(),
+}, (table) => [
+  index('usage_events_account_idx').on(table.account_id),
+  index('usage_events_created_idx').on(table.created_at),
+]);
+
+/** Attribution for every mutating admin action (Constitution VIII). */
+export const adminAuditLog = pgTable('admin_audit_log', {
+  id: text('id').primaryKey(),
+  super_admin_id: text('super_admin_id').notNull().references(() => superAdmins.id),
+  action: text('action').notNull(),
+  target_account_id: text('target_account_id'),
+  metadata_json: text('metadata_json'),
+  created_at: text('created_at').notNull(),
+}, (table) => [
+  index('admin_audit_log_created_idx').on(table.created_at),
 ]);

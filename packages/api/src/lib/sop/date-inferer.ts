@@ -14,7 +14,16 @@
  * The function accepts an optional `model` parameter for testability.
  * Production callers pass nothing; the default Gemini provider is used.
  *
- * Source of truth: research.md R3.
+ * 027-platform-admin-console note: this internal date-normalization utility
+ * intentionally stays on the platform-default Gemini model rather than the
+ * per-tenant resolved provider. It is a deterministic helper (not the
+ * tenant-facing conversation model), runs deep in the SOP pipeline without an
+ * `accountId` in scope, and keeping it on the fast default avoids threading the
+ * resolver through hot paths. The tenant-facing chat model IS resolved
+ * per-tenant (see app/api/chat/route.ts). Callers may still inject a resolved
+ * model via `input.model` if per-tenant date inference is ever desired.
+ *
+ * Source of truth: research.md R3 + 027 plan T039.
  */
 import { generateObject } from 'ai';
 import type { LanguageModelV1 } from 'ai';

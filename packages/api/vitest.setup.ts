@@ -22,3 +22,17 @@ if (!process.env.SESSION_SECRET) {
 if (!process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
   process.env.GOOGLE_GENERATIVE_AI_API_KEY = 'mock-key';
 }
+// 027-platform-admin-console: admin session + encryption + provider fallback keys.
+if (!process.env.ADMIN_SESSION_SECRET) {
+  process.env.ADMIN_SESSION_SECRET = 'b'.repeat(32);
+}
+if (!process.env.ENCRYPTION_KEY) {
+  // 32 bytes of zeros, hex-encoded (64 hex chars) — test-only.
+  process.env.ENCRYPTION_KEY = '00'.repeat(32);
+}
+if (!process.env.ANTHROPIC_API_KEY) {
+  process.env.ANTHROPIC_API_KEY = 'mock-anthropic-key';
+}
+if (!process.env.OPENAI_API_KEY) {
+  process.env.OPENAI_API_KEY = 'mock-openai-key';
+}

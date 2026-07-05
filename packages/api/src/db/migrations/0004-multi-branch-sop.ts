@@ -35,8 +35,8 @@
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 
-import { branches, branchVersions, accounts, caseTypes, subTypes, sopSteps, sopConfigurations } from '../schema.js';
-import type { db as ProductionDb } from '../index.js';
+import { branches, branchVersions, accounts, caseTypes, subTypes, sopSteps, sopConfigurations } from '../schema';
+import type { db as ProductionDb } from '../index';
 
 // ---------------------------------------------------------------------------
 // Types

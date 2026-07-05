@@ -37,7 +37,10 @@ CREATE TABLE \`accounts\` (
   \`email\` text NOT NULL,
   \`password_hash\` text NOT NULL,
   \`firm_name\` text,
-  \`created_at\` text NOT NULL
+  \`created_at\` text NOT NULL,
+  \`status\` text DEFAULT 'active' NOT NULL,
+  \`onboarding_status\` text DEFAULT 'live' NOT NULL,
+  \`deleted_at\` text
 );
 
 CREATE TABLE \`case_types\` (

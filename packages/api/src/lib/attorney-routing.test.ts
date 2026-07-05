@@ -46,7 +46,10 @@ CREATE TABLE \`accounts\` (
   \`email\` text NOT NULL,
   \`password_hash\` text NOT NULL,
   \`firm_name\` text,
-  \`created_at\` text NOT NULL
+  \`created_at\` text NOT NULL,
+  \`status\` text DEFAULT 'active' NOT NULL,
+  \`onboarding_status\` text DEFAULT 'live' NOT NULL,
+  \`deleted_at\` text
 );
 
 CREATE TABLE \`attorneys\` (
@@ -100,7 +103,7 @@ beforeEach(() => {
   for (const stmt of MIGRATION_SQL.split(';').filter((s) => s.trim())) {
     sqlite.exec(stmt);
   }
-  sqlite.exec(`INSERT INTO accounts VALUES ('${ACCT}', 'firm@test.com', 'hash', 'Test Firm', '${NOW}')`);
+  sqlite.exec(`INSERT INTO accounts (id, email, password_hash, firm_name, created_at) VALUES ('${ACCT}', 'firm@test.com', 'hash', 'Test Firm', '${NOW}')`);
 });
 
 afterEach(() => {
