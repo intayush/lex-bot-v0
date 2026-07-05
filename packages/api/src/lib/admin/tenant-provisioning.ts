@@ -17,14 +17,15 @@ export async function generateApiKey(): Promise<{ plaintext: string; keyHash: st
   return { plaintext, keyHash };
 }
 
+const DEFAULT_GREETING = 'Hi! Thanks for reaching out. I can help answer questions and connect you with the right attorney. How can I help you today?';
+
 /** Which required wizard sections are still missing (FR-012). */
 export function missingRequiredSections(sub: WizardSubmission): string[] {
   const missing: string[] = [];
-  for (const key of REQUIRED_WIZARD_SECTIONS) {
-    const val = (sub as Record<string, unknown>)[key];
-    if (val == null || (Array.isArray(val) && val.length === 0)) {
-      missing.push(key);
-    }
+  if (sub.firmIdentity == null) missing.push('firmIdentity');
+  if (sub.caseTypeSelection == null || sub.caseTypeSelection.length === 0
+      || sub.caseTypeSelection.every((c) => c.subTypeSlugs.length === 0)) {
+    missing.push('caseTypeSelection');
   }
   return missing;
 }
@@ -35,19 +36,18 @@ export function missingRequiredSections(sub: WizardSubmission): string[] {
  */
 export function buildDraftFromWizard(sub: WizardSubmission, now: string): Record<string, unknown> {
   const identity = sub.firmIdentity;
-  const contact = sub.contact;
   return {
     version: 1,
     saved_at: now,
     persona: {
       firm_name: identity?.firmName ?? '',
       chatbot_name: identity?.chatbotName ?? 'Assistant',
-      greeting_message: identity?.greetingMessage ?? 'Hi! How can I help you today?',
-      tone: sub.persona?.tone ?? 'friendly',
-      language: identity?.language ?? 'English',
+      greeting_message: DEFAULT_GREETING,
+      tone: 'friendly',
+      language: 'English',
     },
     out_of_scope_response:
-      "I'm not able to help with that area, but I'd recommend reaching out to another attorney who specializes in it.",
+      "I'm not able to help with that area, but I'd recommend reaching out to an attorney who specializes in it.",
     boundaries: {
       never_say: [
         'Never provide specific legal advice or legal opinions',
@@ -56,16 +56,14 @@ export function buildDraftFromWizard(sub: WizardSubmission, now: string): Record
       ],
     },
     escalation: {
-      triggers: sub.escalation?.triggers ?? [],
-      message: sub.escalation?.message ?? '',
+      triggers: [],
+      message: '',
     },
     contact: {
-      phone: contact?.phone ?? '',
-      // configurationSchema requires a valid email; use a placeholder for
-      // partial drafts (contact is a required section before publish anyway).
-      email: contact?.email ?? 'unknown@example.com',
-      office_hours: contact?.officeHours ?? [],
-      after_hours_message: contact?.afterHoursMessage ?? '',
+      phone: '',
+      email: identity?.email ?? 'unknown@example.com',
+      office_hours: [],
+      after_hours_message: '',
     },
     custom_instructions: '',
   };
@@ -107,6 +105,12 @@ export async function saveOnboardingDraft(
     });
   }
 
+  if (submission.firmIdentity?.domain) {
+    await db.update(schema.accounts)
+      .set({ domain: submission.firmIdentity.domain })
+      .where(eq(schema.accounts.id, accountId));
+  }
+
   return { ready: missing.length === 0, missing };
 }
 
@@ -115,15 +119,29 @@ export async function saveOnboardingDraft(
  * Delegates to the shared seed/ensure machinery (idempotent). Kept as a thin
  * seam so route/integration tests can mock it.
  */
-export async function seedSopAndBranches(accountId: string): Promise<void> {
+export async function seedSopAndBranches(
+  accountId: string,
+  selection?: Array<{ caseTypeSlug: string; subTypeSlugs: string[] }>,
+): Promise<void> {
   const { seedSopForAccount } = await import('../../db/seed');
   const { ensureContactStepForAccount } = await import('../../db/ensure-contact-step');
-  const { ensureCarAccidentBranchForAccount } = await import('../../db/ensure-car-accident-branch');
-  const { ensureDefaultBranchesForAccount } = await import('../../db/ensure-default-branches');
-  await seedSopForAccount(accountId);
+  await seedSopForAccount(accountId, selection ? { selection } : undefined);
   await ensureContactStepForAccount(accountId);
-  await ensureCarAccidentBranchForAccount(accountId);
-  await ensureDefaultBranchesForAccount(accountId);
+  // Note: car-accident/default branch ensures are handled inside seedSopForAccount's
+  // selection path; do not force-add branches for unselected sub-types.
+}
+
+export async function provisionAttorneys(
+  accountId: string,
+  attorneys: NonNullable<WizardSubmission['attorneys']>,
+): Promise<void> {
+  const { createAttorney } = await import('../../lib/attorneys');
+  for (const a of attorneys) {
+    await createAttorney(accountId, {
+      name: a.name, email: a.email, mobile: a.mobile ?? null,
+      assignments: a.subTypeAssignments.map((s) => ({ caseTypeSlug: s.caseTypeSlug, subTypeSlug: s.subTypeSlug })),
+    });
+  }
 }
 
 /** Publish the tenant: flip config + SOP `is_published`, set onboarding 'live'. */

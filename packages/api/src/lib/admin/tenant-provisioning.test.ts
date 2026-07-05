@@ -12,29 +12,23 @@ import {
 
 const NOW = '2026-07-05T10:00:00.000Z';
 
-const fullSubmission: WizardSubmission = {
-  firmIdentity: {
-    firmName: 'Acme Law',
-    chatbotName: 'Ace',
-    greetingMessage: 'Hi from Acme!',
-    language: 'English',
-  },
-  caseTypes: [{ slug: 'dui', label: 'DUI', subTypes: [{ slug: 'first', label: 'First Offense' }] }],
-  persona: { tone: 'formal' },
-  contact: { phone: '555-1234', email: 'info@acme.law', officeHours: [], afterHoursMessage: 'Closed' },
-  escalation: { triggers: ['emergency'], message: 'Call 911' },
+const sub: WizardSubmission = {
+  firmIdentity: { firmName: 'Acme Law', chatbotName: 'Ace', email: 'info@acme.law', domain: 'acme.law' },
+  caseTypeSelection: [{ caseTypeSlug: 'dui', subTypeSlugs: ['first_offense'] }],
+  attorneys: [],
 };
 
 describe('buildDraftFromWizard — T025', () => {
-  it('maps wizard answers into a valid configurationSchema shape', () => {
-    const draft = buildDraftFromWizard(fullSubmission, NOW);
-    const parsed = configurationSchema.safeParse(draft);
-    expect(parsed.success).toBe(true);
-    expect(draft.persona).toMatchObject({ firm_name: 'Acme Law', chatbot_name: 'Ace', tone: 'formal' });
+  it('maps to a valid configuration with default greeting/tone/contact', () => {
+    const draft = buildDraftFromWizard(sub, NOW);
+    expect(configurationSchema.safeParse(draft).success).toBe(true);
+    expect((draft.persona as { chatbot_name: string }).chatbot_name).toBe('Ace');
+    expect((draft.persona as { tone: string }).tone).toBe('friendly'); // defaulted
+    expect((draft.persona as { greeting_message: string }).greeting_message.length).toBeGreaterThan(0);
   });
 
   it('fills sensible defaults when optional sections are omitted', () => {
-    const draft = buildDraftFromWizard({ firmIdentity: fullSubmission.firmIdentity }, NOW);
+    const draft = buildDraftFromWizard({ attorneys: [] }, NOW);
     const parsed = configurationSchema.safeParse(draft);
     expect(parsed.success).toBe(true);
     // Persona tone defaults to friendly when not provided.
@@ -44,19 +38,17 @@ describe('buildDraftFromWizard — T025', () => {
 
 describe('missingRequiredSections — T025 (FR-012)', () => {
   it('returns empty when all required sections present', () => {
-    expect(missingRequiredSections(fullSubmission)).toEqual([]);
+    expect(missingRequiredSections(sub)).toEqual([]);
   });
 
-  it('flags missing firmIdentity / caseTypes / contact', () => {
-    const missing = missingRequiredSections({ persona: { tone: 'neutral' } });
-    expect(missing).toContain('firmIdentity');
-    expect(missing).toContain('caseTypes');
-    expect(missing).toContain('contact');
+  it('flags missing firmIdentity and empty caseTypeSelection', () => {
+    expect(missingRequiredSections({ attorneys: [] })).toEqual(expect.arrayContaining(['firmIdentity', 'caseTypeSelection']));
+    expect(missingRequiredSections({ ...sub, caseTypeSelection: [] })).toEqual(['caseTypeSelection']);
   });
 
-  it('treats an empty caseTypes array as missing', () => {
-    const missing = missingRequiredSections({ ...fullSubmission, caseTypes: [] });
-    expect(missing).toEqual(['caseTypes']);
+  it('treats an all-empty-subTypeSlugs caseTypeSelection as missing', () => {
+    const missing = missingRequiredSections({ ...sub, caseTypeSelection: [{ caseTypeSlug: 'dui', subTypeSlugs: [] }] });
+    expect(missing).toEqual(['caseTypeSelection']);
   });
 });
 
