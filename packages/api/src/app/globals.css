@@ -336,3 +336,8 @@ tbody tr:hover {
     grid-template-columns: minmax(0, 1fr) 7rem 4rem 1rem;
   }
 }
+
+/* ---- Onboarding wizard step transition ---- */
+.onboarding-step { animation: onboarding-fade 220ms ease; }
+@keyframes onboarding-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .onboarding-step { animation: none; } }
