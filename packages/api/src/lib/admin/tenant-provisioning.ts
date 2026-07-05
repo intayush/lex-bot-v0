@@ -6,7 +6,7 @@
 import bcrypt from 'bcryptjs';
 import { nanoid } from 'nanoid';
 import { eq, and, desc } from 'drizzle-orm';
-import type { WizardSubmission } from '@legal-chatbot/shared';
+import type { WizardSubmission, WizardDraft } from '@legal-chatbot/shared';
 import { REQUIRED_WIZARD_SECTIONS } from '@legal-chatbot/shared';
 import { db, schema } from '../../db/index';
 
@@ -142,6 +142,24 @@ export async function provisionAttorneys(
       assignments: a.subTypeAssignments.map((s) => ({ caseTypeSlug: s.caseTypeSlug, subTypeSlug: s.subTypeSlug })),
     });
   }
+}
+
+export async function saveWizardDraft(
+  accountId: string, draft: WizardDraft, now: () => string = () => new Date().toISOString(),
+): Promise<void> {
+  void now;
+  const updates: Record<string, unknown> = { onboarding_draft_json: JSON.stringify(draft) };
+  const domain = draft.firmIdentity?.domain;
+  if (domain && domain.length > 0) updates.domain = domain;
+  await db.update(schema.accounts).set(updates).where(eq(schema.accounts.id, accountId));
+}
+
+export async function getWizardDraft(accountId: string): Promise<unknown | null> {
+  const rows = await db.select({ json: schema.accounts.onboarding_draft_json })
+    .from(schema.accounts).where(eq(schema.accounts.id, accountId));
+  const json = rows[0]?.json;
+  if (!json) return null;
+  try { return JSON.parse(json); } catch { return null; }
 }
 
 /** Publish the tenant: flip config + SOP `is_published`, set onboarding 'live'. */

@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
-import { wizardSubmissionSchema } from '@legal-chatbot/shared';
+import { wizardSubmissionSchema, wizardDraftSchema } from '@legal-chatbot/shared';
 import { requireSuperAdmin } from '../../../../../../lib/admin-guard';
 import { recordAdminAction } from '../../../../../../lib/admin/audit';
 import {
   saveOnboardingDraft,
   seedSopAndBranches,
   provisionAttorneys,
+  saveWizardDraft,
+  getWizardDraft,
 } from '../../../../../../lib/admin/tenant-provisioning';
 
 /**
@@ -19,16 +21,15 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   const { id: accountId } = await params;
   const body = await req.json().catch(() => null);
-  const parsed = wizardSubmissionSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid submission' }, { status: 400 });
-  }
-  const submission = parsed.data;
 
-  // Save progress (upsert draft config) regardless of finish.
-  const { ready, missing } = await saveOnboardingDraft(accountId, submission);
-
-  if (submission.finish) {
+  if (body?.finish === true) {
+    // Finish path: strict validation
+    const parsed = wizardSubmissionSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Invalid submission' }, { status: 400 });
+    }
+    const submission = parsed.data;
+    const { ready, missing } = await saveOnboardingDraft(accountId, submission);
     if (!ready) {
       return NextResponse.json(
         { error: 'Required sections are missing', missing },
@@ -43,5 +44,20 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     return NextResponse.json({ onboardingStatus: 'draft', draftReady: true });
   }
 
-  return NextResponse.json({ onboardingStatus: 'draft', draftReady: ready });
+  // Partial autosave path: permissive draft validation
+  const draft = wizardDraftSchema.safeParse(body);
+  if (!draft.success) {
+    return NextResponse.json({ error: 'Malformed draft' }, { status: 400 });
+  }
+  await saveWizardDraft(accountId, draft.data);
+  return NextResponse.json({ onboardingStatus: 'draft', saved: true });
+}
+
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const guard = await requireSuperAdmin();
+  if (!guard.ok) return guard.response;
+
+  const { id: accountId } = await params;
+  const draft = await getWizardDraft(accountId);
+  return NextResponse.json({ draft });
 }

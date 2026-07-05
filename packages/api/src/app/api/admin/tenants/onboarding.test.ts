@@ -40,7 +40,7 @@ vi.mock('../../../../lib/admin/tenant-provisioning.js', async (orig) => {
 import { describe, it, expect, beforeEach } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { POST as registerTenant } from './route.js';
-import { PUT as onboarding } from './[id]/onboarding/route.js';
+import { PUT as onboarding, GET as getOnboardingDraft } from './[id]/onboarding/route.js';
 import { POST as publish } from './[id]/publish/route.js';
 import { db, schema } from '../../../../db/index.js';
 
@@ -172,5 +172,28 @@ describe('onboarding finish + publish — T026', () => {
     await db.insert(schema.accounts).values({ id: 'empty_1', email: 'e@e.com', password_hash: 'h', firm_name: 'E', created_at: new Date().toISOString(), status: 'active', onboarding_status: 'draft', deleted_at: null });
     const res = await publish(new Request('http://localhost/x', { method: 'POST' }), { params: Promise.resolve({ id: 'empty_1' }) });
     expect(res.status).toBe(409);
+  });
+
+  it('partial PUT without finish=true saves draft and does NOT call seed/provision', async () => {
+    const id = await register();
+    const partialDraft = { firmIdentity: { firmName: 'Acme' } };
+    const res = await onboarding(jsonReq('http://localhost/x', partialDraft), { params: Promise.resolve({ id }) });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.saved).toBe(true);
+    expect(seedSopAndBranchesMock).not.toHaveBeenCalled();
+    expect(provisionAttorneysMock).not.toHaveBeenCalled();
+  });
+
+  it('GET returns the saved draft after a partial PUT', async () => {
+    const id = await register();
+    const partialDraft = { firmIdentity: { firmName: 'Acme' } };
+    await onboarding(jsonReq('http://localhost/x', partialDraft), { params: Promise.resolve({ id }) });
+
+    const res = await getOnboardingDraft(new Request('http://localhost/x'), { params: Promise.resolve({ id }) });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.draft).toBeTruthy();
+    expect(data.draft.firmIdentity.firmName).toBe('Acme');
   });
 });
