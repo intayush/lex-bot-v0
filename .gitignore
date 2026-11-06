@@ -28,3 +28,4 @@ chatbot-redesign-*.png
 
 # Generated test-matrix reports (regeneratable from /tmp/seed-run.log + DB).
 packages/api/scripts/reports/
+cookie.txt

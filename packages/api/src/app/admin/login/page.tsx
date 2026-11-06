@@ -1,8 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-/** 027 US1 — super-admin login (mirrors /login, posts to /api/admin/login). */
+/**
+ * 028-admin-ui-rework — polished super-admin login.
+ * Posts to /api/admin/login (backend unchanged).
+ */
 export default function AdminLoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -36,36 +43,49 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 py-12" style={{ backgroundColor: '#FAFAFA' }}>
-      <div className="w-full max-w-[400px]">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold tracking-tight mb-1.5" style={{ color: 'var(--color-text-primary)', letterSpacing: '-0.025em' }}>
-            Platform Admin
-          </h1>
-          <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-            Operator console — manage all law-firm tenants.
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          {error && (
-            <div className="px-4 py-3 rounded-lg text-sm" style={{ backgroundColor: 'var(--color-badge-urgent-bg)', borderLeft: '3px solid var(--color-danger)', color: 'var(--color-badge-urgent-text)' }}>
-              {error}
+    <div className="login-gradient-bg min-h-screen flex items-center justify-center px-4">
+      <Card className="w-full max-w-sm">
+        <CardHeader className="text-center pb-4">
+          <CardTitle className="text-xl">Platform Admin</CardTitle>
+          <CardDescription>
+            Operator console — manage law-firm tenants.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="admin@lexbot.dev"
+              />
             </div>
-          )}
-          <div>
-            <label htmlFor="email">Email address</label>
-            <input id="email" name="email" type="email" required autoComplete="email" placeholder="admin@lexbot.dev" />
-          </div>
-          <div>
-            <label htmlFor="password">Password</label>
-            <input id="password" name="password" type="password" required autoComplete="current-password" placeholder="Enter your password" />
-          </div>
-          <button type="submit" disabled={pending} className="btn btn-primary w-full" style={{ padding: '0.75rem 1.25rem', fontSize: '0.9375rem', marginTop: '0.5rem' }}>
-            {pending ? 'Signing in…' : 'Sign in'}
-          </button>
-        </form>
-      </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                required
+                autoComplete="current-password"
+                placeholder="Enter your password"
+              />
+            </div>
+            <Button type="submit" disabled={pending} className="w-full">
+              {pending ? 'Signing in…' : 'Sign in'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

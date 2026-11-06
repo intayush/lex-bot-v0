@@ -2,45 +2,67 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { cn } from 'cn';
+import { Button } from '@/components/ui/button';
+import {
+  LayoutDashboard,
+  UserPlus,
+  LogOut,
+} from 'lucide-react';
 
 const navItems = [
-  { label: 'Fleet', href: '/admin' },
-  { label: 'Register tenant', href: '/admin/tenants/new' },
+  { label: 'Fleet', href: '/admin', icon: LayoutDashboard },
+  { label: 'Register Tenant', href: '/admin/tenants/new', icon: UserPlus },
 ];
 
-/** 027 US1 — super-admin console sidebar. */
+/**
+ * 028-admin-ui-rework — sidebar with nav, active state, and sign out.
+ */
 export function AdminSidebar({ email }: { email?: string }) {
   const pathname = usePathname();
+
   const isActive = (href: string) =>
     href === '/admin' ? pathname === '/admin' : pathname.startsWith(href);
 
   return (
-    <aside className="hidden lg:flex lg:flex-col lg:w-[240px] border-r" style={{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-surface)' }}>
-      <div className="p-6">
-        <span className="text-lg font-semibold tracking-tight">Lex Bot Admin</span>
+    <aside className="hidden lg:flex lg:flex-col lg:w-56 border-r bg-white">
+      <div className="p-5 border-b">
+        <Link href="/admin" className="flex items-center gap-2">
+          <div className="size-7 rounded-lg bg-primary flex items-center justify-center">
+            <span className="text-xs font-bold text-primary-foreground">LB</span>
+          </div>
+          <span className="font-semibold text-sm">Lex Bot Admin</span>
+        </Link>
       </div>
-      <nav className="flex-1 px-3 space-y-1">
-        {navItems.map((item) => (
-          <Link
-            key={item.href}
-            href={item.href}
-            className="block px-3 py-2 rounded-lg text-sm"
-            style={{
-              backgroundColor: isActive(item.href) ? 'var(--color-bg)' : 'transparent',
-              color: isActive(item.href) ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-              fontWeight: isActive(item.href) ? 600 : 400,
-            }}
-          >
-            {item.label}
-          </Link>
-        ))}
+
+      <nav className="flex-1 p-3 space-y-1">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm font-medium transition-colors',
+                isActive(item.href)
+                  ? 'bg-zinc-100 text-zinc-900'
+                  : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-50'
+              )}
+            >
+              <Icon className="size-4" />
+              {item.label}
+            </Link>
+          );
+        })}
       </nav>
-      <div className="p-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
-        <div className="text-xs mb-2" style={{ color: 'var(--color-text-muted)' }}>{email}</div>
+
+      <div className="p-4 border-t space-y-2">
+        <p className="text-xs text-zinc-400 truncate">{email}</p>
         <form action="/api/admin/logout" method="POST">
-          <button type="submit" className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+          <Button type="submit" variant="ghost" size="sm" className="w-full justify-start text-xs text-zinc-500">
+            <LogOut className="size-3.5 mr-2" />
             Sign out
-          </button>
+          </Button>
         </form>
       </div>
     </aside>

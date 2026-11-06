@@ -1,56 +1,115 @@
 import Link from 'next/link';
 import { getFleetSummary } from '../../../lib/admin/fleet';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
-/** 027 US1 — fleet overview: every tenant, health at a glance (FR-004/FR-005). */
+const statusVariant: Record<string, 'default' | 'secondary' | 'outline' | 'destructive'> = {
+  active: 'default',
+  suspended: 'destructive',
+  draft: 'secondary',
+  live: 'default',
+};
+
+const onboardingVariant: Record<string, 'default' | 'secondary' | 'outline'> = {
+  live: 'default',
+  draft: 'secondary',
+  completed: 'outline',
+};
+
+/**
+ * 028-admin-ui-rework — fleet overview with shadcn/ui table.
+ */
 export default async function FleetOverviewPage() {
   const tenants = await getFleetSummary();
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold tracking-tight" style={{ color: 'var(--color-text-primary)' }}>
-          Tenants
-        </h1>
-        <Link href="/admin/tenants/new" className="btn btn-primary">Register tenant</Link>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Tenants</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {tenants.length} firm{tenants.length !== 1 ? 's' : ''} registered
+          </p>
+        </div>
+        <Link href="/admin/tenants/new">
+          <Button>
+            <Plus className="size-4 mr-2" />
+            Register Tenant
+          </Button>
+        </Link>
       </div>
 
       {tenants.length === 0 ? (
-        <p style={{ color: 'var(--color-text-secondary)' }}>No tenants yet. Register your first firm.</p>
+        <div className="rounded-lg border border-dashed p-12 text-center">
+          <p className="text-sm text-muted-foreground">
+            No tenants yet. Register your first firm.
+          </p>
+        </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border" style={{ borderColor: 'var(--color-border)' }}>
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ color: 'var(--color-text-muted)', textAlign: 'left' }}>
-                <th className="px-4 py-3 font-medium">Firm</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Onboarding</th>
-                <th className="px-4 py-3 font-medium">Leads (30d)</th>
-                <th className="px-4 py-3 font-medium">Est. spend (30d)</th>
-                <th className="px-4 py-3 font-medium">Last activity</th>
-              </tr>
-            </thead>
-            <tbody>
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Firm</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Onboarding</TableHead>
+                <TableHead className="text-right">Leads (30d)</TableHead>
+                <TableHead className="text-right">Est. spend (30d)</TableHead>
+                <TableHead>Last activity</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {tenants.map((t) => (
-                <tr key={t.accountId} className="border-t" style={{ borderColor: 'var(--color-border)' }}>
-                  <td className="px-4 py-3">
-                    <Link href={`/admin/tenants/${t.accountId}`} style={{ color: 'var(--color-text-primary)', fontWeight: 600 }}>
+                <TableRow key={t.accountId}>
+                  <TableCell>
+                    <Link
+                      href={`/admin/tenants/${t.accountId}`}
+                      className="font-medium hover:underline"
+                    >
                       {t.firmName || t.email}
                     </Link>
-                    <div style={{ color: 'var(--color-text-muted)', fontSize: '0.75rem' }}>{t.email}</div>
-                  </td>
-                  <td className="px-4 py-3">{t.status}</td>
-                  <td className="px-4 py-3">{t.onboardingStatus}</td>
-                  <td className="px-4 py-3">{t.leadCount30d}</td>
-                  <td className="px-4 py-3">${t.estimatedSpend30d.toFixed(2)}</td>
-                  <td className="px-4 py-3" style={{ color: 'var(--color-text-muted)' }}>
-                    {t.lastActivityAt ? new Date(t.lastActivityAt).toLocaleDateString() : '—'}
-                  </td>
-                </tr>
+                    <div className="text-xs text-muted-foreground">{t.email}</div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={statusVariant[t.status] ?? 'outline'}>{t.status}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={onboardingVariant[t.onboardingStatus] ?? 'outline'}
+                    >
+                      {t.onboardingStatus}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    {t.leadCount30d}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm">
+                    ${t.estimatedSpend30d.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {t.lastActivityAt
+                      ? new Date(t.lastActivityAt).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })
+                      : '—'}
+                  </TableCell>
+                </TableRow>
               ))}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </div>
       )}
     </div>
